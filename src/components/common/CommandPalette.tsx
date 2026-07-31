@@ -14,10 +14,7 @@ export const CommandPalette: React.FC = () => {
 
   return (
     <div className="dialog-backdrop gc-command-palette-backdrop" onClick={closePalette}>
-      <div
-        className="dialog gc-command-palette"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="dialog gc-command-palette" onClick={e => e.stopPropagation()}>
         <input
           value={paletteQ}
           onChange={e => setPaletteQ(e.target.value)}

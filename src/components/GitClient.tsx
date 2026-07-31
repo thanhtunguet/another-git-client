@@ -22,7 +22,10 @@ import { CommandPalette } from './common/CommandPalette';
 import { Dialog } from './common/Dialog';
 import { ProgressToast } from './common/ProgressToast';
 
-const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className = '', style }) => {
+const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
+  className = '',
+  style
+}) => {
   const { view } = useGitClient();
 
   const renderActiveView = () => {
@@ -72,7 +75,7 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
   );
 };
 
-export const GitClient: React.FC<GitClientProps> = (props) => {
+export const GitClient: React.FC<GitClientProps> = props => {
   return (
     <GitClientProvider props={props}>
       <GitClientInner className={props.className} style={props.style} />

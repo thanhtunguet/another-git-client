@@ -16,7 +16,10 @@ export const Dialog: React.FC = () => {
             <div className="dialog-title" style={{ fontSize: '18px' }}>
               {dialog.title}
             </div>
-            <div className="dialog-body" style={{ marginTop: 'var(--space-2)', textWrap: 'pretty' }}>
+            <div
+              className="dialog-body"
+              style={{ marginTop: 'var(--space-2)', textWrap: 'pretty' }}
+            >
               {dialog.body}
             </div>
           </div>

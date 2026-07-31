@@ -10,7 +10,9 @@
   font-family: var(--font-body);
   overflow: hidden;
 
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     box-sizing: border-box;
   }
 }
@@ -34,9 +36,24 @@
   align-items: center;
   padding-right: var(--space-1);
 
-  .gc-dot-close { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; }
-  .gc-dot-min { width: 12px; height: 12px; border-radius: 50%; background: #febc2e; }
-  .gc-dot-max { width: 12px; height: 12px; border-radius: 50%; background: #28c840; }
+  .gc-dot-close {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ff5f57;
+  }
+  .gc-dot-min {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #febc2e;
+  }
+  .gc-dot-max {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #28c840;
+  }
 }
 
 .gc-main-row {
@@ -75,7 +92,9 @@
   font-weight: 500;
   transition: background-color 0.12s ease;
 
-  &:hover { background: var(--hover); }
+  &:hover {
+    background: var(--hover);
+  }
 
   &.active {
     background: var(--sel);

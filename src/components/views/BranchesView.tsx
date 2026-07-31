@@ -4,18 +4,10 @@ import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { Card } from '../common/Card';
-import { BranchTreeNode } from '../../types/git-client';
+import { BranchTreeNode, RefBadge } from '../../types/git-client';
 
 export const BranchesView: React.FC = () => {
-  const {
-    branchQ,
-    setBranchQ,
-    act,
-    openMenu,
-    confirm,
-    setView,
-    commits
-  } = useGitClient();
+  const { branchQ, setBranchQ, act, openMenu, confirm, setView, commits } = useGitClient();
 
   const rawTreeNodes: BranchTreeNode[] = [
     { g: 'Local' },
@@ -46,7 +38,9 @@ export const BranchesView: React.FC = () => {
   ];
 
   const q = branchQ.toLowerCase();
-  const filteredNodes = rawTreeNodes.filter(r => !q || r.g || (r.full || r.n || '').toLowerCase().indexOf(q) >= 0);
+  const filteredNodes = rawTreeNodes.filter(
+    r => !q || r.g || (r.full || r.n || '').toLowerCase().indexOf(q) >= 0
+  );
 
   const handleBranchMenu = (e: React.MouseEvent, name: string, kind?: string) => {
     openMenu(e, name, [
@@ -64,39 +58,95 @@ export const BranchesView: React.FC = () => {
       {
         label: 'Reset current to here — hard',
         danger: true,
-        run: () => confirm(`Hard reset main to ${name}?`, 'All uncommitted changes in the working tree and index are permanently discarded — 12 modified files will be lost.', `git reset --hard ${name}`, 'Reset --hard', act('Hard reset'))
+        run: () =>
+          confirm(
+            `Hard reset main to ${name}?`,
+            'All uncommitted changes in the working tree and index are permanently discarded — 12 modified files will be lost.',
+            `git reset --hard ${name}`,
+            'Reset --hard',
+            act('Hard reset')
+          )
       },
       { sep: true },
       { label: kind === 'remote' ? 'Untrack upstream' : 'Set upstream…', run: act('Set upstream') },
       {
         label: `Delete ${name}`,
         danger: true,
-        run: () => confirm(`Delete branch ${name}?`, kind === 'remote' ? 'This deletes the branch on the remote for everyone.' : 'The branch has 3 commits not merged into main.', kind === 'remote' ? `git push origin --delete ${name.replace('origin/', '')}` : `git branch -D ${name}`, 'Delete branch', act('Delete branch'))
+        run: () =>
+          confirm(
+            `Delete branch ${name}?`,
+            kind === 'remote'
+              ? 'This deletes the branch on the remote for everyone.'
+              : 'The branch has 3 commits not merged into main.',
+            kind === 'remote'
+              ? `git push origin --delete ${name.replace('origin/', '')}`
+              : `git branch -D ${name}`,
+            'Delete branch',
+            act('Delete branch')
+          )
       }
     ]);
   };
 
   const branchPreviewIndices = [6, 7, 8];
 
-  const branchActionChips = [
-    'Checkout', 'Create', 'Rename', 'Track upstream', 'Merge into current', 'Rebase onto',
-    'Compare', 'Open in Git Graph', 'Reset soft/mixed', 'Reset hard', 'Delete'
+  const branchActionChips: { label: string; variant: RefBadge['variant'] }[] = [
+    'Checkout',
+    'Create',
+    'Rename',
+    'Track upstream',
+    'Merge into current',
+    'Rebase onto',
+    'Compare',
+    'Open in Git Graph',
+    'Reset soft/mixed',
+    'Reset hard',
+    'Delete'
   ].map(l => ({
     label: l,
-    cls: (l === 'Reset hard' || l === 'Delete') ? 'tag-outline' : 'tag-neutral'
+    variant: l === 'Reset hard' || l === 'Delete' ? 'outline' : 'neutral'
   }));
 
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-      <div style={{ flex: '0 0 340px', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--line)', background: 'var(--panel)', minHeight: 0 }}>
-        <div style={{ height: '38px', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '0 var(--space-3)', borderBottom: '1px solid var(--line)' }}>
+      <div
+        style={{
+          flex: '0 0 340px',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRight: '1px solid var(--line)',
+          background: 'var(--panel)',
+          minHeight: 0
+        }}
+      >
+        <div
+          style={{
+            height: '38px',
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            padding: '0 var(--space-3)',
+            borderBottom: '1px solid var(--line)'
+          }}
+        >
           <Input
             value={branchQ}
             onChange={e => setBranchQ(e.target.value)}
             placeholder="Fuzzy find branch or tag…"
-            style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            style={{
+              height: '25px',
+              minHeight: 0,
+              fontSize: '12px',
+              fontFamily: 'var(--font-mono)'
+            }}
           />
-          <Button variant="secondary" onClick={act('Create branch')} title="New branch" style={{ width: '25px', height: '25px', padding: 0 }}>
+          <Button
+            variant="secondary"
+            onClick={act('Create branch')}
+            title="New branch"
+            style={{ width: '25px', height: '25px', padding: 0 }}
+          >
             <i className="ph ph-plus" style={{ fontSize: '13px' }} />
           </Button>
         </div>
@@ -128,7 +178,11 @@ export const BranchesView: React.FC = () => {
             const full = b.full || b.n || '';
             const depth = b.d || 1;
             const padLeft = 10 + depth * 12;
-            const iconColor = b.tag ? 'var(--warn)' : b.kind === 'remote' ? 'var(--fg3)' : 'var(--color-accent)';
+            const iconColor = b.tag
+              ? 'var(--warn)'
+              : b.kind === 'remote'
+                ? 'var(--fg3)'
+                : 'var(--color-accent)';
             const glyph = b.folder ? 'ph-folder' : b.tag ? 'ph-tag' : 'ph-git-branch';
             const twisty = b.folder ? 'ph-caret-down' : '';
 
@@ -152,16 +206,35 @@ export const BranchesView: React.FC = () => {
                   fontFamily: 'var(--font-mono)'
                 }}
               >
-                <i className={`ph ${twisty}`} style={{ fontSize: '11px', color: 'var(--fg3)', width: '11px' }} />
+                <i
+                  className={`ph ${twisty}`}
+                  style={{ fontSize: '11px', color: 'var(--fg3)', width: '11px' }}
+                />
                 <i className={`ph ${glyph}`} style={{ fontSize: '13px', color: iconColor }} />
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
                   {b.n}
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--fg3)' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10.5px',
+                    color: 'var(--fg3)'
+                  }}
+                >
                   {b.meta}
                 </span>
                 {b.cur && (
-                  <Tag variant="outline" style={{ fontSize: '9.5px', padding: '0 5px', letterSpacing: '.05em' }}>
+                  <Tag
+                    variant="outline"
+                    style={{ fontSize: '9.5px', padding: '0 5px', letterSpacing: '.05em' }}
+                  >
                     HEAD
                   </Tag>
                 )}
@@ -170,43 +243,118 @@ export const BranchesView: React.FC = () => {
           })}
         </div>
 
-        <div style={{ flex: '0 0 auto', borderTop: '1px solid var(--line)', padding: 'var(--space-2) var(--space-3)', display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <div
+          style={{
+            flex: '0 0 auto',
+            borderTop: '1px solid var(--line)',
+            padding: 'var(--space-2) var(--space-3)',
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center'
+          }}
+        >
           <span style={{ fontSize: '11px', color: 'var(--fg3)', flex: 1 }}>3 remotes</span>
-          <Button variant="secondary" style={{ height: '22px', fontSize: '11px' }} onClick={act('Add remote')}>
+          <Button
+            variant="secondary"
+            style={{ height: '22px', fontSize: '11px' }}
+            onClick={act('Add remote')}
+          >
             Add remote…
           </Button>
-          <Button variant="secondary" style={{ height: '22px', fontSize: '11px' }} onClick={act('Manage remotes')}>
+          <Button
+            variant="secondary"
+            style={{ height: '22px', fontSize: '11px' }}
+            onClick={act('Manage remotes')}
+          >
             Manage
           </Button>
         </div>
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ height: '38px', flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '10px', padding: '0 var(--space-4)', borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
+        <div
+          style={{
+            height: '38px',
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '0 var(--space-4)',
+            borderBottom: '1px solid var(--line)',
+            background: 'var(--panel)'
+          }}
+        >
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>feature/mlx5-next</span>
-          <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>tracking origin/feature/mlx5-next · 3 ahead, 1 behind</span>
+          <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
+            tracking origin/feature/mlx5-next · 3 ahead, 1 behind
+          </span>
           <div style={{ flex: 1 }} />
-          <Button variant="secondary" style={{ height: '25px', padding: '0 10px' }} onClick={() => setView('compare')}>
+          <Button
+            variant="secondary"
+            style={{ height: '25px', padding: '0 10px' }}
+            onClick={() => setView('compare')}
+          >
             Compare with current
           </Button>
-          <Button variant="primary" style={{ height: '25px', padding: '0 10px' }} onClick={act('Merge feature/mlx5-next into main', 'merge feature/mlx5-next')}>
+          <Button
+            variant="primary"
+            style={{ height: '25px', padding: '0 10px' }}
+            onClick={act('Merge feature/mlx5-next into main', 'merge feature/mlx5-next')}
+          >
             <i className="ph ph-git-merge" style={{ fontSize: '14px' }} /> Merge into main
           </Button>
         </div>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-6) var(--space-4)', minHeight: 0 }}>
-          <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>Recent commits on this branch</h6>
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: 'var(--space-6) var(--space-4)',
+            minHeight: 0
+          }}
+        >
+          <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>
+            Recent commits on this branch
+          </h6>
           {branchPreviewIndices.map(idx => {
             const c = commits[idx];
             return (
               <div
                 key={idx}
-                style={{ display: 'flex', gap: '12px', alignItems: 'baseline', padding: '7px 8px', borderBottom: '1px solid var(--line)', borderRadius: 'var(--radius-sm)' }}
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'baseline',
+                  padding: '7px 8px',
+                  borderBottom: '1px solid var(--line)',
+                  borderRadius: 'var(--radius-sm)'
+                }}
               >
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--iris)', fontSize: '11.5px' }}>{getHash(idx)}</span>
-                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c[0]}</span>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    color: 'var(--iris)',
+                    fontSize: '11.5px'
+                  }}
+                >
+                  {getHash(idx)}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {c[0]}
+                </span>
                 <span style={{ color: 'var(--fg3)', fontSize: '11.5px' }}>{c[1]}</span>
-                <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{c[2].slice(5, 10)}</span>
+                <span
+                  style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
+                >
+                  {c[2].slice(5, 10)}
+                </span>
               </div>
             );
           })}
@@ -215,7 +363,7 @@ export const BranchesView: React.FC = () => {
             <h6 style={{ margin: 0, color: 'var(--fg3)' }}>Right-click any row for</h6>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {branchActionChips.map((a, i) => (
-                <Tag key={i} variant={a.cls as any}>
+                <Tag key={i} variant={a.variant}>
                   {a.label}
                 </Tag>
               ))}

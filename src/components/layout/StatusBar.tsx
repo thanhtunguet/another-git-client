@@ -41,23 +41,48 @@ export const StatusBar: React.FC = () => {
           </Tag>
           <span style={{ color: 'var(--fg2)' }}>{`Step ${op.step} of ${op.total}`}</span>
           <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{op.detail}</span>
-          <Button variant="primary" style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }} onClick={opContinue}>
+          <Button
+            variant="primary"
+            style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }}
+            onClick={opContinue}
+          >
             Continue
           </Button>
-          <Button variant="secondary" style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }} onClick={opSkip}>
+          <Button
+            variant="secondary"
+            style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }}
+            onClick={opSkip}
+          >
             Skip
           </Button>
           <Button
             variant="secondary"
-            style={{ height: '18px', fontSize: '10.5px', padding: '0 8px', color: 'var(--del)', borderColor: 'var(--del)' }}
+            style={{
+              height: '18px',
+              fontSize: '10.5px',
+              padding: '0 8px',
+              color: 'var(--del)',
+              borderColor: 'var(--del)'
+            }}
             onClick={opAbort}
           >
             Abort
           </Button>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--fg2)', fontFamily: 'var(--font-mono)' }}>
-          <i className="ph ph-git-branch" style={{ fontSize: '13px', color: 'var(--color-accent)' }} />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            color: 'var(--fg2)',
+            fontFamily: 'var(--font-mono)'
+          }}
+        >
+          <i
+            className="ph ph-git-branch"
+            style={{ fontSize: '13px', color: 'var(--color-accent)' }}
+          />
           <span>{currentBranch}</span>
           <span style={{ color: 'var(--add)' }}>↓{behindCount}</span>
           <span style={{ color: 'var(--warn)' }}>↑{aheadCount}</span>
@@ -68,7 +93,11 @@ export const StatusBar: React.FC = () => {
 
       <div style={{ flex: 1 }} />
 
-      <Button variant="ghost" style={{ height: '18px', fontSize: '10.5px', color: 'var(--fg3)' }} onClick={toggleConsole}>
+      <Button
+        variant="ghost"
+        style={{ height: '18px', fontSize: '10.5px', color: 'var(--fg3)' }}
+        onClick={toggleConsole}
+      >
         Output
         <i className={`ph ${consoleChevron}`} style={{ fontSize: '10px' }} />
       </Button>

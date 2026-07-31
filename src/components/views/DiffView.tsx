@@ -5,7 +5,7 @@ import { Button } from '../common/Button';
 export const DiffView: React.FC = () => {
   const { diffTab, setDiffTab, act } = useGitClient();
 
-  const tabs: [id: string, label: string][] = [
+  const tabs: [id: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources', label: string][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
     ['parent', 'Commit ↔ parent'],
@@ -23,13 +23,42 @@ export const DiffView: React.FC = () => {
   const renderDiffPane = () => {
     if (diffTab === 'merge') {
       const col = (title: string, tint: string, lines: [string, number][], fill: string) => (
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--line)' }}>
-          <div style={{ height: '26px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px', background: 'var(--panel)', borderBottom: '1px solid var(--line)', fontSize: '11px' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: tint }} /> {title}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            borderRight: '1px solid var(--line)'
+          }}
+        >
+          <div
+            style={{
+              height: '26px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0 10px',
+              background: 'var(--panel)',
+              borderBottom: '1px solid var(--line)',
+              fontSize: '11px'
+            }}
+          >
+            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: tint }} />{' '}
+            {title}
           </div>
           <div style={{ flex: 1, overflow: 'auto', padding: '6px 0' }}>
             {lines.map((l, i) => (
-              <div key={i} style={{ ...monoStyle, whiteSpace: 'pre', padding: '0 10px', background: l[1] ? fill : 'transparent', color: l[1] ? 'var(--fg)' : 'var(--fg2)' }}>
+              <div
+                key={i}
+                style={{
+                  ...monoStyle,
+                  whiteSpace: 'pre',
+                  padding: '0 10px',
+                  background: l[1] ? fill : 'transparent',
+                  color: l[1] ? 'var(--fg)' : 'var(--fg2)'
+                }}
+              >
                 {l[0]}
               </div>
             ))}
@@ -61,14 +90,55 @@ export const DiffView: React.FC = () => {
 
       return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ flex: '0 0 auto', height: '32px', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 12px', background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
+          <div
+            style={{
+              flex: '0 0 auto',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0 12px',
+              background: 'var(--panel)',
+              borderBottom: '1px solid var(--line)'
+            }}
+          >
             <span style={{ fontSize: '11.5px', color: 'var(--warn)' }}>2 conflicts remaining</span>
             <span style={{ flex: 1 }} />
-            <Button variant="secondary" onClick={act('Previous conflict')} style={{ height: '22px', fontSize: '11.5px' }}>↑ Previous</Button>
-            <Button variant="secondary" onClick={act('Next conflict')} style={{ height: '22px', fontSize: '11.5px' }}>↓ Next</Button>
-            <Button variant="secondary" onClick={act('Take left')} style={{ height: '22px', fontSize: '11.5px' }}>Take left</Button>
-            <Button variant="secondary" onClick={act('Take right')} style={{ height: '22px', fontSize: '11.5px' }}>Take right</Button>
-            <Button variant="primary" onClick={act('Mark resolved')} style={{ height: '22px', fontSize: '11.5px' }}>Resolve</Button>
+            <Button
+              variant="secondary"
+              onClick={act('Previous conflict')}
+              style={{ height: '22px', fontSize: '11.5px' }}
+            >
+              ↑ Previous
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={act('Next conflict')}
+              style={{ height: '22px', fontSize: '11.5px' }}
+            >
+              ↓ Next
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={act('Take left')}
+              style={{ height: '22px', fontSize: '11.5px' }}
+            >
+              Take left
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={act('Take right')}
+              style={{ height: '22px', fontSize: '11.5px' }}
+            >
+              Take right
+            </Button>
+            <Button
+              variant="primary"
+              onClick={act('Mark resolved')}
+              style={{ height: '22px', fontSize: '11.5px' }}
+            >
+              Resolve
+            </Button>
           </div>
           <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
             {col('Local — main', 'var(--color-accent)', left, 'var(--delbg)')}
@@ -80,7 +150,10 @@ export const DiffView: React.FC = () => {
     }
 
     const hunk: [string, string][] = [
-      ['@@ -412,9 +412,14 @@ static void mlx5e_tx_err_cqe_work(struct work_struct *recover_work)', 'h'],
+      [
+        '@@ -412,9 +412,14 @@ static void mlx5e_tx_err_cqe_work(struct work_struct *recover_work)',
+        'h'
+      ],
       [' \tstruct mlx5e_txqsq *sq = container_of(recover_work, struct mlx5e_txqsq,', ' '],
       [' \t\t\t\t      recover_work);', ' '],
       [' ', ' '],
@@ -93,7 +166,10 @@ export const DiffView: React.FC = () => {
       ['+\tmlx5e_reporter_tx_err_cqe(sq);', '+'],
       [' \t\treturn;', ' '],
       [' }', ' '],
-      ['@@ -488,6 +493,8 @@ int mlx5e_open_txqsq(struct mlx5e_channel *c, u32 tisn, int txq_ix,', 'h'],
+      [
+        '@@ -488,6 +493,8 @@ int mlx5e_open_txqsq(struct mlx5e_channel *c, u32 tisn, int txq_ix,',
+        'h'
+      ],
       [' \tsq->stop_room = param->stop_room;', ' '],
       ['+\tsq->tunnel_steering = MLX5_CAP_ETH(mdev, tunnel_stateless_gre);', '+'],
       [' \tINIT_WORK(&sq->recover_work, mlx5e_tx_err_cqe_work);', ' ']
@@ -105,8 +181,22 @@ export const DiffView: React.FC = () => {
     const rows = hunk.map((h, i) => {
       const text = h[0];
       const k = h[1];
-      const bg = k === '+' ? 'var(--addbg)' : k === '-' ? 'var(--delbg)' : k === 'h' ? 'var(--raised)' : 'transparent';
-      const fg = k === '+' ? 'var(--add)' : k === '-' ? 'var(--del)' : k === 'h' ? 'var(--fg3)' : 'var(--fg)';
+      const bg =
+        k === '+'
+          ? 'var(--addbg)'
+          : k === '-'
+            ? 'var(--delbg)'
+            : k === 'h'
+              ? 'var(--raised)'
+              : 'transparent';
+      const fg =
+        k === '+'
+          ? 'var(--add)'
+          : k === '-'
+            ? 'var(--del)'
+            : k === 'h'
+              ? 'var(--fg3)'
+              : 'var(--fg)';
       let ln1: string | number = '';
       let ln2: string | number = '';
 
@@ -123,8 +213,31 @@ export const DiffView: React.FC = () => {
 
       return (
         <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          <span style={{ width: '46px', flex: '0 0 auto', textAlign: 'right', paddingRight: '8px', color: 'var(--fg3)', userSelect: 'none' }}>{ln1}</span>
-          <span style={{ width: '46px', flex: '0 0 auto', textAlign: 'right', paddingRight: '10px', color: 'var(--fg3)', userSelect: 'none', borderRight: '1px solid var(--line)' }}>{ln2}</span>
+          <span
+            style={{
+              width: '46px',
+              flex: '0 0 auto',
+              textAlign: 'right',
+              paddingRight: '8px',
+              color: 'var(--fg3)',
+              userSelect: 'none'
+            }}
+          >
+            {ln1}
+          </span>
+          <span
+            style={{
+              width: '46px',
+              flex: '0 0 auto',
+              textAlign: 'right',
+              paddingRight: '10px',
+              color: 'var(--fg3)',
+              userSelect: 'none',
+              borderRight: '1px solid var(--line)'
+            }}
+          >
+            {ln2}
+          </span>
           <span style={{ paddingLeft: '10px', whiteSpace: 'pre', color: fg, flex: 1 }}>{text}</span>
         </div>
       );
@@ -132,22 +245,55 @@ export const DiffView: React.FC = () => {
 
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div style={{ flex: '0 0 auto', height: '32px', display: 'flex', alignItems: 'center', gap: '10px', padding: '0 12px', background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>drivers/net/ethernet/mellanox/mlx5/core/en_tx.c</span>
+        <div
+          style={{
+            flex: '0 0 auto',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '0 12px',
+            background: 'var(--panel)',
+            borderBottom: '1px solid var(--line)'
+          }}
+        >
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+            drivers/net/ethernet/mellanox/mlx5/core/en_tx.c
+          </span>
           <span style={{ fontSize: '11px', color: 'var(--add)' }}>+7</span>
           <span style={{ fontSize: '11px', color: 'var(--del)' }}>−2</span>
           <span style={{ flex: 1 }} />
-          <Button variant="secondary" style={{ height: '22px', fontSize: '11.5px' }} onClick={() => setDiffTab(diffTab === 'sources' ? 'work' : 'sources')}>
+          <Button
+            variant="secondary"
+            style={{ height: '22px', fontSize: '11.5px' }}
+            onClick={() => setDiffTab(diffTab === 'sources' ? 'work' : 'sources')}
+          >
             {diffTab === 'sources' ? 'Unified' : 'Split'}
           </Button>
-          <Button variant="secondary" style={{ height: '22px', fontSize: '11.5px' }} onClick={act('Stage hunk')}>
+          <Button
+            variant="secondary"
+            style={{ height: '22px', fontSize: '11.5px' }}
+            onClick={act('Stage hunk')}
+          >
             Stage hunk
           </Button>
-          <Button variant="secondary" style={{ height: '22px', fontSize: '11.5px' }} onClick={act('Copy patch')}>
+          <Button
+            variant="secondary"
+            style={{ height: '22px', fontSize: '11.5px' }}
+            onClick={act('Copy patch')}
+          >
             Copy patch
           </Button>
         </div>
-        <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: '6px 0', background: 'var(--color-bg)' }}>
+        <div
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            minHeight: 0,
+            padding: '6px 0',
+            background: 'var(--color-bg)'
+          }}
+        >
           {rows}
         </div>
       </div>
@@ -156,14 +302,26 @@ export const DiffView: React.FC = () => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: '6px', height: '38px', padding: '0 var(--space-3)', borderBottom: '1px solid var(--line)', background: 'var(--panel)', overflow: 'auto' }}>
+      <div
+        style={{
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          height: '38px',
+          padding: '0 var(--space-3)',
+          borderBottom: '1px solid var(--line)',
+          background: 'var(--panel)',
+          overflow: 'auto'
+        }}
+      >
         {tabs.map(t => {
           const active = diffTab === t[0];
           return (
             <Button
               key={t[0]}
               variant="secondary"
-              onClick={() => setDiffTab(t[0] as any)}
+              onClick={() => setDiffTab(t[0])}
               style={{
                 flex: '0 0 auto',
                 height: '25px',
@@ -178,10 +336,18 @@ export const DiffView: React.FC = () => {
           );
         })}
         <div style={{ flex: 1, minWidth: '20px' }} />
-        <Button variant="secondary" onClick={act('Swap diff direction')} style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}>
+        <Button
+          variant="secondary"
+          onClick={act('Swap diff direction')}
+          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
+        >
           <i className="ph ph-arrows-left-right" style={{ fontSize: '13px' }} /> Swap direction
         </Button>
-        <Button variant="secondary" onClick={act('Compare with revision')} style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}>
+        <Button
+          variant="secondary"
+          onClick={act('Compare with revision')}
+          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
+        >
           Compare with Revision…
         </Button>
       </div>

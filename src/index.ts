@@ -25,7 +25,12 @@ export { Tag } from './components/common/Tag';
 export type { TagProps } from './components/common/Tag';
 
 export { Input, Textarea, Select, Checkbox } from './components/common/FormControls';
-export type { InputProps, TextareaProps, SelectProps, CheckboxProps } from './components/common/FormControls';
+export type {
+  InputProps,
+  TextareaProps,
+  SelectProps,
+  CheckboxProps
+} from './components/common/FormControls';
 
 export { SegmentedControl } from './components/common/SegmentedControl';
 export type { SegmentedControlProps, SegmentOption } from './components/common/SegmentedControl';

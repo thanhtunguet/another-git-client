@@ -62,7 +62,12 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const selectEl = (
     <select className={`input ${className}`.trim()} {...props}>
-      {children || options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+      {children ||
+        options.map(opt => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
     </select>
   );
 
@@ -81,11 +86,7 @@ export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElemen
   label?: React.ReactNode;
 }
 
-export const Checkbox: React.FC<CheckboxProps> = ({
-  label,
-  className = '',
-  ...props
-}) => {
+export const Checkbox: React.FC<CheckboxProps> = ({ label, className = '', ...props }) => {
   return (
     <label className={`radio ${className}`.trim()}>
       <input type="checkbox" {...props} />

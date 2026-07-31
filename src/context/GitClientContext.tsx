@@ -31,37 +31,133 @@ export const COLORS = [
 ];
 
 export const RAW_COMMITS: CommitRaw[] = [
-  ["Merge branch 'mlx5-next' into net-next", "Jakub Kicinski", "2026-07-30 14:22", [1, 6], ["main", "origin/main"]],
-  ["mm/slub: fix kmalloc_nolock() vs kfree() race on cpu_slab", "Vlastimil Babka", "2026-07-30 11:04", [2], []],
-  ["sched/fair: prevent stale util_est after task migration", "Peter Zijlstra", "2026-07-29 18:47", [3], []],
-  ["Merge tag 'v6.19-rc4' into for-next", "Linus Torvalds", "2026-07-29 09:31", [4, 9], ["tag: v6.19-rc4"]],
-  ["kbuild: drop -Wmaybe-uninitialized for clang builds", "Nathan Chancellor", "2026-07-28 21:15", [5], []],
-  ["io_uring: fix ring buffer accounting on resize", "Jens Axboe", "2026-07-28 16:02", [11], []],
-  ["net/mlx5e: add TX steering for tunneled traffic", "Saeed Mahameed", "2026-07-28 13:40", [7], ["feature/mlx5-next", "origin/feature/mlx5-next"]],
-  ["net/mlx5: split ESW offload init into helpers", "Roi Dayan", "2026-07-27 19:58", [8], []],
-  ["net/mlx5: introduce per-vport packet counters", "Saeed Mahameed", "2026-07-27 10:12", [12], []],
-  ["arm64: dts: qcom: enable UFS on sm8750", "Bjorn Andersson", "2026-07-27 08:44", [10], ["fix/kbuild-clang"]],
-  ["arm64: errata: workaround for Cortex-A725 erratum 3699571", "Mark Rutland", "2026-07-26 15:20", [12], []],
-  ["block: fix nr_requests underflow on queue resize", "Ming Lei", "2026-07-26 12:07", [12], []],
-  ["Merge tag 'v6.19-rc3'", "Linus Torvalds", "2026-07-25 17:33", [13], ["tag: v6.19-rc3"]],
-  ["Merge branch 'sched/core' into for-linus", "Ingo Molnar", "2026-07-25 09:18", [14, 17], []],
-  ["ext4: avoid inode reuse race in orphan cleanup", "Theodore Ts'o", "2026-07-24 22:41", [15], []],
-  ["btrfs: zoned: reclaim unusable space earlier", "David Sterba", "2026-07-24 14:09", [16], []],
-  ["fs: rename lookup_one_len() callers to lookup_noperm()", "Al Viro", "2026-07-23 20:26", [20], []],
-  ["sched_ext: allow BPF schedulers to opt out of core sched", "Tejun Heo", "2026-07-23 11:55", [18], ["release/6.18.y", "origin/release/6.18.y"]],
-  ["sched_ext: document dispatch queue lifetime rules", "David Vernet", "2026-07-22 16:31", [19], []],
-  ["sched/core: tidy up nohz balance entry points", "Peter Zijlstra", "2026-07-22 09:47", [20], []],
-  ["Merge tag 'v6.19-rc2'", "Linus Torvalds", "2026-07-21 18:12", [21], ["tag: v6.19-rc2"]],
-  ["drm/amdgpu: bump VCN firmware version for VCN 5.0", "Alex Deucher", "2026-07-21 13:26", [22], []],
-  ["Merge branch 'rust-next'", "Miguel Ojeda", "2026-07-20 15:39", [23, 25], []],
-  ["rust: alloc: implement Vec::try_with_capacity", "Danilo Krummrich", "2026-07-20 10:03", [24], []],
-  ["rust: kernel: add Pin<KBox<T>> conversions", "Benno Lossin", "2026-07-19 19:48", [27], []],
-  ["perf tools: fix build against libbpf 1.6", "Arnaldo Carvalho de Melo", "2026-07-19 12:22", [26], ["feature/perf-tui"]],
-  ["perf report: add TUI column for cgroup id", "Namhyung Kim", "2026-07-18 17:05", [27], []],
-  ["Merge tag 'v6.19-rc1'", "Linus Torvalds", "2026-07-18 08:50", [28], ["tag: v6.19-rc1"]],
-  ["cgroup: fix memcg stat flush deadlock under memory pressure", "Michal Hocko", "2026-07-17 21:14", [29], []],
-  ["x86/mm: relax LAM enablement check for 5-level paging", "Dave Hansen", "2026-07-17 11:38", [30], []],
-  ["Linux 6.19-rc1", "Linus Torvalds", "2026-07-16 19:00", [], []]
+  [
+    "Merge branch 'mlx5-next' into net-next",
+    'Jakub Kicinski',
+    '2026-07-30 14:22',
+    [1, 6],
+    ['main', 'origin/main']
+  ],
+  [
+    'mm/slub: fix kmalloc_nolock() vs kfree() race on cpu_slab',
+    'Vlastimil Babka',
+    '2026-07-30 11:04',
+    [2],
+    []
+  ],
+  [
+    'sched/fair: prevent stale util_est after task migration',
+    'Peter Zijlstra',
+    '2026-07-29 18:47',
+    [3],
+    []
+  ],
+  [
+    "Merge tag 'v6.19-rc4' into for-next",
+    'Linus Torvalds',
+    '2026-07-29 09:31',
+    [4, 9],
+    ['tag: v6.19-rc4']
+  ],
+  [
+    'kbuild: drop -Wmaybe-uninitialized for clang builds',
+    'Nathan Chancellor',
+    '2026-07-28 21:15',
+    [5],
+    []
+  ],
+  ['io_uring: fix ring buffer accounting on resize', 'Jens Axboe', '2026-07-28 16:02', [11], []],
+  [
+    'net/mlx5e: add TX steering for tunneled traffic',
+    'Saeed Mahameed',
+    '2026-07-28 13:40',
+    [7],
+    ['feature/mlx5-next', 'origin/feature/mlx5-next']
+  ],
+  ['net/mlx5: split ESW offload init into helpers', 'Roi Dayan', '2026-07-27 19:58', [8], []],
+  ['net/mlx5: introduce per-vport packet counters', 'Saeed Mahameed', '2026-07-27 10:12', [12], []],
+  [
+    'arm64: dts: qcom: enable UFS on sm8750',
+    'Bjorn Andersson',
+    '2026-07-27 08:44',
+    [10],
+    ['fix/kbuild-clang']
+  ],
+  [
+    'arm64: errata: workaround for Cortex-A725 erratum 3699571',
+    'Mark Rutland',
+    '2026-07-26 15:20',
+    [12],
+    []
+  ],
+  ['block: fix nr_requests underflow on queue resize', 'Ming Lei', '2026-07-26 12:07', [12], []],
+  ["Merge tag 'v6.19-rc3'", 'Linus Torvalds', '2026-07-25 17:33', [13], ['tag: v6.19-rc3']],
+  ["Merge branch 'sched/core' into for-linus", 'Ingo Molnar', '2026-07-25 09:18', [14, 17], []],
+  ['ext4: avoid inode reuse race in orphan cleanup', "Theodore Ts'o", '2026-07-24 22:41', [15], []],
+  ['btrfs: zoned: reclaim unusable space earlier', 'David Sterba', '2026-07-24 14:09', [16], []],
+  [
+    'fs: rename lookup_one_len() callers to lookup_noperm()',
+    'Al Viro',
+    '2026-07-23 20:26',
+    [20],
+    []
+  ],
+  [
+    'sched_ext: allow BPF schedulers to opt out of core sched',
+    'Tejun Heo',
+    '2026-07-23 11:55',
+    [18],
+    ['release/6.18.y', 'origin/release/6.18.y']
+  ],
+  [
+    'sched_ext: document dispatch queue lifetime rules',
+    'David Vernet',
+    '2026-07-22 16:31',
+    [19],
+    []
+  ],
+  ['sched/core: tidy up nohz balance entry points', 'Peter Zijlstra', '2026-07-22 09:47', [20], []],
+  ["Merge tag 'v6.19-rc2'", 'Linus Torvalds', '2026-07-21 18:12', [21], ['tag: v6.19-rc2']],
+  [
+    'drm/amdgpu: bump VCN firmware version for VCN 5.0',
+    'Alex Deucher',
+    '2026-07-21 13:26',
+    [22],
+    []
+  ],
+  ["Merge branch 'rust-next'", 'Miguel Ojeda', '2026-07-20 15:39', [23, 25], []],
+  [
+    'rust: alloc: implement Vec::try_with_capacity',
+    'Danilo Krummrich',
+    '2026-07-20 10:03',
+    [24],
+    []
+  ],
+  ['rust: kernel: add Pin<KBox<T>> conversions', 'Benno Lossin', '2026-07-19 19:48', [27], []],
+  [
+    'perf tools: fix build against libbpf 1.6',
+    'Arnaldo Carvalho de Melo',
+    '2026-07-19 12:22',
+    [26],
+    ['feature/perf-tui']
+  ],
+  ['perf report: add TUI column for cgroup id', 'Namhyung Kim', '2026-07-18 17:05', [27], []],
+  ["Merge tag 'v6.19-rc1'", 'Linus Torvalds', '2026-07-18 08:50', [28], ['tag: v6.19-rc1']],
+  [
+    'cgroup: fix memcg stat flush deadlock under memory pressure',
+    'Michal Hocko',
+    '2026-07-17 21:14',
+    [29],
+    []
+  ],
+  [
+    'x86/mm: relax LAM enablement check for 5-level paging',
+    'Dave Hansen',
+    '2026-07-17 11:38',
+    [30],
+    []
+  ],
+  ['Linux 6.19-rc1', 'Linus Torvalds', '2026-07-16 19:00', [], []]
 ];
 
 export function getHash(i: number): string {
@@ -72,14 +168,21 @@ export function getHash(i: number): string {
 }
 
 export function statusColor(s: string): string {
-  return s === 'A' ? 'var(--add)' : s === 'D' ? 'var(--del)' : s === 'R' ? 'var(--iris)' : 'var(--color-accent)';
+  return s === 'A'
+    ? 'var(--add)'
+    : s === 'D'
+      ? 'var(--del)'
+      : s === 'R'
+        ? 'var(--iris)'
+        : 'var(--color-accent)';
 }
 
 export function refBadge(label: string): RefBadge {
-  if (label.indexOf('tag: ') === 0) return { label: label.slice(5), cls: 'tag-outline' };
-  if (label.indexOf('origin/') === 0) return { label, cls: 'tag-neutral' };
-  if (label === 'main') return { label: 'HEAD → ' + label, cls: 'tag-accent' };
-  return { label, cls: 'tag-accent-2' };
+  if (label.indexOf('tag: ') === 0)
+    return { label: label.slice(5), cls: 'tag-outline', variant: 'outline' };
+  if (label.indexOf('origin/') === 0) return { label, cls: 'tag-neutral', variant: 'neutral' };
+  if (label === 'main') return { label: 'HEAD → ' + label, cls: 'tag-accent', variant: 'accent' };
+  return { label, cls: 'tag-accent-2', variant: 'accent-2' };
 }
 
 export function buildGraphData(commits: CommitRaw[]): GraphData {
@@ -121,7 +224,12 @@ export function buildGraphData(commits: CommitRaw[]): GraphData {
     }
 
     while (lanes.length && lanes[lanes.length - 1] == null) lanes.pop();
-    const row: GraphRowData = { lane: L, edges, after: lanes.slice(), width: Math.max(before.length, lanes.length) };
+    const row: GraphRowData = {
+      lane: L,
+      edges,
+      after: lanes.slice(),
+      width: Math.max(before.length, lanes.length)
+    };
     rows.push(row);
   });
 
@@ -140,7 +248,7 @@ export function buildFiles(i: number, commits: CommitRaw[]): DiffFile[] {
   for (let k = 0; k < n; k++) {
     out.push({
       path: base + '/' + names[(i + k) % names.length],
-      status: (k === 0 && i % 5 === 0) ? 'A' : ((i % 7 === 3 && k === n - 1) ? 'D' : 'M'),
+      status: k === 0 && i % 5 === 0 ? 'A' : i % 7 === 3 && k === n - 1 ? 'D' : 'M',
       add: 3 + ((i * 13 + k * 7) % 90),
       del: 1 + ((i * 5 + k * 3) % 40)
     });
@@ -261,7 +369,7 @@ export const GitClientProvider: React.FC<{
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [toastPct, setToastPct] = useState<number>(0);
-  const [toastTimer, setToastTimer] = useState<NodeJS.Timeout | null>(null);
+  const [toastTimer, setToastTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
@@ -270,13 +378,23 @@ export const GitClientProvider: React.FC<{
   const [compareLayout, setCompareLayout] = useState<'side' | 'stack'>('side');
   const [filterOpen, setFilterOpen] = useState<boolean>(false);
   const [f, setF] = useState<FilterState>({ ref: '', author: '', msg: '', from: '', to: '' });
-  const [cf, setCf] = useState<CompareFilterState>({ msg: '', author: '', excl: '', from: '', to: '', noMerges: false, matching: true });
+  const [cf, setCf] = useState<CompareFilterState>({
+    msg: '',
+    author: '',
+    excl: '',
+    from: '',
+    to: '',
+    noMerges: false,
+    matching: true
+  });
   const [branchQ, setBranchQ] = useState<string>('');
   const [scTab, setScTab] = useState<'changes' | 'stash'>('changes');
-  const [diffTab, setDiffTab] = useState<'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources'>('work');
+  const [diffTab, setDiffTab] = useState<
+    'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources'
+  >('work');
   const [consoleLines, setConsoleLines] = useState<LogEntry[]>(seedLog());
   const [commitMsg, setCommitMsg] = useState<string>(
-    "net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: "
+    'net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: '
   );
 
   const commits = RAW_COMMITS;
@@ -314,24 +432,27 @@ export const GitClientProvider: React.FC<{
     setConsoleLines([]);
   }, []);
 
-  const toastRun = useCallback((title: string, detail: string, done?: () => void) => {
-    if (toastTimer) clearInterval(toastTimer);
-    setToast({ title, detail });
-    setToastPct(6);
-    let p = 6;
-    const interval = setInterval(() => {
-      p += 11;
-      if (p >= 100) {
-        clearInterval(interval);
-        setToastPct(100);
-        setTimeout(() => setToast(null), 700);
-        if (done) done();
-      } else {
-        setToastPct(p);
-      }
-    }, 220);
-    setToastTimer(interval);
-  }, [toastTimer]);
+  const toastRun = useCallback(
+    (title: string, detail: string, done?: () => void) => {
+      if (toastTimer) clearInterval(toastTimer);
+      setToast({ title, detail });
+      setToastPct(6);
+      let p = 6;
+      const interval = setInterval(() => {
+        p += 11;
+        if (p >= 100) {
+          clearInterval(interval);
+          setToastPct(100);
+          setTimeout(() => setToast(null), 700);
+          if (done) done();
+        } else {
+          setToastPct(p);
+        }
+      }, 220);
+      setToastTimer(interval);
+    },
+    [toastTimer]
+  );
 
   const cancelToast = useCallback(() => {
     if (toastTimer) clearInterval(toastTimer);
@@ -339,10 +460,13 @@ export const GitClientProvider: React.FC<{
     log([{ text: '^C  operation cancelled by user', type: 'warn' }]);
   }, [toastTimer, log]);
 
-  const confirm = useCallback((title: string, body: string, cmd: string, action: string, run?: () => void) => {
-    setDialog({ title, body, cmd, action, run });
-    setMenu(null);
-  }, []);
+  const confirm = useCallback(
+    (title: string, body: string, cmd: string, action: string, run?: () => void) => {
+      setDialog({ title, body, cmd, action, run });
+      setMenu(null);
+    },
+    []
+  );
 
   const closeDialog = useCallback(() => {
     setDialog(null);
@@ -354,15 +478,21 @@ export const GitClientProvider: React.FC<{
     if (d && d.run) d.run();
   }, [dialog]);
 
-  const openMenu = useCallback((e: React.MouseEvent | MouseEvent, title: string, items: MenuItem[]) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const x = Math.min((e as React.MouseEvent).clientX || 100, window.innerWidth - 290);
-    const y = Math.min((e as React.MouseEvent).clientY || 100, Math.max(60, window.innerHeight - Math.min(items.length * 27 + 60, 470)));
-    setMenu({ x, y, title, items });
-  }, []);
+  const openMenu = useCallback(
+    (e: React.MouseEvent | MouseEvent, title: string, items: MenuItem[]) => {
+      if (e && e.preventDefault) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      const x = Math.min((e as React.MouseEvent).clientX || 100, window.innerWidth - 290);
+      const y = Math.min(
+        (e as React.MouseEvent).clientY || 100,
+        Math.max(60, window.innerHeight - Math.min(items.length * 27 + 60, 470))
+      );
+      setMenu({ x, y, title, items });
+    },
+    []
+  );
 
   const closeMenu = useCallback((e?: React.MouseEvent | MouseEvent) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -399,24 +529,35 @@ export const GitClientProvider: React.FC<{
     setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
   }, []);
 
-  const act = useCallback((label: string, extra?: string) => {
-    return () => {
-      setMenu(null);
-      setPaletteOpen(false);
-      const cmdStr = extra || label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-      log([
-        { text: '$ git ' + cmdStr, type: 'cmd' },
-        { text: 'ok', type: 'ok' }
-      ]);
-      toastRun(label, 'running ' + (extra || 'git command') + '…');
-    };
-  }, [log, toastRun]);
+  const act = useCallback(
+    (label: string, extra?: string) => {
+      return () => {
+        setMenu(null);
+        setPaletteOpen(false);
+        const cmdStr =
+          extra ||
+          label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+        log([
+          { text: '$ git ' + cmdStr, type: 'cmd' },
+          { text: 'ok', type: 'ok' }
+        ]);
+        toastRun(label, 'running ' + (extra || 'git command') + '…');
+      };
+    },
+    [log, toastRun]
+  );
 
   const doFetch = useCallback(() => {
     setPaletteOpen(false);
     log([{ text: '$ git fetch --all --prune', type: 'cmd' }]);
     toastRun('Fetching all remotes', 'git fetch --all --prune', () => {
-      log([{ text: '   f3a9c21..a71bd0e  master -> origin/master', type: 'out' }, { text: 'done', type: 'ok' }]);
+      log([
+        { text: '   f3a9c21..a71bd0e  master -> origin/master', type: 'out' },
+        { text: 'done', type: 'ok' }
+      ]);
     });
     if (props.onFetch) props.onFetch();
   }, [log, toastRun, props]);
@@ -440,7 +581,10 @@ export const GitClientProvider: React.FC<{
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
-    toastRun('Generating commit message', 'analysing staged diff — 4 files, 212 lines (timeout 20s)');
+    toastRun(
+      'Generating commit message',
+      'analysing staged diff — 4 files, 212 lines (timeout 20s)'
+    );
   }, [toastRun]);
 
   const updateAll = useCallback(() => {
@@ -484,36 +628,45 @@ export const GitClientProvider: React.FC<{
 
   const getFileList = useCallback((i: number) => buildFiles(i, commits), [commits]);
 
-  const matchesFilter = useCallback((i: number) => {
-    const r = commits[i];
-    if (f.author && r[1].toLowerCase().indexOf(f.author.toLowerCase()) < 0) return false;
-    if (f.msg && r[0].toLowerCase().indexOf(f.msg.toLowerCase()) < 0) return false;
-    if (f.from && r[2].slice(0, 10) < f.from) return false;
-    if (f.to && r[2].slice(0, 10) > f.to) return false;
-    if (f.ref) {
-      const q = f.ref.replace('*', '').toLowerCase();
-      if (!(r[4] || []).some(x => x.toLowerCase().indexOf(q) >= 0)) return false;
-    }
-    return true;
-  }, [commits, f]);
+  const matchesFilter = useCallback(
+    (i: number) => {
+      const r = commits[i];
+      if (f.author && r[1].toLowerCase().indexOf(f.author.toLowerCase()) < 0) return false;
+      if (f.msg && r[0].toLowerCase().indexOf(f.msg.toLowerCase()) < 0) return false;
+      if (f.from && r[2].slice(0, 10) < f.from) return false;
+      if (f.to && r[2].slice(0, 10) > f.to) return false;
+      if (f.ref) {
+        const q = f.ref.replace('*', '').toLowerCase();
+        if (!(r[4] || []).some(x => x.toLowerCase().indexOf(q) >= 0)) return false;
+      }
+      return true;
+    },
+    [commits, f]
+  );
 
-  const matchesCompareFilter = useCallback((i: number) => {
-    const r = commits[i];
-    if (cf.msg && r[0].toLowerCase().indexOf(cf.msg.toLowerCase()) < 0) return false;
-    if (cf.author && r[1].toLowerCase().indexOf(cf.author.toLowerCase()) < 0) return false;
-    if (cf.noMerges && r[0].indexOf('Merge ') === 0) return false;
-    if (cf.excl) {
-      try {
-        if (new RegExp(cf.excl, 'i').test(r[0])) return false;
-      } catch (err) {}
-    }
-    if (cf.from && r[2].slice(0, 10) < cf.from) return false;
-    if (cf.to && r[2].slice(0, 10) > cf.to) return false;
-    return true;
-  }, [commits, cf]);
+  const matchesCompareFilter = useCallback(
+    (i: number) => {
+      const r = commits[i];
+      if (cf.msg && r[0].toLowerCase().indexOf(cf.msg.toLowerCase()) < 0) return false;
+      if (cf.author && r[1].toLowerCase().indexOf(cf.author.toLowerCase()) < 0) return false;
+      if (cf.noMerges && r[0].indexOf('Merge ') === 0) return false;
+      if (cf.excl) {
+        try {
+          if (new RegExp(cf.excl, 'i').test(r[0])) return false;
+        } catch {}
+      }
+      if (cf.from && r[2].slice(0, 10) < cf.from) return false;
+      if (cf.to && r[2].slice(0, 10) > cf.to) return false;
+      return true;
+    },
+    [commits, cf]
+  );
 
   const paletteAll = useCallback((): PaletteItem[] => {
-    const nav = (v: GitClientView) => () => { setView(v); setPaletteOpen(false); };
+    const nav = (v: GitClientView) => () => {
+      setView(v);
+      setPaletteOpen(false);
+    };
     return [
       { group: 'Go to', label: 'Git Graph', hint: '⌘2', run: nav('graph') },
       { group: 'Go to', label: 'Branches', hint: '⌘1', run: nav('branches') },
@@ -540,7 +693,14 @@ export const GitClientProvider: React.FC<{
       { group: 'Diff', label: 'Compare file with revision…', run: act('Compare with revision') },
       { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: act('Open repository') },
       { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
-      { group: 'View', label: 'Toggle output console', run: () => { setConsoleOpen(prev => !prev); setPaletteOpen(false); } }
+      {
+        group: 'View',
+        label: 'Toggle output console',
+        run: () => {
+          setConsoleOpen(prev => !prev);
+          setPaletteOpen(false);
+        }
+      }
     ];
   }, [act, doFetch, aiMessage, updateAll, toggleTheme]);
 

@@ -32,6 +32,7 @@ export interface Commit {
 export interface RefBadge {
   label: string;
   cls: 'tag-accent' | 'tag-accent-2' | 'tag-neutral' | 'tag-outline';
+  variant: 'accent' | 'accent-2' | 'neutral' | 'outline';
 }
 
 export type DiffFileStatus = 'A' | 'D' | 'M' | 'R' | '?';

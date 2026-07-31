@@ -11,7 +11,11 @@ export const ProgressToast: React.FC = () => {
     <div className="card elev-md gc-progress-toast">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
         <span style={{ fontSize: '12.5px', fontWeight: 500, flex: 1 }}>{toast.title}</span>
-        <Button variant="secondary" style={{ height: '19px', fontSize: '10.5px' }} onClick={cancelToast}>
+        <Button
+          variant="secondary"
+          style={{ height: '19px', fontSize: '10.5px' }}
+          onClick={cancelToast}
+        >
           Cancel
         </Button>
       </div>
@@ -27,7 +31,14 @@ export const ProgressToast: React.FC = () => {
       >
         {toast.detail}
       </div>
-      <div style={{ height: '3px', borderRadius: '2px', background: 'var(--raised2)', overflow: 'hidden' }}>
+      <div
+        style={{
+          height: '3px',
+          borderRadius: '2px',
+          background: 'var(--raised2)',
+          overflow: 'hidden'
+        }}
+      >
         <div
           style={{
             height: '100%',

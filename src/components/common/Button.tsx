@@ -15,7 +15,8 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   ...props
 }) => {
-  const variantClass = variant === 'primary' ? 'btn-primary' : variant === 'ghost' ? 'btn-ghost' : 'btn-secondary';
+  const variantClass =
+    variant === 'primary' ? 'btn-primary' : variant === 'ghost' ? 'btn-ghost' : 'btn-secondary';
   const iconClass = iconOnly ? 'btn-icon' : '';
   const blockClass = fullWidth ? 'btn-block' : '';
 

@@ -1,7 +1,8 @@
 {
   "name": "git-client-design",
   "version": "1.0.0",
-  "description": "A reusable React + TypeScript + SCSS Git Client component library based on Nocturne Design System",
+  "description": "A reusable React + TypeScript 7.0 + SCSS Git Client component library based on Nocturne Design System",
+  "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,9 +20,11 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && tsc --declaration --emitDeclarationOnly --outDir dist && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "NODE_OPTIONS=\"-r ./scripts/eslint-ts7-compat.cjs\" eslint src",
+    "format": "prettier --write \"src/**/*.{ts,tsx,scss,css,json}\""
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
@@ -32,10 +35,19 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.21.0",
+    "@typescript-eslint/parser": "^8.21.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.4.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "sass": "^1.83.0",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.7",
-    "vite-plugin-dts": "^4.5.0"
+    "typescript": "^7.0.2",
+    "typescript6": "npm:typescript@^6.0.3",
+    "vite": "^6.0.7"
   }
 }

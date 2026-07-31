@@ -71,21 +71,79 @@ export const CompareView: React.FC = () => {
         fill="none"
       />
     );
-    nodes.push(<line key="la" x1={xA} x2={xA} y1={y(0)} y2={y(A.length - 1)} stroke={COLORS[0]} strokeWidth={2} />);
-    nodes.push(<line key="lb" x1={xB} x2={xB} y1={y(0)} y2={y(B.length - 1)} stroke={COLORS[1]} strokeWidth={2} />);
+    nodes.push(
+      <line
+        key="la"
+        x1={xA}
+        x2={xA}
+        y1={y(0)}
+        y2={y(A.length - 1)}
+        stroke={COLORS[0]}
+        strokeWidth={2}
+      />
+    );
+    nodes.push(
+      <line
+        key="lb"
+        x1={xB}
+        x2={xB}
+        y1={y(0)}
+        y2={y(B.length - 1)}
+        stroke={COLORS[1]}
+        strokeWidth={2}
+      />
+    );
 
     const renderNode = (i: number, x: number, yy: number, color: string) => [
-      <circle key={`c${x}${i}`} cx={x} cy={yy} r={5} fill="var(--color-bg)" stroke={color} strokeWidth={2} opacity={dim(i)} />,
-      <text key={`h${x}${i}`} x={x - 14} y={yy + 4} textAnchor="end" fill="var(--iris)" fontSize={11} fontFamily="var(--font-mono)" opacity={dim(i)}>
+      <circle
+        key={`c${x}${i}`}
+        cx={x}
+        cy={yy}
+        r={5}
+        fill="var(--color-bg)"
+        stroke={color}
+        strokeWidth={2}
+        opacity={dim(i)}
+      />,
+      <text
+        key={`h${x}${i}`}
+        x={x - 14}
+        y={yy + 4}
+        textAnchor="end"
+        fill="var(--iris)"
+        fontSize={11}
+        fontFamily="var(--font-mono)"
+        opacity={dim(i)}
+      >
         {getHash(i)}
       </text>,
       <foreignObject key={`t${x}${i}`} x={x + 14} y={yy - 9} width={msgW(x)} height={16}>
-        <div style={{ fontSize: '12.5px', color: 'var(--color-text)', opacity: dim(i), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-body)' }}>
+        <div
+          style={{
+            fontSize: '12.5px',
+            color: 'var(--color-text)',
+            opacity: dim(i),
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-body)'
+          }}
+        >
           {commits[i][0]}
         </div>
       </foreignObject>,
       <foreignObject key={`a${x}${i}`} x={x + 14} y={yy + 10} width={msgW(x)} height={14}>
-        <div style={{ fontSize: '10.5px', color: 'var(--fg3)', opacity: dim(i), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+        <div
+          style={{
+            fontSize: '10.5px',
+            color: 'var(--fg3)',
+            opacity: dim(i),
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-mono)'
+          }}
+        >
           {`${commits[i][1]} · ${commits[i][2]}`}
         </div>
       </foreignObject>
@@ -95,23 +153,48 @@ export const CompareView: React.FC = () => {
     B.forEach((i, k) => nodes.push(...renderNode(i, xB, y(k), COLORS[1])));
 
     nodes.push(
-      <text key="mb" x={xA - 66} y={y(A.length - 1) + 62} fill="var(--fg3)" fontSize={11} fontFamily="var(--font-mono)">
+      <text
+        key="mb"
+        x={xA - 66}
+        y={y(A.length - 1) + 62}
+        fill="var(--fg3)"
+        fontSize={11}
+        fontFamily="var(--font-mono)"
+      >
         merge-base 4c1f9ab
       </text>
     );
     nodes.push(
-      <text key="ha" x={xA - 66} y={y(0) - 18} fill={COLORS[0]} fontSize={11.5} fontFamily="var(--font-mono)">
+      <text
+        key="ha"
+        x={xA - 66}
+        y={y(0) - 18}
+        fill={COLORS[0]}
+        fontSize={11.5}
+        fontFamily="var(--font-mono)"
+      >
         main
       </text>
     );
     nodes.push(
-      <text key="hb" x={xB - 66} y={y(0) - 18} fill={COLORS[1]} fontSize={11.5} fontFamily="var(--font-mono)">
+      <text
+        key="hb"
+        x={xB - 66}
+        y={y(0) - 18}
+        fill={COLORS[1]}
+        fontSize={11.5}
+        fontFamily="var(--font-mono)"
+      >
         feature/mlx5-next
       </text>
     );
 
     return (
-      <svg width={920} height={y(A.length - 1) + 96} style={{ display: 'block', overflow: 'visible' }}>
+      <svg
+        width={920}
+        height={y(A.length - 1) + 96}
+        style={{ display: 'block', overflow: 'visible' }}
+      >
         {nodes}
       </svg>
     );
@@ -122,13 +205,49 @@ export const CompareView: React.FC = () => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: '40px', padding: '0 var(--space-3)', borderBottom: '1px solid var(--line)', background: 'var(--panel)' }}>
-        <Select options={['main', 'release/6.18.y']} style={{ width: 'auto', height: '26px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
-        <Button variant="secondary" title="Swap direction" onClick={act('Swap compare direction')} style={{ width: '26px', height: '26px', padding: 0 }}>
+      <div
+        style={{
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          height: '40px',
+          padding: '0 var(--space-3)',
+          borderBottom: '1px solid var(--line)',
+          background: 'var(--panel)'
+        }}
+      >
+        <Select
+          options={['main', 'release/6.18.y']}
+          style={{
+            width: 'auto',
+            height: '26px',
+            minHeight: 0,
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)'
+          }}
+        />
+        <Button
+          variant="secondary"
+          title="Swap direction"
+          onClick={act('Swap compare direction')}
+          style={{ width: '26px', height: '26px', padding: 0 }}
+        >
           <i className="ph ph-arrows-left-right" style={{ fontSize: '13px' }} />
         </Button>
-        <Select options={['feature/mlx5-next', 'origin/main']} style={{ width: 'auto', height: '26px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
-        <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>merge-base 4c1f9ab</span>
+        <Select
+          options={['feature/mlx5-next', 'origin/main']}
+          style={{
+            width: 'auto',
+            height: '26px',
+            minHeight: 0,
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)'
+          }}
+        />
+        <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
+          merge-base 4c1f9ab
+        </span>
 
         <div style={{ flex: 1 }} />
 
@@ -155,43 +274,140 @@ export const CompareView: React.FC = () => {
         )}
 
         <Button variant="secondary" onClick={handleExportMenu} style={{ height: '26px' }}>
-          Export<i className="ph ph-caret-down" style={{ fontSize: '11px' }} />
+          Export
+          <i className="ph ph-caret-down" style={{ fontSize: '11px' }} />
         </Button>
       </div>
 
-      <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-3)', padding: 'var(--space-3)', borderBottom: '1px solid var(--line)', background: 'var(--panel)', flexWrap: 'wrap' }}>
-        <Input label="Fuzzy message" value={cf.msg} onChange={e => setCf({ ...cf, msg: e.target.value })} placeholder="mlx5" fieldClassName="w-150" style={{ height: '25px', minHeight: 0, fontSize: '12px' }} />
-        <Input label="Author" value={cf.author} onChange={e => setCf({ ...cf, author: e.target.value })} placeholder="saeed" fieldClassName="w-130" style={{ height: '25px', minHeight: 0, fontSize: '12px' }} />
-        <Input label="Exclude (regex)" value={cf.excl} onChange={e => setCf({ ...cf, excl: e.target.value })} placeholder="^Merge" fieldClassName="w-130" style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
-        <Input label="From" value={cf.from} onChange={e => setCf({ ...cf, from: e.target.value })} placeholder="2026-07-16" fieldClassName="w-112" style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
-        <Input label="To" value={cf.to} onChange={e => setCf({ ...cf, to: e.target.value })} placeholder="2026-07-31" fieldClassName="w-112" style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
+      <div
+        style={{
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 'var(--space-3)',
+          padding: 'var(--space-3)',
+          borderBottom: '1px solid var(--line)',
+          background: 'var(--panel)',
+          flexWrap: 'wrap'
+        }}
+      >
+        <Input
+          label="Fuzzy message"
+          value={cf.msg}
+          onChange={e => setCf({ ...cf, msg: e.target.value })}
+          placeholder="mlx5"
+          fieldClassName="w-150"
+          style={{ height: '25px', minHeight: 0, fontSize: '12px' }}
+        />
+        <Input
+          label="Author"
+          value={cf.author}
+          onChange={e => setCf({ ...cf, author: e.target.value })}
+          placeholder="saeed"
+          fieldClassName="w-130"
+          style={{ height: '25px', minHeight: 0, fontSize: '12px' }}
+        />
+        <Input
+          label="Exclude (regex)"
+          value={cf.excl}
+          onChange={e => setCf({ ...cf, excl: e.target.value })}
+          placeholder="^Merge"
+          fieldClassName="w-130"
+          style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+        />
+        <Input
+          label="From"
+          value={cf.from}
+          onChange={e => setCf({ ...cf, from: e.target.value })}
+          placeholder="2026-07-16"
+          fieldClassName="w-112"
+          style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+        />
+        <Input
+          label="To"
+          value={cf.to}
+          onChange={e => setCf({ ...cf, to: e.target.value })}
+          placeholder="2026-07-31"
+          fieldClassName="w-112"
+          style={{ height: '25px', minHeight: 0, fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+        />
 
         <Button
           variant="secondary"
           onClick={() => setCf({ ...cf, noMerges: !cf.noMerges })}
-          style={{ height: '25px', fontSize: '11.5px', boxShadow: cf.noMerges ? 'inset 0 0 0 1px var(--color-accent)' : 'none' }}
+          style={{
+            height: '25px',
+            fontSize: '11.5px',
+            boxShadow: cf.noMerges ? 'inset 0 0 0 1px var(--color-accent)' : 'none'
+          }}
         >
           Ignore merges
         </Button>
         <Button
           variant="secondary"
           onClick={() => setCf({ ...cf, matching: !cf.matching })}
-          style={{ height: '25px', fontSize: '11.5px', boxShadow: cf.matching ? 'inset 0 0 0 1px var(--color-accent)' : 'none' }}
+          style={{
+            height: '25px',
+            fontSize: '11.5px',
+            boxShadow: cf.matching ? 'inset 0 0 0 1px var(--color-accent)' : 'none'
+          }}
         >
           Detect matching-message cherry-picks
         </Button>
 
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>Esc clears · ⌘A selects all</span>
+        <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
+          Esc clears · ⌘A selects all
+        </span>
       </div>
 
       {compareMode === 'list' ? (
-        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: cmpCols, gridTemplateRows: cmpRows, gap: '1px', background: 'var(--line)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--color-bg)' }}>
-            <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: '30px', padding: '0 var(--space-3)', background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: 'var(--color-accent)' }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600 }}>main .. feature/mlx5-next</span>
-              <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>3 commits · 34 files · +1,204 −318</span>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: cmpCols,
+            gridTemplateRows: cmpRows,
+            gap: '1px',
+            background: 'var(--line)'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+              minWidth: 0,
+              background: 'var(--color-bg)'
+            }}
+          >
+            <div
+              style={{
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                height: '30px',
+                padding: '0 var(--space-3)',
+                background: 'var(--panel)',
+                borderBottom: '1px solid var(--line)'
+              }}
+            >
+              <span
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '2px',
+                  background: 'var(--color-accent)'
+                }}
+              />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600 }}>
+                main .. feature/mlx5-next
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
+                3 commits · 34 files · +1,204 −318
+              </span>
             </div>
             <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               {sideA.map(i => {
@@ -217,22 +433,92 @@ export const CompareView: React.FC = () => {
                       opacity: isMatch ? 1 : 0.26
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--iris)' }}>{getHash(i)}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c[0]}</span>
-                    {isPicked && <Tag variant="accent" style={{ fontSize: '9.5px', padding: '0 6px' }}>MATCHED</Tag>}
-                    <span style={{ width: '120px', color: 'var(--fg3)', fontSize: '11.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c[1]}</span>
-                    <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{c[2].slice(5, 10)}</span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--iris)'
+                      }}
+                    >
+                      {getHash(i)}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {c[0]}
+                    </span>
+                    {isPicked && (
+                      <Tag variant="accent" style={{ fontSize: '9.5px', padding: '0 6px' }}>
+                        MATCHED
+                      </Tag>
+                    )}
+                    <span
+                      style={{
+                        width: '120px',
+                        color: 'var(--fg3)',
+                        fontSize: '11.5px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {c[1]}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--fg3)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {c[2].slice(5, 10)}
+                    </span>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: 'var(--color-bg)' }}>
-            <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', height: '30px', padding: '0 var(--space-3)', background: 'var(--panel)', borderBottom: '1px solid var(--line)' }}>
-              <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: 'var(--add)' }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600 }}>feature/mlx5-next .. main</span>
-              <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>12 commits · 96 files · +3,881 −1,022</span>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+              minWidth: 0,
+              background: 'var(--color-bg)'
+            }}
+          >
+            <div
+              style={{
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                height: '30px',
+                padding: '0 var(--space-3)',
+                background: 'var(--panel)',
+                borderBottom: '1px solid var(--line)'
+              }}
+            >
+              <span
+                style={{
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '2px',
+                  background: 'var(--add)'
+                }}
+              />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600 }}>
+                feature/mlx5-next .. main
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
+                12 commits · 96 files · +3,881 −1,022
+              </span>
             </div>
             <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
               {sideB.map(i => {
@@ -258,11 +544,51 @@ export const CompareView: React.FC = () => {
                       opacity: isMatch ? 1 : 0.26
                     }}
                   >
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--iris)' }}>{getHash(i)}</span>
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c[0]}</span>
-                    {isPicked && <Tag variant="accent" style={{ fontSize: '9.5px', padding: '0 6px' }}>MATCHED</Tag>}
-                    <span style={{ width: '120px', color: 'var(--fg3)', fontSize: '11.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c[1]}</span>
-                    <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{c[2].slice(5, 10)}</span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--iris)'
+                      }}
+                    >
+                      {getHash(i)}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {c[0]}
+                    </span>
+                    {isPicked && (
+                      <Tag variant="accent" style={{ fontSize: '9.5px', padding: '0 6px' }}>
+                        MATCHED
+                      </Tag>
+                    )}
+                    <span
+                      style={{
+                        width: '120px',
+                        color: 'var(--fg3)',
+                        fontSize: '11.5px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {c[1]}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--fg3)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {c[2].slice(5, 10)}
+                    </span>
                   </div>
                 );
               })}
@@ -270,7 +596,15 @@ export const CompareView: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 'var(--space-8)', background: 'var(--color-bg)' }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'auto',
+            padding: 'var(--space-8)',
+            background: 'var(--color-bg)'
+          }}
+        >
           {renderCompareGraphSvg()}
         </div>
       )}
