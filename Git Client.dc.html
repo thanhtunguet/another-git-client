@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="ds/nocturne.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<script src="ds/nocturne-bundle.js"></script>
+<style>
+:root{
+  --panel: var(--color-surface);
+  --raised: color-mix(in srgb, var(--color-text) 6%, var(--color-surface));
+  --raised2: color-mix(in srgb, var(--color-text) 13%, var(--color-surface));
+  --line: var(--color-divider);
+  --line2: var(--color-neutral-700);
+  --fg: var(--color-text);
+  --fg2: color-mix(in srgb, var(--color-text) 68%, transparent);
+  --fg3: color-mix(in srgb, var(--color-text) 46%, transparent);
+  --hover: color-mix(in srgb, var(--color-text) 7%, transparent);
+  --sel: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  --selline: color-mix(in srgb, var(--color-accent) 60%, transparent);
+  --iris: var(--color-accent-400);
+  --add: oklch(.74 .10 152);
+  --del: oklch(.72 .12 25);
+  --warn: oklch(.80 .10 85);
+  --addbg: color-mix(in srgb, oklch(.74 .10 152) 13%, transparent);
+  --delbg: color-mix(in srgb, oklch(.72 .12 25) 13%, transparent);
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+[data-theme="light"]{
+  --color-bg:#f3f3f6;
+  --color-surface:#ffffff;
+  --color-text:#1b1c26;
+  --color-accent:#5f52a8;
+  --color-divider: color-mix(in srgb, #1b1c26 15%, transparent);
+  --line2: color-mix(in srgb, #1b1c26 30%, transparent);
+  --iris: #6f5fb8;
+  --add: oklch(.52 .11 152);
+  --del: oklch(.53 .15 25);
+  --warn: oklch(.55 .11 80);
+  --addbg: color-mix(in srgb, oklch(.52 .11 152) 12%, transparent);
+  --delbg: color-mix(in srgb, oklch(.53 .15 25) 12%, transparent);
+}
+body{margin:0;overflow:hidden;font-size:13px;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+a{color:var(--color-accent)}
+a:hover{color:var(--color-accent-300)}
+.btn{font-size:12px}
+@keyframes popIn{from{opacity:0;transform:translateY(4px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;width:100vw;background:var(--color-bg);color:var(--fg);line-height:1.45">
+
+  <!-- ===== TOP COMMAND BAR ===== -->
+  <div style="flex:0 0 auto;height:46px;display:flex;align-items:center;gap:var(--space-4);padding:0 var(--space-4);background:var(--panel);box-shadow:var(--shadow-sm);user-select:none;z-index:5">
+    <div style="display:flex;gap:8px;align-items:center;padding-right:var(--space-1)">
+      <div style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#febc2e"></div>
+      <div style="width:12px;height:12px;border-radius:50%;background:#28c840"></div>
+    </div>
+
+    <button onClick="{{ menuRepo }}" class="btn btn-secondary" style="height:28px;gap:8px;font-size:12.5px" style-hover="background:var(--hover)">
+      <i class="ph ph-git-fork" style="font-size:14px;color:var(--color-accent)"></i>
+      <span style="font-weight:500">linux</span>
+      <span style="color:var(--fg3);font-family:var(--font-mono);font-size:11px">~/src/torvalds/linux</span>
+      <i class="ph ph-caret-down" style="font-size:11px;color:var(--fg3)"></i>
+    </button>
+
+    <button onClick="{{ menuBranchChip }}" class="btn btn-secondary" style="height:28px;gap:6px;font-family:var(--font-mono);font-size:12px">
+      <i class="ph ph-git-branch" style="font-size:14px;color:var(--color-accent)"></i>
+      <span>main</span>
+      <span style="color:var(--add)">↓12</span>
+      <span style="color:var(--warn)">↑3</span>
+    </button>
+
+    <button onClick="{{ openPalette }}" style="flex:1 1 auto;max-width:520px;height:28px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--raised);border:1px solid var(--line);border-radius:var(--radius-md);color:var(--fg3);cursor:text;font-family:inherit;font-size:12.5px;text-align:left" style-hover="border-color:var(--line2)">
+      <i class="ph ph-magnifying-glass" style="font-size:13px"></i>
+      <span style="flex:1">Quick Git Actions — search branches, commits, commands…</span>
+      <span style="font-family:var(--font-mono);font-size:10.5px;border:1px solid var(--line2);border-radius:var(--radius-sm);padding:1px 5px">⌘K</span>
+    </button>
+
+    <div style="flex:1"></div>
+
+    <div style="display:flex;align-items:center;gap:2px">
+      <button onClick="{{ doFetch }}" class="btn btn-ghost" style="height:24px;padding:0 8px;color:var(--fg2)">Fetch</button>
+      <button onClick="{{ doPull }}" class="btn btn-ghost" style="height:24px;padding:0 8px;color:var(--fg2)">Pull ↓12</button>
+      <button onClick="{{ doPush }}" class="btn btn-ghost" style="height:24px;padding:0 8px;color:var(--fg2)">Push ↑3</button>
+    </div>
+
+    <button onClick="{{ toggleTheme }}" title="Toggle theme" class="btn btn-secondary" style="width:28px;height:28px;padding:0"><i class="ph {{ themeIcon }}" style="font-size:15px"></i></button>
+    <button onClick="{{ toggleDock }}" class="btn btn-secondary" style="height:28px;background:{{ dockBtnBg }}">Source Control</button>
+  </div>
+
+  <!-- ===== MAIN ROW ===== -->
+  <div style="flex:1 1 auto;display:flex;min-height:0">
+
+    <div style="flex:0 0 auto;width:82px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:var(--space-2) 0;gap:2px;user-select:none">
+      <sc-for list="{{ nav }}" as="n" hint-placeholder-count="8">
+        <button onClick="{{ n.go }}" title="{{ n.label }}" style="display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 6px;padding:var(--space-2) 2px;background:{{ n.bg }};border:0;border-left:2px solid {{ n.mark }};border-radius:var(--radius-md);color:{{ n.fg }};cursor:pointer;font-family:inherit;font-size:10.5px;font-weight:500" style-hover="background:var(--hover)">
+          <i class="ph {{ n.ic }}" style="font-size:18px"></i>
+          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px">{{ n.label }}</span>
+        </button>
+      </sc-for>
+      <div style="flex:1"></div>
+      <button onClick="{{ goSettings }}" title="Settings" style="display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 6px;padding:var(--space-2) 2px;background:{{ setBg }};border:0;border-radius:var(--radius-md);color:var(--fg2);cursor:pointer;font-family:inherit;font-size:10.5px" style-hover="background:var(--hover)">
+        <i class="ph ph-gear" style="font-size:18px"></i>
+        <span>Settings</span>
+      </button>
+    </div>
+
+    <div style="flex:1 1 auto;min-width:0;display:flex;flex-direction:column;background:var(--color-bg)">
+
+      <!-- ============ BRANCHES ============ -->
+      <sc-if value="{{ isBranches }}">
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="flex:0 0 340px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel);min-height:0">
+            <div style="height:38px;flex:0 0 auto;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-3);border-bottom:1px solid var(--line)">
+              <input value="{{ branchQ }}" onInput="{{ setBranchQ }}" class="input" placeholder="Fuzzy find branch or tag…" style="height:25px;min-height:0;font-size:12px;font-family:var(--font-mono)" />
+              <button onClick="{{ newBranch }}" title="New branch" class="btn btn-secondary" style="width:25px;height:25px;padding:0"><i class="ph ph-plus" style="font-size:13px"></i></button>
+            </div>
+            <div style="flex:1;overflow:auto;padding:var(--space-2) 0;min-height:0">
+              <sc-for list="{{ branchRows }}" as="b" hint-placeholder-count="14">
+                <div onClick="{{ b.click }}" onContextMenu="{{ b.menu }}" style="display:flex;align-items:center;gap:7px;height:{{ b.h }}px;padding-left:{{ b.pad }}px;padding-right:var(--space-3);cursor:{{ b.cursor }};background:{{ b.bg }};color:{{ b.fg }};font-size:{{ b.size }}px;font-weight:{{ b.weight }};font-family:{{ b.font }};letter-spacing:{{ b.ls }};text-transform:{{ b.tt }}" style-hover="background:var(--hover)">
+                  <i class="ph {{ b.twisty }}" style="font-size:11px;color:var(--fg3);width:11px"></i>
+                  <i class="ph {{ b.glyph }}" style="font-size:13px;color:{{ b.iconColor }}"></i>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.label }}</span>
+                  <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--fg3)">{{ b.meta }}</span>
+                  <sc-if value="{{ b.current }}" hint-placeholder-val="{{ false }}">
+                    <span class="tag tag-outline" style="font-size:9.5px;padding:0 5px;letter-spacing:.05em">HEAD</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <div style="flex:0 0 auto;border-top:1px solid var(--line);padding:var(--space-2) var(--space-3);display:flex;gap:6px;align-items:center">
+              <span style="font-size:11px;color:var(--fg3);flex:1">3 remotes</span>
+              <button onClick="{{ addRemote }}" class="btn btn-secondary" style="height:22px;font-size:11px">Add remote…</button>
+              <button onClick="{{ menuRemotes }}" class="btn btn-secondary" style="height:22px;font-size:11px">Manage</button>
+            </div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:38px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 var(--space-4);border-bottom:1px solid var(--line);background:var(--panel)">
+              <span style="font-family:var(--font-mono);font-weight:600">feature/mlx5-next</span>
+              <span style="font-size:11px;color:var(--fg3)">tracking origin/feature/mlx5-next · 3 ahead, 1 behind</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ compareWithCurrent }}" class="btn btn-secondary" style="height:25px;padding:0 10px;box-sizing:border-box">Compare with current</button>
+              <button onClick="{{ mergeIntoCurrent }}" class="btn btn-primary" style="height:25px;padding:0 10px;box-sizing:border-box"><i class="ph ph-git-merge" style="font-size:14px"></i>Merge into main</button>
+            </div>
+            <div style="flex:1;overflow:auto;padding:var(--space-6) var(--space-4);min-height:0">
+              <h6 style="margin:0 0 var(--space-3);color:var(--fg3)">Recent commits on this branch</h6>
+              <sc-for list="{{ branchPreview }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex;gap:12px;align-items:baseline;padding:7px 8px;border-bottom:1px solid var(--line);border-radius:var(--radius-sm)" style-hover="background:var(--hover)">
+                  <span style="font-family:var(--font-mono);color:var(--iris);font-size:11.5px">{{ c.short }}</span>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.subject }}</span>
+                  <span style="color:var(--fg3);font-size:11.5px">{{ c.author }}</span>
+                  <span style="color:var(--fg3);font-family:var(--font-mono);font-size:11px">{{ c.date }}</span>
+                </div>
+              </sc-for>
+              <div class="card elev-sm" style="margin-top:var(--space-8)">
+                <h6 style="margin:0;color:var(--fg3)">Right-click any row for</h6>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  <sc-for list="{{ branchActionChips }}" as="a" hint-placeholder-count="10">
+                    <span class="tag {{ a.cls }}">{{ a.label }}</span>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ GIT GRAPH ============ -->
+      <sc-if value="{{ isGraph }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="height:38px;flex:0 0 auto;display:flex;align-items:center;gap:var(--space-2);padding:0 var(--space-3);border-bottom:1px solid var(--line);background:var(--panel)">
+            <button onClick="{{ toggleFilter }}" class="btn btn-secondary" style="height:25px;background:{{ filterBtnBg }}"><i class="ph ph-funnel" style="font-size:14px"></i>Filter Graph {{ filterCount }}</button>
+            <span style="font-size:11px;color:var(--fg3);padding-left:var(--space-2)">Layout</span>
+            <div class="seg" style="height:25px">
+              <button onClick="{{ setLayoutRows }}" class="seg-opt" style="padding:0 10px;font-size:11.5px;border:0;background:transparent;color:{{ lrFg }};box-shadow:{{ lrRing }};cursor:pointer;font-family:inherit">Rows</button>
+              <button onClick="{{ setLayoutGrouped }}" class="seg-opt" style="padding:0 10px;font-size:11.5px;border:0;border-left:1px solid var(--line);background:transparent;color:{{ lgFg }};box-shadow:{{ lgRing }};cursor:pointer;font-family:inherit">Grouped by day</button>
+            </div>
+            <div style="flex:1"></div>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--font-mono)">{{ matchLabel }}</span>
+            <span style="font-size:11px;color:var(--fg3)">·</span>
+            <span style="font-size:11px;color:var(--fg3)">{{ selLabel }}</span>
+          </div>
+
+          <sc-if value="{{ filterOpen }}">
+            <div style="flex:0 0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:var(--space-3);padding:var(--space-3);background:var(--panel);border-bottom:1px solid var(--line)">
+              <div class="field"><label>Branch / ref</label><input value="{{ f_ref }}" onInput="{{ setFRef }}" class="input" placeholder="main, feature/*" style="height:26px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+              <div class="field"><label>Author</label><input value="{{ f_author }}" onInput="{{ setFAuthor }}" class="input" placeholder="torvalds" style="height:26px;min-height:0;font-size:12px" /></div>
+              <div class="field"><label>Message contains</label><input value="{{ f_msg }}" onInput="{{ setFMsg }}" class="input" placeholder="fix, sched…" style="height:26px;min-height:0;font-size:12px" /></div>
+              <div class="field"><label>From</label><input value="{{ f_from }}" onInput="{{ setFFrom }}" class="input" placeholder="2026-07-20" style="height:26px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+              <div class="field"><label>To</label><input value="{{ f_to }}" onInput="{{ setFTo }}" class="input" placeholder="2026-07-31" style="height:26px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+            </div>
+          </sc-if>
+
+          <div style="flex:1;overflow:auto;min-height:0">
+            <div style="display:flex;align-items:center;height:26px;position:sticky;top:0;z-index:2;background:var(--panel);border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg3);padding-right:var(--space-4)">
+              <span style="width:{{ graphW }}px;flex:0 0 auto"></span>
+              <span style="flex:1;padding-left:6px">Subject</span>
+              <span style="width:150px;flex:0 0 auto">Author</span>
+              <span style="width:104px;flex:0 0 auto">Date</span>
+              <span style="width:74px;flex:0 0 auto;text-align:right">Commit</span>
+            </div>
+            <sc-for list="{{ graphRows }}" as="c" hint-placeholder-count="18">
+              <div>
+                <sc-if value="{{ c.dayHeader }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;height:24px;padding-left:var(--space-3);background:var(--raised);border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--fg2);font-family:var(--font-mono)">{{ c.dayHeader }}</div>
+                </sc-if>
+                <div onClick="{{ c.click }}" onDoubleClick="{{ c.expand }}" onContextMenu="{{ c.menu }}" style="display:flex;align-items:center;height:30px;padding-right:var(--space-4);cursor:pointer;background:{{ c.bg }};box-shadow:{{ c.ring }};opacity:{{ c.dim }}" style-hover="background:var(--hover)">
+                  <span style="width:{{ graphW }}px;flex:0 0 auto;display:flex;align-items:center">{{ c.svg }}</span>
+                  <span style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding-left:6px">
+                    <sc-for list="{{ c.refs }}" as="r" hint-placeholder-count="1">
+                      <span class="tag {{ r.cls }}" style="flex:0 0 auto;font-family:var(--font-mono);font-size:10.5px;padding:1px 6px">{{ r.label }}</span>
+                    </sc-for>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:{{ c.weight }}">{{ c.subject }}</span>
+                  </span>
+                  <span style="width:150px;flex:0 0 auto;color:var(--fg2);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.author }}</span>
+                  <span style="width:104px;flex:0 0 auto;color:var(--fg3);font-family:var(--font-mono);font-size:11px">{{ c.date }}</span>
+                  <span style="width:74px;flex:0 0 auto;text-align:right;font-family:var(--font-mono);font-size:11.5px;color:var(--iris)">{{ c.short }}</span>
+                </div>
+                <sc-if value="{{ c.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;background:var(--panel);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+                    <div style="width:{{ graphW }}px;flex:0 0 auto;display:flex">{{ c.gutter }}</div>
+                    <div style="flex:1;padding:var(--space-2) var(--space-4) var(--space-3) 6px;min-width:0">
+                      <h6 style="margin:0 0 6px;color:var(--fg3)">{{ c.fileCount }} files changed</h6>
+                      <sc-for list="{{ c.files }}" as="f" hint-placeholder-count="3">
+                        <div onClick="{{ f.open }}" style="display:flex;align-items:center;gap:8px;height:22px;font-family:var(--font-mono);font-size:11.5px;cursor:pointer;border-radius:var(--radius-sm);padding:0 6px" style-hover="background:var(--hover)">
+                          <span style="width:12px;text-align:center;color:{{ f.color }};font-weight:600">{{ f.status }}</span>
+                          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)">{{ f.path }}</span>
+                          <span style="color:var(--add)">+{{ f.add }}</span>
+                          <span style="color:var(--del)">−{{ f.del }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div style="display:flex;justify-content:center;padding:var(--space-6)">
+              <button onClick="{{ loadMore }}" class="btn btn-secondary" style="height:28px">Load 250 more commits — showing {{ shownCount }} of 1,284,930</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ COMMIT DETAILS ============ -->
+      <sc-if value="{{ isDetails }}">
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="flex:0 0 380px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel);min-height:0">
+            <div style="flex:0 0 auto;padding:var(--space-4);border-bottom:1px solid var(--line)">
+              <h6 style="margin:0 0 6px;color:var(--color-accent)">{{ detailKicker }}</h6>
+              <div style="font-size:14px;font-weight:500;margin-bottom:var(--space-2);text-wrap:pretty">{{ detailSubject }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);font-size:11.5px;color:var(--fg2)">
+                <span>{{ detailAuthor }}</span>
+                <span style="color:var(--fg3);font-family:var(--font-mono)">{{ detailDate }}</span>
+                <span style="font-family:var(--font-mono);color:var(--iris)">{{ detailHash }}</span>
+              </div>
+            </div>
+            <div style="flex:0 0 auto;display:flex;gap:6px;padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--line);flex-wrap:wrap">
+              <button onClick="{{ openSelectedDiffs }}" class="btn btn-secondary" style="height:23px;font-size:11.5px">Open diffs ({{ selFileCount }})</button>
+              <button onClick="{{ revertSelected }}" class="btn btn-secondary" style="height:23px;font-size:11.5px">Revert selected</button>
+              <button onClick="{{ cherrySelected }}" class="btn btn-secondary" style="height:23px;font-size:11.5px">Cherry-pick selected</button>
+              <button onClick="{{ createPatch }}" class="btn btn-secondary" style="height:23px;font-size:11.5px">Create patch…</button>
+            </div>
+            <div style="flex:1;overflow:auto;padding:var(--space-2) 0;min-height:0">
+              <sc-for list="{{ detailTree }}" as="f" hint-placeholder-count="12">
+                <div onClick="{{ f.click }}" onContextMenu="{{ f.menu }}" style="display:flex;align-items:center;gap:7px;height:23px;padding-left:{{ f.pad }}px;padding-right:var(--space-4);cursor:pointer;font-family:var(--font-mono);font-size:11.5px;background:{{ f.bg }}" style-hover="background:var(--hover)">
+                  <i class="ph {{ f.twisty }}" style="font-size:11px;color:var(--fg3);width:10px"></i>
+                  <span style="width:11px;text-align:center;color:{{ f.color }};font-weight:600">{{ f.status }}</span>
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ f.fg }}">{{ f.name }}</span>
+                  <span style="color:var(--add);font-size:11px">{{ f.add }}</span>
+                  <span style="color:var(--del);font-size:11px">{{ f.del }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">{{ diffPane }}</div>
+        </div>
+      </sc-if>
+
+      <!-- ============ COMPARE BRANCHES ============ -->
+      <sc-if value="{{ isCompare }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:var(--space-2);height:40px;padding:0 var(--space-3);border-bottom:1px solid var(--line);background:var(--panel)">
+            <select class="input" style="width:auto;height:26px;min-height:0;font-size:12px;font-family:var(--font-mono)">
+              <option>main</option>
+              <option>release/6.18.y</option>
+            </select>
+            <button onClick="{{ swapCompare }}" title="Swap direction" class="btn btn-secondary" style="width:26px;height:26px;padding:0"><i class="ph ph-arrows-left-right" style="font-size:13px"></i></button>
+            <select class="input" style="width:auto;height:26px;min-height:0;font-size:12px;font-family:var(--font-mono)">
+              <option>feature/mlx5-next</option>
+              <option>origin/main</option>
+            </select>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--font-mono)">merge-base 4c1f9ab</span>
+            <div style="flex:1"></div>
+            <div class="seg" style="height:26px">
+              <button onClick="{{ cmpList }}" class="seg-opt" style="padding:0 11px;font-size:11.5px;border:0;background:transparent;color:{{ cmListFg }};box-shadow:{{ cmListRing }};cursor:pointer;font-family:inherit">List</button>
+              <button onClick="{{ cmpGraph }}" class="seg-opt" style="padding:0 11px;font-size:11.5px;border:0;border-left:1px solid var(--line);background:transparent;color:{{ cmGraphFg }};box-shadow:{{ cmGraphRing }};cursor:pointer;font-family:inherit">Graph</button>
+            </div>
+            <sc-if value="{{ cmpIsList }}" hint-placeholder-val="{{ true }}">
+              <div class="seg" style="height:26px">
+                <button onClick="{{ cmpSide }}" class="seg-opt" style="padding:0 11px;font-size:11.5px;border:0;background:transparent;color:{{ cmSideFg }};box-shadow:{{ cmSideRing }};cursor:pointer;font-family:inherit">Side by side</button>
+                <button onClick="{{ cmpStack }}" class="seg-opt" style="padding:0 11px;font-size:11.5px;border:0;border-left:1px solid var(--line);background:transparent;color:{{ cmStackFg }};box-shadow:{{ cmStackRing }};cursor:pointer;font-family:inherit">Stacked</button>
+              </div>
+            </sc-if>
+            <button onClick="{{ exportCompare }}" class="btn btn-secondary" style="height:26px">Export<i class="ph ph-caret-down" style="font-size:11px"></i></button>
+          </div>
+
+          <div style="flex:0 0 auto;display:flex;align-items:end;gap:var(--space-3);padding:var(--space-3);border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap">
+            <div class="field" style="width:150px"><label>Fuzzy message</label><input value="{{ c_msg }}" onInput="{{ setCMsg }}" class="input" placeholder="mlx5" style="height:25px;min-height:0;font-size:12px" /></div>
+            <div class="field" style="width:130px"><label>Author</label><input value="{{ c_author }}" onInput="{{ setCAuthor }}" class="input" placeholder="saeed" style="height:25px;min-height:0;font-size:12px" /></div>
+            <div class="field" style="width:130px"><label>Exclude (regex)</label><input value="{{ c_excl }}" onInput="{{ setCExcl }}" class="input" placeholder="^Merge" style="height:25px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+            <div class="field" style="width:112px"><label>From</label><input value="{{ c_from }}" onInput="{{ setCFrom }}" class="input" placeholder="2026-07-16" style="height:25px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+            <div class="field" style="width:112px"><label>To</label><input value="{{ c_to }}" onInput="{{ setCTo }}" class="input" placeholder="2026-07-31" style="height:25px;min-height:0;font-size:12px;font-family:var(--font-mono)" /></div>
+            <button onClick="{{ toggleNoMerges }}" class="btn btn-secondary" style="height:25px;font-size:11.5px;box-shadow:{{ noMergesRing }}">Ignore merges</button>
+            <button onClick="{{ toggleMatching }}" class="btn btn-secondary" style="height:25px;font-size:11.5px;box-shadow:{{ matchingRing }}">Detect matching-message cherry-picks</button>
+            <div style="flex:1"></div>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--font-mono)">Esc clears · ⌘A selects all</span>
+          </div>
+
+          <sc-if value="{{ cmpIsList }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;min-height:0;display:grid;grid-template-columns:{{ cmpCols }};grid-template-rows:{{ cmpRows }};gap:1px;background:var(--line)">
+              <div style="display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--color-bg)">
+                <div style="flex:0 0 auto;display:flex;align-items:center;gap:var(--space-2);height:30px;padding:0 var(--space-3);background:var(--panel);border-bottom:1px solid var(--line)">
+                  <span style="width:7px;height:7px;border-radius:2px;background:var(--color-accent)"></span>
+                  <span style="font-family:var(--font-mono);font-size:12px;font-weight:600">main .. feature/mlx5-next</span>
+                  <span style="font-size:11px;color:var(--fg3)">3 commits · 34 files · +1,204 −318</span>
+                </div>
+                <div style="flex:1;overflow:auto;min-height:0">
+                  <sc-for list="{{ cmpA }}" as="c" hint-placeholder-count="3">
+                    <div onClick="{{ c.click }}" onContextMenu="{{ c.menu }}" style="display:flex;align-items:center;gap:10px;height:26px;padding:0 var(--space-3);cursor:pointer;font-size:12px;background:{{ c.bg }};opacity:{{ c.dim }}" style-hover="background:var(--hover)">
+                      <span style="font-family:var(--font-mono);font-size:11px;color:var(--iris)">{{ c.short }}</span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.subject }}</span>
+                      <sc-if value="{{ c.picked }}" hint-placeholder-val="{{ false }}">
+                        <span class="tag tag-accent" style="font-size:9.5px;padding:0 6px">MATCHED</span>
+                      </sc-if>
+                      <span style="width:120px;color:var(--fg3);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.author }}</span>
+                      <span style="color:var(--fg3);font-family:var(--font-mono);font-size:11px">{{ c.date }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--color-bg)">
+                <div style="flex:0 0 auto;display:flex;align-items:center;gap:var(--space-2);height:30px;padding:0 var(--space-3);background:var(--panel);border-bottom:1px solid var(--line)">
+                  <span style="width:7px;height:7px;border-radius:2px;background:var(--add)"></span>
+                  <span style="font-family:var(--font-mono);font-size:12px;font-weight:600">feature/mlx5-next .. main</span>
+                  <span style="font-size:11px;color:var(--fg3)">12 commits · 96 files · +3,881 −1,022</span>
+                </div>
+                <div style="flex:1;overflow:auto;min-height:0">
+                  <sc-for list="{{ cmpB }}" as="c" hint-placeholder-count="7">
+                    <div onClick="{{ c.click }}" onContextMenu="{{ c.menu }}" style="display:flex;align-items:center;gap:10px;height:26px;padding:0 var(--space-3);cursor:pointer;font-size:12px;background:{{ c.bg }};opacity:{{ c.dim }}" style-hover="background:var(--hover)">
+                      <span style="font-family:var(--font-mono);font-size:11px;color:var(--iris)">{{ c.short }}</span>
+                      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.subject }}</span>
+                      <sc-if value="{{ c.picked }}" hint-placeholder-val="{{ false }}">
+                        <span class="tag tag-accent" style="font-size:9.5px;padding:0 6px">MATCHED</span>
+                      </sc-if>
+                      <span style="width:120px;color:var(--fg3);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.author }}</span>
+                      <span style="color:var(--fg3);font-family:var(--font-mono);font-size:11px">{{ c.date }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ cmpIsGraph }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-height:0;overflow:auto;padding:var(--space-8);background:var(--color-bg)">{{ compareGraph }}</div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ============ DIFF / MERGE ============ -->
+      <sc-if value="{{ isDiff }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:6px;height:38px;padding:0 var(--space-3);border-bottom:1px solid var(--line);background:var(--panel);overflow:auto">
+            <sc-for list="{{ diffTabs }}" as="t" hint-placeholder-count="6">
+              <button onClick="{{ t.click }}" class="btn btn-secondary" style="flex:0 0 auto;height:25px;font-size:11.5px;white-space:nowrap;color:{{ t.fg }};box-shadow:{{ t.ring }}">{{ t.label }}</button>
+            </sc-for>
+            <div style="flex:1;min-width:20px"></div>
+            <button onClick="{{ swapDiff }}" class="btn btn-secondary" style="flex:0 0 auto;height:25px;font-size:11.5px"><i class="ph ph-arrows-left-right" style="font-size:13px"></i>Swap direction</button>
+            <button onClick="{{ compareRevision }}" class="btn btn-secondary" style="flex:0 0 auto;height:25px;font-size:11.5px">Compare with Revision…</button>
+          </div>
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column">{{ diffPane }}</div>
+        </div>
+      </sc-if>
+
+      <!-- ============ WORKTREES ============ -->
+      <sc-if value="{{ isWorktrees }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px;height:38px;padding:0 var(--space-4);border-bottom:1px solid var(--line);background:var(--panel)">
+            <span style="font-weight:500">Worktrees</span>
+            <span style="font-size:11px;color:var(--fg3)">5 registered · 1 locked · 1 prunable</span>
+            <div style="flex:1"></div>
+            <button onClick="{{ previewPrune }}" class="btn btn-secondary" style="height:25px">Preview prune</button>
+            <button onClick="{{ addWorktree }}" class="btn btn-primary" style="height:25px"><i class="ph ph-plus" style="font-size:13px"></i>Add worktree…</button>
+          </div>
+          <div style="flex:1;overflow:auto;min-height:0;padding:var(--space-1) 0">
+            <sc-for list="{{ worktrees }}" as="w" hint-placeholder-count="6">
+              <div>
+                <sc-if value="{{ w.group }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:var(--space-2);height:26px;padding:0 var(--space-4);margin-top:var(--space-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3)">
+                    <span>{{ w.group }}</span>
+                    <span style="flex:1;height:1px;background:var(--line)"></span>
+                  </div>
+                </sc-if>
+                <div onContextMenu="{{ w.menu }}" onClick="{{ w.menu }}" style="display:flex;align-items:center;gap:var(--space-4);height:44px;padding:0 var(--space-4);cursor:pointer;border-left:2px solid {{ w.mark }}" style-hover="background:var(--hover)">
+                  <i class="ph {{ w.icon }}" style="font-size:16px;color:{{ w.dot }}"></i>
+                  <span style="width:230px;flex:0 0 auto;font-family:var(--font-mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.branch }}</span>
+                  <span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11.5px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.path }}</span>
+                  <span style="font-size:11px;color:{{ w.stateColor }}">{{ w.state }}</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--iris)">{{ w.head }}</span>
+                  <i class="ph ph-dots-three" style="font-size:15px;color:var(--fg3)"></i>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SUBMODULES ============ -->
+      <sc-if value="{{ isSubmodules }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="flex:0 0 auto;display:flex;align-items:center;gap:10px;height:38px;padding:0 var(--space-4);border-bottom:1px solid var(--line);background:var(--panel)">
+            <span style="font-weight:500">Submodules</span>
+            <span style="font-size:11px;color:var(--fg3)">7 total · 2 need attention</span>
+            <div style="flex:1"></div>
+            <button onClick="{{ initAll }}" class="btn btn-secondary" style="height:25px">Init all</button>
+            <button onClick="{{ syncAll }}" class="btn btn-secondary" style="height:25px">Sync URLs</button>
+            <button onClick="{{ updateAll }}" class="btn btn-primary" style="height:25px">Update all --recursive</button>
+          </div>
+          <div style="flex:1;overflow:auto;min-height:0;padding:var(--space-1) 0">
+            <sc-for list="{{ submodules }}" as="s" hint-placeholder-count="6">
+              <div>
+                <sc-if value="{{ s.group }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:var(--space-2);height:26px;padding:0 var(--space-4);margin-top:var(--space-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:{{ s.groupColor }}">
+                    <span>{{ s.group }}</span>
+                    <span style="flex:1;height:1px;background:var(--line)"></span>
+                  </div>
+                </sc-if>
+                <div onContextMenu="{{ s.menu }}" onClick="{{ s.menu }}" style="display:flex;align-items:center;gap:var(--space-4);height:42px;padding-right:var(--space-4);padding-left:{{ s.pad }}px;cursor:pointer;border-left:2px solid {{ s.mark }}" style-hover="background:var(--hover)">
+                  <i class="ph {{ s.icon }}" style="font-size:16px;color:{{ s.dot }}"></i>
+                  <span style="width:210px;flex:0 0 auto;font-family:var(--font-mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.path }}</span>
+                  <span style="flex:1;min-width:0;font-size:11.5px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.url }}</span>
+                  <span style="font-size:11px;color:{{ s.stateColor }}">{{ s.state }}</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--iris)">{{ s.sha }}</span>
+                  <i class="ph ph-dots-three" style="font-size:15px;color:var(--fg3)"></i>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SETTINGS ============ -->
+      <sc-if value="{{ isSettings }}">
+        <div style="flex:1;display:flex;min-height:0">
+          <div style="flex:0 0 200px;border-right:1px solid var(--line);background:var(--panel);padding:var(--space-3) 0;overflow:auto">
+            <sc-for list="{{ settingsNav }}" as="s" hint-placeholder-count="6">
+              <a href="{{ s.href }}" style="display:block;padding:6px var(--space-4);font-size:12.5px;color:var(--fg2);text-decoration:none" style-hover="background:var(--hover);color:var(--color-accent)">{{ s.label }}</a>
+            </sc-for>
+          </div>
+          <div style="flex:1;overflow:auto;min-height:0">
+            <div style="max-width:760px;padding:var(--space-8) var(--space-8) 60px">
+              <h3 style="margin:0 0 var(--space-1)">Preferences</h3>
+              <p style="font-size:12.5px;color:var(--fg3);margin-bottom:var(--space-8)">Settings apply per repository unless marked Global.</p>
+              <sc-for list="{{ settingsSections }}" as="sec" hint-placeholder-count="6">
+                <div id="{{ sec.id }}" style="margin-bottom:var(--space-8)">
+                  <h6 style="margin:0 0 var(--space-3);padding-bottom:var(--space-2);border-bottom:1px solid var(--line);color:var(--fg3)">{{ sec.title }}</h6>
+                  <sc-for list="{{ sec.rows }}" as="r" hint-placeholder-count="4">
+                    <div style="display:grid;grid-template-columns:260px 1fr;gap:var(--space-6);align-items:start;padding:var(--space-2) 0">
+                      <div>
+                        <div style="font-size:12.5px">{{ r.label }}</div>
+                        <div style="font-size:11px;color:var(--fg3);text-wrap:pretty">{{ r.hint }}</div>
+                      </div>
+                      <div>{{ r.control }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ COMPONENT SPEC ============ -->
+      <sc-if value="{{ isComponents }}">
+        <div style="flex:1;overflow:auto;min-height:0;padding:var(--space-8) var(--space-8) 70px">
+          <h3 style="margin:0 0 var(--space-1)">Shared components</h3>
+          <p style="font-size:12.5px;color:var(--fg3);margin-bottom:var(--space-6)">Nocturne classes and tokens, specialised for a git client.</p>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:var(--space-4)">
+            <sc-for list="{{ specCards }}" as="s" hint-placeholder-count="9">
+              <div class="card elev-sm" style="padding:0;overflow:hidden">
+                <div style="padding:var(--space-3);border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:var(--space-2)">
+                  <span style="font-size:12.5px;font-weight:500">{{ s.title }}</span>
+                  <span style="font-size:11px;color:var(--fg3);font-family:var(--font-mono)">{{ s.tag }}</span>
+                </div>
+                <div style="padding:var(--space-4) var(--space-3);flex:1;display:flex;flex-direction:column;justify-content:center;gap:var(--space-2);background:var(--color-bg)">{{ s.demo }}</div>
+                <div style="padding:var(--space-2) var(--space-3);border-top:1px solid var(--line);font-size:11px;color:var(--fg3);text-wrap:pretty">{{ s.note }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== OUTPUT CONSOLE DRAWER ===== -->
+      <sc-if value="{{ consoleOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:0 0 auto;height:200px;border-top:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column">
+          <div style="flex:0 0 auto;height:28px;display:flex;align-items:center;gap:10px;padding:0 var(--space-3);border-bottom:1px solid var(--line)">
+            <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)">Output — git</span>
+            <span style="font-size:11px;color:var(--fg3);font-family:var(--font-mono)">{{ consoleStatus }}</span>
+            <div style="flex:1"></div>
+            <button onClick="{{ clearConsole }}" class="btn btn-secondary" style="height:20px;font-size:11px">Clear</button>
+            <button onClick="{{ toggleConsole }}" class="btn btn-secondary" style="height:20px;font-size:11px">Hide</button>
+          </div>
+          <div style="flex:1;overflow:auto;padding:var(--space-2) var(--space-3);font-family:var(--font-mono);font-size:11.5px;line-height:1.6">
+            <sc-for list="{{ consoleLines }}" as="l" hint-placeholder-count="8">
+              <div style="color:{{ l.color }};white-space:pre-wrap">{{ l.text }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <!-- ===== SOURCE CONTROL DOCK ===== -->
+    <sc-if value="{{ dock }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:0 0 auto;width:330px;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0">
+        <div style="flex:0 0 auto;display:flex;gap:var(--space-2);padding:var(--space-2)">
+          <button onClick="{{ scChanges }}" class="btn btn-secondary" style="flex:1;height:25px;font-size:11.5px;color:{{ scChFg }};box-shadow:{{ scChRing }}">Changes 12</button>
+          <button onClick="{{ scStash }}" class="btn btn-secondary" style="flex:1;height:25px;font-size:11.5px;color:{{ scStFg }};box-shadow:{{ scStRing }}">Stash 4</button>
+        </div>
+
+        <sc-if value="{{ scIsChanges }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;overflow:auto;min-height:0">
+            <div style="display:flex;align-items:center;gap:var(--space-2);height:26px;padding:0 var(--space-3);background:var(--raised);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1">
+              <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)">Staged (4)</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ unstageAll }}" class="btn btn-ghost" style="height:18px;font-size:10.5px">Unstage all</button>
+            </div>
+            <sc-for list="{{ staged }}" as="f" hint-placeholder-count="4">
+              <div onClick="{{ f.click }}" onContextMenu="{{ f.menu }}" style="display:flex;align-items:center;gap:var(--space-2);height:24px;padding:0 var(--space-3);cursor:pointer;font-family:var(--font-mono);font-size:11.5px" style-hover="background:var(--hover)">
+                <span style="width:11px;text-align:center;color:{{ f.color }};font-weight:600">{{ f.status }}</span>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left">{{ f.path }}</span>
+                <span style="color:var(--fg3);font-size:11px">{{ f.stat }}</span>
+              </div>
+            </sc-for>
+            <div style="display:flex;align-items:center;gap:var(--space-2);height:26px;padding:0 var(--space-3);background:var(--raised);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+              <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--fg2)">Unstaged (8)</span>
+              <div style="flex:1"></div>
+              <button onClick="{{ stageAll }}" class="btn btn-ghost" style="height:18px;font-size:10.5px">Stage all</button>
+            </div>
+            <sc-for list="{{ unstaged }}" as="f" hint-placeholder-count="8">
+              <div onClick="{{ f.click }}" onContextMenu="{{ f.menu }}" style="display:flex;align-items:center;gap:var(--space-2);height:24px;padding:0 var(--space-3);cursor:pointer;font-family:var(--font-mono);font-size:11.5px" style-hover="background:var(--hover)">
+                <span style="width:11px;text-align:center;color:{{ f.color }};font-weight:600">{{ f.status }}</span>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left">{{ f.path }}</span>
+                <button onClick="{{ f.shelve }}" title="Shelve this file" class="btn btn-ghost" style="height:17px;font-size:10px;padding:0 4px">shelve</button>
+                <span style="color:var(--fg3);font-size:11px">{{ f.stat }}</span>
+              </div>
+            </sc-for>
+            <div style="padding:var(--space-3);border-top:1px solid var(--line);margin-top:var(--space-2)">
+              <h6 style="margin:0 0 6px;color:var(--fg3)">Partial staging</h6>
+              <div style="border:1px solid var(--line);border-radius:var(--radius-md);overflow:hidden;font-family:var(--font-mono);font-size:11px">
+                <div style="display:flex;align-items:center;gap:var(--space-2);padding:4px 8px;background:var(--raised);border-bottom:1px solid var(--line)">
+                  <span style="color:var(--fg3)">@@ -412,7 +412,9 @@</span>
+                  <div style="flex:1"></div>
+                  <button onClick="{{ stageHunk }}" class="btn btn-ghost" style="height:17px;font-size:10px;padding:0 4px">Stage hunk</button>
+                </div>
+                <div style="padding:3px 8px;color:var(--fg3);white-space:pre">  mlx5e_tx_reporter_err_cqe(sq);</div>
+                <div style="padding:3px 8px;background:var(--delbg);color:var(--del);white-space:pre">- if (unlikely(!priv->channels.num))</div>
+                <div style="padding:3px 8px;background:var(--addbg);color:var(--add);white-space:pre">+ if (unlikely(!priv->channels.num ||</div>
+                <div style="padding:3px 8px;background:var(--addbg);color:var(--add);white-space:pre">+     !test_bit(MLX5E_STATE_OPENED)))</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:0 0 auto;border-top:1px solid var(--line);padding:var(--space-3)">
+            <div style="display:flex;gap:6px;margin-bottom:6px">
+              <button onClick="{{ pickTemplate }}" class="btn btn-secondary" style="flex:1;height:22px;font-size:11px">Template<i class="ph ph-caret-down" style="font-size:10px"></i></button>
+              <button onClick="{{ aiMessage }}" class="btn btn-secondary" style="flex:1;height:22px;font-size:11px"><i class="ph ph-sparkle" style="font-size:12px;color:var(--color-accent)"></i>Generate</button>
+            </div>
+            <textarea value="{{ commitMsg }}" onChange="{{ setCommitMsg }}" rows="4" class="input" placeholder="Commit message… ⌘↵ to commit" style="min-height:78px;font-family:var(--font-mono);font-size:11.5px"></textarea>
+            <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2)">
+              <label class="radio" style="font-size:11px;color:var(--fg2)"><input type="checkbox" /><span class="dot"></span>Amend</label>
+              <div style="flex:1"></div>
+              <button onClick="{{ commit }}" class="btn btn-primary" style="height:26px">Commit ⌘↵</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ scIsStash }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;overflow:auto;min-height:0;padding:var(--space-2)">
+            <button onClick="{{ createStash }}" class="btn btn-secondary btn-block" style="height:26px;font-size:11.5px;border-style:dashed;margin:0 0 var(--space-2)">+ Stash changes… (untracked / keep index)</button>
+            <sc-for list="{{ stashes }}" as="s" hint-placeholder-count="4">
+              <div onContextMenu="{{ s.menu }}" onClick="{{ s.menu }}" class="card" style="padding:var(--space-3);margin-bottom:6px;cursor:pointer;gap:5px" style-hover="box-shadow:var(--shadow-sm)">
+                <div style="display:flex;align-items:baseline;gap:var(--space-2)">
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--color-accent)">{{ s.ref }}</span>
+                  <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.msg }}</span>
+                </div>
+                <div style="display:flex;gap:var(--space-2);font-size:10.5px;color:var(--fg3);font-family:var(--font-mono)">
+                  <span>{{ s.branch }}</span><span>·</span><span>{{ s.files }}</span><span>·</span><span>{{ s.when }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div style="flex:0 0 auto;height:26px;display:flex;align-items:center;gap:10px;padding:0 var(--space-3);background:{{ statusBg }};border-top:1px solid var(--line);font-size:11.5px;user-select:none">
+    <sc-if value="{{ opActive }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:var(--space-2)">
+        <span class="tag tag-outline" style="font-size:10px;padding:0 6px;letter-spacing:.06em;color:var(--warn);border-color:var(--warn)">{{ opName }}</span>
+        <span style="color:var(--fg2)">{{ opStep }}</span>
+        <span style="color:var(--fg3);font-family:var(--font-mono)">{{ opDetail }}</span>
+        <button onClick="{{ opContinue }}" class="btn btn-primary" style="height:18px;font-size:10.5px;padding:0 8px">Continue</button>
+        <button onClick="{{ opSkip }}" class="btn btn-secondary" style="height:18px;font-size:10.5px;padding:0 8px">Skip</button>
+        <button onClick="{{ opAbort }}" class="btn btn-secondary" style="height:18px;font-size:10.5px;padding:0 8px;color:var(--del);border-color:var(--del)">Abort</button>
+      </div>
+    </sc-if>
+    <sc-if value="{{ opIdle }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:var(--space-2);color:var(--fg2);font-family:var(--font-mono)">
+        <i class="ph ph-git-branch" style="font-size:13px;color:var(--color-accent)"></i>
+        <span>main</span>
+        <span style="color:var(--add)">↓12</span><span style="color:var(--warn)">↑3</span>
+        <span style="color:var(--fg3)">·</span>
+        <span>12 changed, 4 staged</span>
+      </div>
+    </sc-if>
+    <div style="flex:1"></div>
+    <button onClick="{{ toggleConsole }}" class="btn btn-ghost" style="height:18px;font-size:10.5px;color:var(--fg3)">Output<i class="ph {{ consoleChevron }}" style="font-size:10px"></i></button>
+    <span style="color:var(--fg3);font-family:var(--font-mono)">git 2.51.0</span>
+    <span style="color:var(--fg3)">·</span>
+    <span style="color:var(--fg3);font-family:var(--font-mono)">1,284,930 commits</span>
+  </div>
+</div>
+
+<!-- ===== CONTEXT MENU ===== -->
+<sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeMenu }}" onContextMenu="{{ closeMenu }}" style="position:fixed;inset:0;z-index:60">
+    <div style="position:absolute;left:{{ menuX }}px;top:{{ menuY }}px;min-width:252px;background:var(--color-surface);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);padding:5px;animation:popIn .09s ease-out">
+      <sc-if value="{{ menuTitle }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:5px 9px 6px;font-family:var(--font-mono);font-size:11px;color:var(--fg3);border-bottom:1px solid var(--line);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ menuTitle }}</div>
+      </sc-if>
+      <sc-for list="{{ menuItems }}" as="m" hint-placeholder-count="8">
+        <div onClick="{{ m.run }}" style="display:flex;align-items:center;gap:10px;height:{{ m.h }}px;margin:{{ m.margin }};padding:{{ m.padding }};border-radius:var(--radius-sm);cursor:{{ m.cursor }};background:{{ m.bg }};color:{{ m.color }};font-size:12.5px" style-hover="background:var(--sel)">
+          <span style="flex:1;white-space:nowrap">{{ m.label }}</span>
+          <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--fg3)">{{ m.hint }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== COMMAND PALETTE ===== -->
+<sc-if value="{{ paletteOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closePalette }}" class="dialog-backdrop" style="z-index:70;place-items:start center;padding-top:12vh">
+    <div onClick="{{ stop }}" class="dialog" style="width:min(640px,100%);max-height:60vh;padding:0;gap:0;overflow:hidden;animation:popIn .1s ease-out">
+      <input value="{{ paletteQ }}" onInput="{{ setPaletteQ }}" autofocus="true" placeholder="Type an action, branch, or commit…" style="height:44px;background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 var(--space-4);font-family:inherit;font-size:14px;color:var(--fg)" />
+      <div style="flex:1;overflow:auto;padding:var(--space-2)">
+        <sc-for list="{{ paletteItems }}" as="p" hint-placeholder-count="10">
+          <div onClick="{{ p.run }}" style="display:flex;align-items:center;gap:10px;height:32px;padding:0 var(--space-3);border-radius:var(--radius-md);cursor:pointer;background:{{ p.bg }}" style-hover="background:var(--sel)">
+            <span style="font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);width:74px;flex:0 0 auto">{{ p.group }}</span>
+            <span style="flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.label }}</span>
+            <span style="font-family:var(--font-mono);font-size:10.5px;color:var(--fg3)">{{ p.hint }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="height:26px;display:flex;align-items:center;gap:14px;padding:0 var(--space-3);border-top:1px solid var(--line);font-size:10.5px;color:var(--fg3);font-family:var(--font-mono)">
+        <span>↑↓ navigate</span><span>↵ run</span><span>esc close</span>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== CONFIRM DIALOG ===== -->
+<sc-if value="{{ dialogOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="dialog-backdrop" style="z-index:80">
+    <div class="dialog" style="animation:popIn .1s ease-out">
+      <div style="display:flex;gap:var(--space-3);align-items:flex-start">
+        <i class="ph ph-warning-circle" style="font-size:20px;color:var(--del)"></i>
+        <div>
+          <div class="dialog-title" style="font-size:18px">{{ dialogTitle }}</div>
+          <div class="dialog-body" style="margin-top:var(--space-2);text-wrap:pretty">{{ dialogBody }}</div>
+        </div>
+      </div>
+      <div style="padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-md);background:var(--color-bg);font-family:var(--font-mono);font-size:11.5px;color:var(--fg2);white-space:pre-wrap">{{ dialogCmd }}</div>
+      <div class="dialog-actions">
+        <button onClick="{{ closeDialog }}" class="btn btn-secondary" style="height:28px">Cancel</button>
+        <button onClick="{{ confirmDialog }}" class="btn btn-primary" style="height:28px;color:var(--del);border-color:var(--del)">{{ dialogAction }}</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<!-- ===== PROGRESS TOAST ===== -->
+<sc-if value="{{ toastOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="card elev-md" style="position:fixed;right:18px;bottom:38px;z-index:75;width:330px;animation:toastIn .16s ease-out">
+    <div style="display:flex;align-items:baseline;gap:var(--space-2)">
+      <span style="font-size:12.5px;font-weight:500;flex:1">{{ toastTitle }}</span>
+      <button onClick="{{ cancelToast }}" class="btn btn-secondary" style="height:19px;font-size:10.5px">Cancel</button>
+    </div>
+    <div style="font-family:var(--font-mono);font-size:11px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ toastDetail }}</div>
+    <div style="height:3px;border-radius:2px;background:var(--raised2);overflow:hidden">
+      <div style="height:100%;width:{{ toastPct }}%;background:var(--color-accent);transition:width .3s linear"></div>
+    </div>
+  </div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;,&quot;section&quot;:&quot;Appearance&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#9184d9&quot;,&quot;#7fa6d9&quot;,&quot;#89c9a8&quot;,&quot;#d9a184&quot;],&quot;default&quot;:&quot;#89c9a8&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Appearance&quot;}}">
+class Component extends DCLogic {
+  COLORS = ['oklch(.70 .12 289)','oklch(.70 .11 152)','oklch(.72 .11 85)','oklch(.68 .13 25)','oklch(.70 .10 205)','oklch(.70 .12 330)','oklch(.70 .10 255)'];
+
+  RAW = [
+    ["Merge branch 'mlx5-next' into net-next","Jakub Kicinski","2026-07-30 14:22",[1,6],["main","origin/main"]],
+    ["mm/slub: fix kmalloc_nolock() vs kfree() race on cpu_slab","Vlastimil Babka","2026-07-30 11:04",[2],[]],
+    ["sched/fair: prevent stale util_est after task migration","Peter Zijlstra","2026-07-29 18:47",[3],[]],
+    ["Merge tag 'v6.19-rc4' into for-next","Linus Torvalds","2026-07-29 09:31",[4,9],["tag: v6.19-rc4"]],
+    ["kbuild: drop -Wmaybe-uninitialized for clang builds","Nathan Chancellor","2026-07-28 21:15",[5],[]],
+    ["io_uring: fix ring buffer accounting on resize","Jens Axboe","2026-07-28 16:02",[11],[]],
+    ["net/mlx5e: add TX steering for tunneled traffic","Saeed Mahameed","2026-07-28 13:40",[7],["feature/mlx5-next","origin/feature/mlx5-next"]],
+    ["net/mlx5: split ESW offload init into helpers","Roi Dayan","2026-07-27 19:58",[8],[]],
+    ["net/mlx5: introduce per-vport packet counters","Saeed Mahameed","2026-07-27 10:12",[12],[]],
+    ["arm64: dts: qcom: enable UFS on sm8750","Bjorn Andersson","2026-07-27 08:44",[10],["fix/kbuild-clang"]],
+    ["arm64: errata: workaround for Cortex-A725 erratum 3699571","Mark Rutland","2026-07-26 15:20",[12],[]],
+    ["block: fix nr_requests underflow on queue resize","Ming Lei","2026-07-26 12:07",[12],[]],
+    ["Merge tag 'v6.19-rc3'","Linus Torvalds","2026-07-25 17:33",[13],["tag: v6.19-rc3"]],
+    ["Merge branch 'sched/core' into for-linus","Ingo Molnar","2026-07-25 09:18",[14,17],[]],
+    ["ext4: avoid inode reuse race in orphan cleanup","Theodore Ts'o","2026-07-24 22:41",[15],[]],
+    ["btrfs: zoned: reclaim unusable space earlier","David Sterba","2026-07-24 14:09",[16],[]],
+    ["fs: rename lookup_one_len() callers to lookup_noperm()","Al Viro","2026-07-23 20:26",[20],[]],
+    ["sched_ext: allow BPF schedulers to opt out of core sched","Tejun Heo","2026-07-23 11:55",[18],["release/6.18.y","origin/release/6.18.y"]],
+    ["sched_ext: document dispatch queue lifetime rules","David Vernet","2026-07-22 16:31",[19],[]],
+    ["sched/core: tidy up nohz balance entry points","Peter Zijlstra","2026-07-22 09:47",[20],[]],
+    ["Merge tag 'v6.19-rc2'","Linus Torvalds","2026-07-21 18:12",[21],["tag: v6.19-rc2"]],
+    ["drm/amdgpu: bump VCN firmware version for VCN 5.0","Alex Deucher","2026-07-21 13:26",[22],[]],
+    ["Merge branch 'rust-next'","Miguel Ojeda","2026-07-20 15:39",[23,25],[]],
+    ["rust: alloc: implement Vec::try_with_capacity","Danilo Krummrich","2026-07-20 10:03",[24],[]],
+    ["rust: kernel: add Pin<KBox<T>> conversions","Benno Lossin","2026-07-19 19:48",[27],[]],
+    ["perf tools: fix build against libbpf 1.6","Arnaldo Carvalho de Melo","2026-07-19 12:22",[26],["feature/perf-tui"]],
+    ["perf report: add TUI column for cgroup id","Namhyung Kim","2026-07-18 17:05",[27],[]],
+    ["Merge tag 'v6.19-rc1'","Linus Torvalds","2026-07-18 08:50",[28],["tag: v6.19-rc1"]],
+    ["cgroup: fix memcg stat flush deadlock under memory pressure","Michal Hocko","2026-07-17 21:14",[29],[]],
+    ["x86/mm: relax LAM enablement check for 5-level paging","Dave Hansen","2026-07-17 11:38",[30],[]],
+    ["Linux 6.19-rc1","Linus Torvalds","2026-07-16 19:00",[],[]]
+  ];
+
+  state = {
+    view: 'graph', theme: 'dark', dock: true, consoleOpen: false, palette: false, paletteQ: '',
+    menu: null, dialog: null, toast: null, op: null,
+    sel: [0], expanded: {0: true}, graphLayout: 'rows', compareMode: 'list', compareLayout: 'side',
+    filterOpen: false, f: {ref: '', author: '', msg: '', from: '', to: ''},
+    cf: {msg: '', author: '', excl: '', from: '', to: '', noMerges: false, matching: true},
+    branchQ: '', scTab: 'changes', diffTab: 'work', consoleLines: null, toastPct: 0,
+    commitMsg: "net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: "
+  };
+
+  /* ---------- memoised derived data ---------- */
+  hash(i) {
+    if (!this._hashes) {
+      const s = 'f3a9c218be1c042d77a19b0c4e8391ff2d64a7c0b15e93d17cc2a80e4b6d59f2';
+      this._hashes = this.RAW.map((_, n) => {
+        let h = '';
+        for (let k = 0; k < 7; k++) h += s[(n * 7 + k * 3 + 11) % s.length];
+        return h;
+      });
+    }
+    return this._hashes[i] || '0000000';
+  }
+  graph() { if (!this._graph) this._graph = this.buildGraph(); return this._graph; }
+  files(i) {
+    if (!this._files) this._files = {};
+    if (!this._files[i]) this._files[i] = this.buildFiles(i);
+    return this._files[i];
+  }
+  rowGraphic(i) {
+    if (!this._svgs) this._svgs = {};
+    if (!this._svgs[i]) {
+      const g = this.graph(), row = g.rows[i];
+      this._svgs[i] = {svg: this.rowSvg(row, (this.RAW[i][3] || []).length > 1, g.width), gutter: this.gutterSvg(row, g.width)};
+    }
+    return this._svgs[i];
+  }
+  spec() { if (!this._spec) this._spec = this.specCards(); return this._spec; }
+
+  componentDidMount() {
+    const t = this.props.theme || this.state.theme || 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    if (this.props.accent) document.documentElement.style.setProperty('--color-accent', this.props.accent);
+    this._key = (e) => {
+      const k = (e.key || '').toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && k === 'k') { e.preventDefault(); this.setState({palette: true, paletteQ: ''}); }
+      else if (e.key === 'Escape') this.setState({palette: false, menu: null, dialog: null, sel: [0]});
+      else if ((e.metaKey || e.ctrlKey) && k === 'a' && this.state.view === 'compare') { e.preventDefault(); this.setState({sel: this.RAW.map((_, i) => i)}); }
+    };
+    window.addEventListener('keydown', this._key);
+    if (t !== this.state.theme) this.setState({theme: t});
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._key); clearInterval(this._t); }
+
+  seedLog() {
+    return [
+      ['$ git fetch --all --prune', 'cmd'],
+      ['Fetching origin', 'out'],
+      ['From github.com:torvalds/linux', 'out'],
+      ['   4c1f9ab..f3a9c21  master     -> origin/master', 'out'],
+      [' * [new tag]         v6.19-rc4  -> v6.19-rc4', 'out'],
+      ['$ git submodule update --init --recursive tools/lib/bpf', 'cmd'],
+      ["Submodule path 'tools/lib/bpf': checked out '9b41ac2'", 'out'],
+      ['done in 4.2s', 'ok']
+    ];
+  }
+  log(lines) {
+    const cur = (this.state.consoleLines || this.seedLog()).slice(-120);
+    this.setState({consoleLines: cur.concat(lines), consoleOpen: true});
+  }
+  toastRun(title, detail, done) {
+    clearInterval(this._t);
+    this.setState({toast: {title, detail}, toastPct: 6});
+    this._t = setInterval(() => {
+      const p = this.state.toastPct + 11;
+      if (p >= 100) { clearInterval(this._t); this.setState({toastPct: 100}); setTimeout(() => this.setState({toast: null}), 700); if (done) done(); }
+      else this.setState({toastPct: p});
+    }, 220);
+  }
+  confirm(title, body, cmd, action, run) { this.setState({dialog: {title, body, cmd, action, run}, menu: null}); }
+  openMenu(e, title, items) {
+    if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
+    const x = Math.min(e.clientX, window.innerWidth - 290);
+    const y = Math.min(e.clientY, Math.max(60, window.innerHeight - Math.min(items.length * 27 + 60, 470)));
+    this.setState({menu: {x, y, title, items}});
+  }
+  act(label, extra) {
+    return () => {
+      this.setState({menu: null, palette: false});
+      this.log([['$ git ' + (extra || label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()), 'cmd'], ['ok', 'ok']]);
+      this.toastRun(label, 'running ' + (extra || 'git command') + '…');
+    };
+  }
+
+  buildGraph() {
+    const lanes = [], rows = [];
+    this.RAW.forEach((r, i) => {
+      let L = lanes.indexOf(i);
+      if (L < 0) { L = lanes.indexOf(null); if (L < 0) L = lanes.length; lanes[L] = i; }
+      const before = lanes.slice();
+      const edges = [];
+      lanes[L] = null;
+      (r[3] || []).forEach((p, k) => {
+        let pl = lanes.indexOf(p);
+        if (pl < 0) {
+          if (k === 0 && lanes[L] == null) pl = L;
+          else { pl = lanes.indexOf(null); if (pl < 0) pl = lanes.length; }
+          lanes[pl] = p;
+        }
+        edges.push({from: L, to: pl, y0: 15, y1: 30, color: this.COLORS[pl % 7]});
+      });
+      before.forEach((id, l) => { if (id != null && l !== L) edges.push({from: l, to: l, y0: 0, y1: 30, color: this.COLORS[l % 7]}); });
+      if (i > 0) edges.unshift({from: L, to: L, y0: 0, y1: 15, color: this.COLORS[L % 7]});
+      while (lanes.length && lanes[lanes.length - 1] == null) lanes.pop();
+      rows.push({lane: L, edges, after: lanes.slice()});
+      rows[rows.length - 1].width = Math.max(before.length, lanes.length);
+    });
+    const max = rows.reduce((m, r) => Math.max(m, r.width), 1);
+    return {rows, width: max * 15 + 18};
+  }
+  laneX(l) { return 12 + l * 15; }
+  rowSvg(row, isMerge, w) {
+    const R = React.createElement, ch = [];
+    row.edges.forEach((e, i) => {
+      const x1 = this.laneX(e.from), x2 = this.laneX(e.to);
+      const d = x1 === x2 ? 'M' + x1 + ' ' + e.y0 + 'L' + x1 + ' ' + e.y1
+        : 'M' + x1 + ' ' + e.y0 + 'C' + x1 + ' ' + ((e.y0 + e.y1) / 2) + ',' + x2 + ' ' + ((e.y0 + e.y1) / 2) + ',' + x2 + ' ' + e.y1;
+      ch.push(R('path', {key: i, d, stroke: e.color, strokeWidth: 1.7, fill: 'none', strokeLinecap: 'round'}));
+    });
+    const c = this.COLORS[row.lane % 7];
+    ch.push(R('circle', {key: 'dot', cx: this.laneX(row.lane), cy: 15, r: isMerge ? 4.4 : 4, fill: isMerge ? 'var(--color-bg)' : c, stroke: c, strokeWidth: 1.9}));
+    return R('svg', {width: w, height: 30, style: {display: 'block', flex: '0 0 auto'}}, ch);
+  }
+  gutterSvg(row, w) {
+    const R = React.createElement, ch = [];
+    row.after.forEach((id, l) => { if (id != null) ch.push(R('line', {key: l, x1: this.laneX(l), x2: this.laneX(l), y1: 0, y2: '100%', stroke: this.COLORS[l % 7], strokeWidth: 1.7})); });
+    return R('svg', {width: w, height: '100%', preserveAspectRatio: 'none', style: {display: 'block'}}, ch);
+  }
+
+  buildFiles(i) {
+    const subj = this.RAW[i][0];
+    const dir = (subj.split(':')[0] || 'kernel').replace(/[^a-z0-9/_-]/gi, '').toLowerCase();
+    const base = dir.indexOf('/') > 0 ? dir : dir + '/core';
+    const names = ['main.c', 'core.c', 'Makefile', 'internal.h', 'params.c', 'debugfs.c', 'Kconfig'];
+    const n = 2 + (i % 4), out = [];
+    for (let k = 0; k < n; k++) out.push({
+      path: base + '/' + names[(i + k) % names.length],
+      status: (k === 0 && i % 5 === 0) ? 'A' : ((i % 7 === 3 && k === n - 1) ? 'D' : 'M'),
+      add: 3 + ((i * 13 + k * 7) % 90), del: 1 + ((i * 5 + k * 3) % 40)
+    });
+    return out;
+  }
+  statusColor(s) { return s === 'A' ? 'var(--add)' : s === 'D' ? 'var(--del)' : s === 'R' ? 'var(--iris)' : 'var(--color-accent)'; }
+
+  matches(i) {
+    const f = this.state.f, r = this.RAW[i];
+    if (f.author && r[1].toLowerCase().indexOf(f.author.toLowerCase()) < 0) return false;
+    if (f.msg && r[0].toLowerCase().indexOf(f.msg.toLowerCase()) < 0) return false;
+    if (f.from && r[2].slice(0, 10) < f.from) return false;
+    if (f.to && r[2].slice(0, 10) > f.to) return false;
+    if (f.ref) { const q = f.ref.replace('*', '').toLowerCase(); if (!(r[4] || []).some(x => x.toLowerCase().indexOf(q) >= 0)) return false; }
+    return true;
+  }
+  cmpMatch(i) {
+    const c = this.state.cf, r = this.RAW[i];
+    if (c.msg && r[0].toLowerCase().indexOf(c.msg.toLowerCase()) < 0) return false;
+    if (c.author && r[1].toLowerCase().indexOf(c.author.toLowerCase()) < 0) return false;
+    if (c.noMerges && r[0].indexOf('Merge ') === 0) return false;
+    if (c.excl) { try { if (new RegExp(c.excl, 'i').test(r[0])) return false; } catch (err) {} }
+    if (c.from && r[2].slice(0, 10) < c.from) return false;
+    if (c.to && r[2].slice(0, 10) > c.to) return false;
+    return true;
+  }
+  refBadge(label) {
+    if (label.indexOf('tag: ') === 0) return {label: label.slice(5), cls: 'tag-outline'};
+    if (label.indexOf('origin/') === 0) return {label, cls: 'tag-neutral'};
+    if (label === 'main') return {label: 'HEAD → ' + label, cls: 'tag-accent'};
+    return {label, cls: 'tag-accent-2'};
+  }
+
+  /* ---------- diff pane ---------- */
+  btn() { return {height: 22, padding: '0 9px', background: 'transparent', border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', color: 'var(--fg2)', cursor: 'pointer', fontSize: 11.5, fontFamily: 'inherit'}; }
+  diffPane() {
+    const R = React.createElement;
+    const mono = {fontFamily: 'var(--font-mono)', fontSize: '11.8px', lineHeight: '18px'};
+    if (this.state.diffTab === 'merge') {
+      const col = (title, tint, lines, fill) => R('div', {style: {flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--line)'}},
+        R('div', {style: {height: 26, display: 'flex', alignItems: 'center', gap: 8, padding: '0 10px', background: 'var(--panel)', borderBottom: '1px solid var(--line)', fontSize: 11}},
+          R('span', {style: {width: 7, height: 7, borderRadius: 2, background: tint}}), title),
+        R('div', {style: {flex: 1, overflow: 'auto', padding: '6px 0'}},
+          lines.map((l, i) => R('div', {key: i, style: {...mono, whiteSpace: 'pre', padding: '0 10px', background: l[1] ? fill : 'transparent', color: l[1] ? 'var(--fg)' : 'var(--fg2)'}}, l[0]))));
+      const left = [['	if (unlikely(!priv->channels.num))', 0], ['		return;', 0], ['	mlx5e_reporter_tx_err_cqe(sq);', 1], ['	queue_work(priv->wq, &sq->recover_work);', 1]];
+      const mid = [['	if (unlikely(!priv->channels.num))', 0], ['		return;', 0], ['<<<<<<< HEAD', 1], ['	mlx5e_reporter_tx_err_cqe(sq);', 1], ['=======', 1], ['	mlx5e_reporter_tx_err_cqe(sq, ctx);', 1], ['>>>>>>> feature/mlx5-next', 1]];
+      const right = [['	if (unlikely(!priv->channels.num))', 0], ['		return;', 0], ['	mlx5e_reporter_tx_err_cqe(sq, ctx);', 1], ['	mlx5e_tx_flush(sq);', 1]];
+      return R('div', {style: {flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0}},
+        R('div', {style: {flex: '0 0 auto', height: 32, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', background: 'var(--panel)', borderBottom: '1px solid var(--line)'}},
+          R('span', {style: {fontSize: 11.5, color: 'var(--warn)'}}, '2 conflicts remaining'),
+          R('span', {style: {flex: 1}}),
+          R('button', {onClick: this.act('Previous conflict'), style: this.btn()}, '↑ Previous'),
+          R('button', {onClick: this.act('Next conflict'), style: this.btn()}, '↓ Next'),
+          R('button', {onClick: this.act('Take left'), style: this.btn()}, 'Take left'),
+          R('button', {onClick: this.act('Take right'), style: this.btn()}, 'Take right'),
+          R('button', {onClick: this.act('Mark resolved'), style: {...this.btn(), color: 'var(--color-accent)', borderColor: 'var(--color-accent)'}}, 'Resolve')),
+        R('div', {style: {flex: 1, display: 'flex', minHeight: 0}},
+          col('Local — main', 'var(--color-accent)', left, 'var(--delbg)'),
+          col('Result — working tree', 'var(--warn)', mid, 'var(--raised)'),
+          col('Remote — feature/mlx5-next', 'var(--add)', right, 'var(--addbg)')));
+    }
+    const hunk = [
+      ['@@ -412,9 +412,14 @@ static void mlx5e_tx_err_cqe_work(struct work_struct *recover_work)', 'h'],
+      [' 	struct mlx5e_txqsq *sq = container_of(recover_work, struct mlx5e_txqsq,', ' '],
+      [' 					      recover_work);', ' '],
+      [' ', ' '],
+      ['-	mlx5e_reporter_tx_err_cqe(sq);', '-'],
+      ['-	if (unlikely(!priv->channels.num))', '-'],
+      ['+	if (unlikely(!priv->channels.num ||', '+'],
+      ['+		     !test_bit(MLX5E_STATE_OPENED, &priv->state)))', '+'],
+      ['+		return;', '+'],
+      ['+', '+'],
+      ['+	mlx5e_reporter_tx_err_cqe(sq);', '+'],
+      [' 		return;', ' '],
+      [' }', ' '],
+      ['@@ -488,6 +493,8 @@ int mlx5e_open_txqsq(struct mlx5e_channel *c, u32 tisn, int txq_ix,', 'h'],
+      [' 	sq->stop_room = param->stop_room;', ' '],
+      ['+	sq->tunnel_steering = MLX5_CAP_ETH(mdev, tunnel_stateless_gre);', '+'],
+      [' 	INIT_WORK(&sq->recover_work, mlx5e_tx_err_cqe_work);', ' ']
+    ];
+    let oldN = 411, newN = 411;
+    const rows = hunk.map((h, i) => {
+      const text = h[0], k = h[1];
+      const bg = k === '+' ? 'var(--addbg)' : k === '-' ? 'var(--delbg)' : k === 'h' ? 'var(--raised)' : 'transparent';
+      const fg = k === '+' ? 'var(--add)' : k === '-' ? 'var(--del)' : k === 'h' ? 'var(--fg3)' : 'var(--fg)';
+      let ln1 = '', ln2 = '';
+      if (k === 'h') { const m = /\+(\d+)/.exec(text); if (m) { newN = +m[1] - 1; oldN = +m[1] - 1; } }
+      else { if (k !== '+') ln1 = ++oldN; if (k !== '-') ln2 = ++newN; }
+      return R('div', {key: i, style: {display: 'flex', background: bg, ...mono}},
+        R('span', {style: {width: 46, flex: '0 0 auto', textAlign: 'right', paddingRight: 8, color: 'var(--fg3)', userSelect: 'none'}}, ln1),
+        R('span', {style: {width: 46, flex: '0 0 auto', textAlign: 'right', paddingRight: 10, color: 'var(--fg3)', userSelect: 'none', borderRight: '1px solid var(--line)'}}, ln2),
+        R('span', {style: {paddingLeft: 10, whiteSpace: 'pre', color: fg, flex: 1}}, text));
+    });
+    return R('div', {style: {flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0}},
+      R('div', {style: {flex: '0 0 auto', height: 32, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px', background: 'var(--panel)', borderBottom: '1px solid var(--line)'}},
+        R('span', {style: {fontFamily: 'var(--font-mono)', fontSize: 12}}, 'drivers/net/ethernet/mellanox/mlx5/core/en_tx.c'),
+        R('span', {style: {fontSize: 11, color: 'var(--add)'}}, '+7'),
+        R('span', {style: {fontSize: 11, color: 'var(--del)'}}, '−2'),
+        R('span', {style: {flex: 1}}),
+        R('button', {onClick: () => this.setState({diffTab: this.state.diffTab === 'split' ? 'work' : 'split'}), style: this.btn()}, this.state.diffTab === 'split' ? 'Unified' : 'Split'),
+        R('button', {onClick: this.act('Stage hunk'), style: this.btn()}, 'Stage hunk'),
+        R('button', {onClick: this.act('Copy patch'), style: this.btn()}, 'Copy patch')),
+      R('div', {style: {flex: 1, overflow: 'auto', minHeight: 0, padding: '6px 0', background: 'var(--color-bg)'}}, rows));
+  }
+
+  compareGraphSvg() {
+    const R = React.createElement;
+    const A = [0, 1, 2, 3, 4, 5], B = [6, 7, 8];
+    const y = i => 34 + i * 44, xA = 100, xB = 360;
+    const dim = i => this.cmpMatch(i) ? 1 : .26;
+    const el = [];
+    el.push(R('path', {key: 'base', d: 'M' + xA + ' ' + y(A.length - 1) + 'C' + xA + ' ' + (y(A.length - 1) + 46) + ',' + xB + ' ' + (y(B.length - 1) + 66) + ',' + xB + ' ' + y(B.length - 1), stroke: 'var(--line2)', strokeWidth: 2, fill: 'none'}));
+    el.push(R('line', {key: 'la', x1: xA, x2: xA, y1: y(0), y2: y(A.length - 1), stroke: this.COLORS[0], strokeWidth: 2}));
+    el.push(R('line', {key: 'lb', x1: xB, x2: xB, y1: y(0), y2: y(B.length - 1), stroke: this.COLORS[1], strokeWidth: 2}));
+    const msgW = x => x === xA ? (xB - xA - 92) : (920 - xB - 34);
+    const node = (i, x, yy, color) => [
+      R('circle', {key: 'c' + x + i, cx: x, cy: yy, r: 5, fill: 'var(--color-bg)', stroke: color, strokeWidth: 2, opacity: dim(i)}),
+      R('text', {key: 'h' + x + i, x: x - 14, y: yy + 4, textAnchor: 'end', fill: 'var(--iris)', fontSize: 11, fontFamily: 'var(--font-mono)', opacity: dim(i)}, this.hash(i)),
+      R('foreignObject', {key: 't' + x + i, x: x + 14, y: yy - 9, width: msgW(x), height: 16},
+        R('div', {style: {fontSize: '12.5px', color: 'var(--color-text)', opacity: dim(i), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-body)'}}, this.RAW[i][0])),
+      R('foreignObject', {key: 'a' + x + i, x: x + 14, y: yy + 10, width: msgW(x), height: 14},
+        R('div', {style: {fontSize: '10.5px', color: 'var(--fg3)', opacity: dim(i), overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)'}}, this.RAW[i][1] + ' · ' + this.RAW[i][2]))
+    ];
+    A.forEach((i, k) => el.push.apply(el, node(i, xA, y(k), this.COLORS[0])));
+    B.forEach((i, k) => el.push.apply(el, node(i, xB, y(k), this.COLORS[1])));
+    el.push(R('text', {key: 'mb', x: xA - 66, y: y(A.length - 1) + 62, fill: 'var(--fg3)', fontSize: 11, fontFamily: 'var(--font-mono)'}, 'merge-base 4c1f9ab'));
+    el.push(R('text', {key: 'ha', x: xA - 66, y: y(0) - 18, fill: this.COLORS[0], fontSize: 11.5, fontFamily: 'var(--font-mono)'}, 'main'));
+    el.push(R('text', {key: 'hb', x: xB - 66, y: y(0) - 18, fill: this.COLORS[1], fontSize: 11.5, fontFamily: 'var(--font-mono)'}, 'feature/mlx5-next'));
+    return R('svg', {width: 920, height: y(A.length - 1) + 96, style: {display: 'block', overflow: 'visible'}}, el);
+  }
+
+  commitMenu(i) {
+    return (e) => this.openMenu(e, this.hash(i) + '  ' + this.RAW[i][0].slice(0, 32), [
+      {label: 'Open in Commit Details', hint: '↵', run: () => this.setState({view: 'details', sel: [i], menu: null})},
+      {label: 'Diff vs parent', run: () => this.setState({view: 'diff', diffTab: 'parent', menu: null})},
+      {sep: true},
+      {label: 'Checkout (detached)', run: this.act('Checkout ' + this.hash(i), 'checkout ' + this.hash(i))},
+      {label: 'Create branch here…', run: this.act('Create branch')},
+      {label: 'Create tag here…', run: this.act('Create tag')},
+      {sep: true},
+      {label: 'Cherry-pick', run: this.act('Cherry-pick', 'cherry-pick ' + this.hash(i))},
+      {label: 'Revert', run: this.act('Revert', 'revert ' + this.hash(i))},
+      {label: 'Create patch…', run: this.act('Create patch')},
+      {label: 'Start interactive rebase from here', run: () => { this.setState({menu: null, op: {name: 'REBASING', step: 2, total: 5, detail: 'pick 8be1c04 mm/slub: fix kmalloc_nolock()'}}); this.log([['$ git rebase -i ' + this.hash(i) + '^', 'cmd'], ['Stopped at ' + this.hash(i) + '... edit', 'warn']]); }},
+      {sep: true},
+      {label: 'Compare with current', run: () => this.setState({view: 'compare', menu: null})},
+      {label: 'Directory timeline for this path…', run: this.act('Directory timeline')},
+      {label: 'Jump to first parent', hint: '⌥↑', run: this.act('Jump to parent')},
+      {label: 'Copy hash', hint: '⌘C', run: this.act('Copy hash')}
+    ]);
+  }
+  branchMenu(name, kind) {
+    return (e) => this.openMenu(e, name, [
+      {label: 'Checkout', hint: '↵', run: this.act('Checkout ' + name, 'checkout ' + name)},
+      {label: 'New branch from ' + name + '…', run: this.act('Create branch')},
+      {label: 'Rename…', run: this.act('Rename branch')},
+      {sep: true},
+      {label: 'Merge ' + name + ' into main', run: this.act('Merge', 'merge ' + name)},
+      {label: 'Rebase main onto ' + name, run: () => { this.setState({menu: null, op: {name: 'REBASING', step: 2, total: 5, detail: 'applying: sched/fair: prevent stale util_est'}}); this.log([['$ git rebase ' + name, 'cmd'], ['Auto-merging kernel/sched/fair.c', 'out'], ['CONFLICT (content): merge conflict in kernel/sched/fair.c', 'err']]); }},
+      {label: 'Compare with current', run: () => this.setState({view: 'compare', menu: null})},
+      {label: 'Open in Git Graph', run: () => this.setState({view: 'graph', menu: null})},
+      {sep: true},
+      {label: 'Reset current to here — soft', run: this.act('Soft reset', 'reset --soft ' + name)},
+      {label: 'Reset current to here — mixed', run: this.act('Mixed reset', 'reset --mixed ' + name)},
+      {label: 'Reset current to here — hard', danger: true, run: () => this.confirm('Hard reset main to ' + name + '?', 'All uncommitted changes in the working tree and index are permanently discarded — 12 modified files will be lost.', 'git reset --hard ' + name, 'Reset --hard', this.act('Hard reset'))},
+      {sep: true},
+      {label: kind === 'remote' ? 'Untrack upstream' : 'Set upstream…', run: this.act('Set upstream')},
+      {label: 'Delete ' + name, danger: true, run: () => this.confirm('Delete branch ' + name + '?', kind === 'remote' ? 'This deletes the branch on the remote for everyone.' : 'The branch has 3 commits not merged into main.', kind === 'remote' ? 'git push origin --delete ' + name.replace('origin/', '') : 'git branch -D ' + name, 'Delete branch', this.act('Delete branch'))}
+    ]);
+  }
+
+  branchTree() {
+    const q = this.state.branchQ.toLowerCase();
+    const raw = [
+      {g: 'Local'},
+      {n: 'main', d: 1, cur: true, meta: '↓12 ↑3'},
+      {n: 'feature/', d: 1, folder: true},
+      {n: 'mlx5-next', d: 2, meta: '3 ahead', full: 'feature/mlx5-next'},
+      {n: 'perf-tui', d: 2, meta: '1 ahead', full: 'feature/perf-tui'},
+      {n: 'sched-ext-rework', d: 2, meta: '12 behind', full: 'feature/sched-ext-rework'},
+      {n: 'release/', d: 1, folder: true},
+      {n: '6.18.y', d: 2, meta: '', full: 'release/6.18.y'},
+      {n: '6.17.y', d: 2, meta: 'stale', full: 'release/6.17.y'},
+      {n: 'fix/kbuild-clang', d: 1, meta: '2 ahead'},
+      {g: 'Remote'},
+      {n: 'origin', d: 1, folder: true},
+      {n: 'main', d: 2, full: 'origin/main', kind: 'remote'},
+      {n: 'feature/mlx5-next', d: 2, full: 'origin/feature/mlx5-next', kind: 'remote'},
+      {n: 'release/6.18.y', d: 2, full: 'origin/release/6.18.y', kind: 'remote'},
+      {n: 'stable', d: 1, folder: true},
+      {n: 'linux-6.18.y', d: 2, full: 'stable/linux-6.18.y', kind: 'remote'},
+      {g: 'Tags'},
+      {n: 'v6.19-rc4', d: 1, tag: true},
+      {n: 'v6.19-rc3', d: 1, tag: true},
+      {n: 'v6.19-rc2', d: 1, tag: true},
+      {g: 'Recent'},
+      {n: 'feature/mlx5-next', d: 1, meta: '4m ago'},
+      {n: 'release/6.18.y', d: 1, meta: '2h ago'},
+      {n: 'main', d: 1, meta: 'yesterday'}
+    ];
+    return raw.filter(r => !q || r.g || (r.full || r.n).toLowerCase().indexOf(q) >= 0);
+  }
+
+  paletteAll() {
+    const nav = (v) => () => this.setState({view: v, palette: false});
+    return [
+      {group: 'Go to', label: 'Git Graph', hint: '⌘2', run: nav('graph')},
+      {group: 'Go to', label: 'Branches', hint: '⌘1', run: nav('branches')},
+      {group: 'Go to', label: 'Compare Branches', hint: '⌘4', run: nav('compare')},
+      {group: 'Go to', label: 'Worktrees', hint: '⌘6', run: nav('worktrees')},
+      {group: 'Go to', label: 'Submodules', hint: '⌘7', run: nav('submodules')},
+      {group: 'Go to', label: 'Settings', hint: '⌘,', run: nav('settings')},
+      {group: 'Branch', label: 'Checkout branch…', hint: '⌘B', run: this.act('Checkout branch')},
+      {group: 'Branch', label: 'Create branch from HEAD…', run: this.act('Create branch')},
+      {group: 'Branch', label: 'Rebase current onto…', run: this.act('Rebase')},
+      {group: 'Branch', label: 'Delete branch…', run: this.act('Delete branch')},
+      {group: 'Remote', label: 'Fetch all with prune', hint: '⌘⇧F', run: () => this.doFetch()},
+      {group: 'Remote', label: 'Pull (rebase)', run: this.act('Pull --rebase')},
+      {group: 'Remote', label: 'Push with lease', run: this.act('Push --force-with-lease')},
+      {group: 'Remote', label: 'Add remote…', run: this.act('Add remote')},
+      {group: 'Commit', label: 'Commit staged changes', hint: '⌘↵', run: this.act('Commit')},
+      {group: 'Commit', label: 'Amend last commit', run: this.act('Amend')},
+      {group: 'Commit', label: 'Generate commit message with AI', run: () => this.aiMessage()},
+      {group: 'Stash', label: 'Stash all changes…', run: this.act('Stash push')},
+      {group: 'Stash', label: 'Pop latest stash', run: this.act('Stash pop')},
+      {group: 'Worktree', label: 'Add worktree…', run: this.act('Worktree add')},
+      {group: 'Submodule', label: 'Update all submodules --recursive', run: () => this.updateAll()},
+      {group: 'Diff', label: 'Compare any two text sources…', run: nav('diff')},
+      {group: 'Diff', label: 'Compare file with revision…', run: this.act('Compare with revision')},
+      {group: 'Repo', label: 'Open repository…', hint: '⌘O', run: this.act('Open repository')},
+      {group: 'View', label: 'Toggle theme', run: () => this.toggleTheme()},
+      {group: 'View', label: 'Toggle output console', run: () => this.setState({consoleOpen: !this.state.consoleOpen, palette: false})}
+    ];
+  }
+
+  doFetch() { this.setState({palette: false}); this.log([['$ git fetch --all --prune', 'cmd']]); this.toastRun('Fetching all remotes', 'git fetch --all --prune', () => this.log([['   f3a9c21..a71bd0e  master -> origin/master', 'out'], ['done', 'ok']])); }
+  doPull() { this.log([['$ git pull --rebase origin main', 'cmd']]); this.toastRun('Pull — 12 incoming', 'preview: 12 commits, 96 files changed'); }
+  doPush() { this.confirm('Push 3 commits to origin/main?', 'Outgoing preview: 3 commits · 11 files · +212 −44. The remote is 12 commits ahead, so a non-fast-forward push will be rejected.', 'git push origin main', 'Push', this.act('Push')); }
+  aiMessage() { this.setState({palette: false}); this.toastRun('Generating commit message', 'analysing staged diff — 4 files, 212 lines (timeout 20s)'); }
+  updateAll() { this.setState({palette: false}); this.log([['$ git submodule update --init --recursive', 'cmd'], ["Cloning into 'tools/lib/bpf'…", 'out'], ["Submodule path 'tools/lib/bpf': checked out '2f8a1c4'", 'out']]); this.toastRun('Updating 7 submodules', 'tools/lib/bpf — receiving objects 42%'); }
+  toggleTheme() {
+    const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    this.setState({theme: t, palette: false});
+  }
+
+  renderVals() {
+    const s = this.state, S = (p) => () => this.setState(p);
+    const g = this.graph();
+    const view = s.view;
+    const sel = (s.sel && s.sel.length) ? s.sel : [0];
+    const selMap = {}; sel.forEach(i => selMap[i] = true);
+    const ring = (on) => on ? 'inset 0 0 0 1px var(--color-accent)' : 'none';
+    const onFg = (on) => on ? 'var(--color-accent)' : 'var(--fg2)';
+
+    const nav = [
+      ['branches', 'Branches', 'ph-git-branch'], ['graph', 'Git Graph', 'ph-git-commit'], ['details', 'Commit Details', 'ph-file-text'],
+      ['compare', 'Compare', 'ph-git-diff'], ['diff', 'Diff / Merge', 'ph-git-merge'], ['worktrees', 'Worktrees', 'ph-tree-structure'],
+      ['submodules', 'Submodules', 'ph-package'], ['components', 'Components', 'ph-stack']
+    ].map(d => ({
+      label: d[1], ic: d[2], go: S({view: d[0]}),
+      bg: view === d[0] ? 'var(--sel)' : 'transparent',
+      fg: view === d[0] ? 'var(--color-accent)' : 'var(--fg2)',
+      mark: view === d[0] ? 'var(--color-accent)' : 'transparent'
+    }));
+
+    let lastDay = null;
+    const graphRows = this.RAW.map((r, i) => {
+      const gr = this.rowGraphic(i);
+      const day = r[2].slice(0, 10);
+      const header = (s.graphLayout === 'grouped' && day !== lastDay) ? day : null;
+      if (s.graphLayout === 'grouped') lastDay = day;
+      const on = !!selMap[i], ok = this.matches(i), fl = this.files(i);
+      return {
+        subject: r[0], author: r[1], date: r[2].slice(5), short: this.hash(i),
+        refs: (r[4] || []).map(x => this.refBadge(x)),
+        svg: gr.svg, gutter: gr.gutter,
+        weight: (r[3] || []).length > 1 ? 400 : 500, dayHeader: header,
+        bg: on ? 'var(--sel)' : 'transparent', ring: on ? 'inset 2px 0 0 var(--color-accent)' : 'none',
+        dim: ok ? 1 : 0.3, open: !!s.expanded[i], fileCount: fl.length,
+        files: fl.map(f => ({...f, color: this.statusColor(f.status), open: S({view: 'diff'})})),
+        click: (e) => { const add = e.shiftKey || e.metaKey || e.ctrlKey; this.setState({sel: add ? (selMap[i] ? sel.filter(x => x !== i) : sel.concat(i)) : [i]}); },
+        expand: () => this.setState({expanded: {...s.expanded, [i]: !s.expanded[i]}}),
+        menu: this.commitMenu(i)
+      };
+    });
+
+    const branchRows = this.branchTree().map(b => {
+      if (b.g) return {label: b.g, h: 26, pad: 10, bg: 'transparent', fg: 'var(--fg3)', size: 10.5, weight: 600, font: 'inherit', ls: '.08em', tt: 'uppercase', twisty: '', glyph: '', meta: '', cursor: 'default', current: false, iconColor: 'var(--fg3)', click: () => {}, menu: () => {}};
+      const full = b.full || b.n;
+      return {
+        label: b.n, h: 24, pad: 10 + b.d * 12, bg: b.cur ? 'var(--sel)' : 'transparent',
+        fg: 'var(--fg)', size: 12.5, weight: b.cur ? 600 : 400, font: 'var(--font-mono)', ls: '0', tt: 'none',
+        cursor: 'pointer', twisty: b.folder ? 'ph-caret-down' : '',
+        glyph: b.folder ? 'ph-folder' : (b.tag ? 'ph-tag' : 'ph-git-branch'),
+        iconColor: b.tag ? 'var(--warn)' : (b.kind === 'remote' ? 'var(--fg3)' : 'var(--color-accent)'),
+        meta: b.meta || '', current: !!b.cur,
+        click: b.folder ? (() => {}) : S({view: 'graph'}),
+        menu: b.folder
+          ? (e) => this.openMenu(e, full, [
+              {label: 'Expand all', run: this.act('Expand')},
+              {label: 'Checkout newest in group', run: this.act('Checkout')},
+              {label: 'Delete merged branches in group…', danger: true, run: () => this.confirm('Delete 4 merged branches?', 'Every branch under ' + full + ' fully merged into main will be deleted.', 'git branch -d feature/a feature/b …', 'Delete 4', this.act('Delete'))}])
+          : this.branchMenu(full, b.kind)
+      };
+    });
+
+    const detailIdx = sel[0];
+    const dfiles = sel.length > 1 ? [].concat.apply([], sel.slice(0, 4).map(i => this.files(i))) : this.files(detailIdx);
+    const dirs = {};
+    dfiles.forEach(f => { const d = f.path.split('/').slice(0, -1).join('/'); (dirs[d] = dirs[d] || []).push(f); });
+    const detailTree = [];
+    Object.keys(dirs).forEach(d => {
+      detailTree.push({name: d + '/', pad: 10, twisty: 'ph-caret-down', status: '', color: 'var(--fg3)', fg: 'var(--fg2)', add: '', del: '', bg: 'transparent', click: () => {}, menu: () => {}});
+      dirs[d].forEach((f, k) => detailTree.push({
+        name: f.path.split('/').pop(), pad: 28, twisty: '', status: f.status, color: this.statusColor(f.status),
+        fg: 'var(--fg)', add: '+' + f.add, del: '−' + f.del, bg: k === 0 ? 'var(--sel)' : 'transparent',
+        click: S({view: 'details'}),
+        menu: (e) => this.openMenu(e, f.path, [
+          {label: 'Open diff', run: () => this.setState({view: 'diff', menu: null})},
+          {label: 'Compare with Revision…', run: this.act('Compare with revision')},
+          {label: 'Revert this file’s changes', run: this.act('Revert file')},
+          {label: 'Cherry-pick this file only', run: this.act('Cherry-pick file')},
+          {sep: true},
+          {label: 'Create patch from selection…', run: this.act('Create patch')},
+          {label: 'Copy patch to clipboard', run: this.act('Copy patch')},
+          {label: 'Apply patch to working tree…', run: this.act('Apply patch')},
+          {sep: true},
+          {label: 'Directory timeline for ' + f.path.split('/')[0] + '/', run: this.act('Directory timeline')},
+          {label: 'Copy path', run: this.act('Copy path')}
+        ])
+      }));
+    });
+
+    const wt = [
+      {group: 'Current', branch: 'main', path: '~/src/torvalds/linux', state: 'clean', head: 'f3a9c21', dot: 'var(--add)', icon: 'ph-house', mark: 'var(--color-accent)'},
+      {group: 'Other worktrees', branch: 'feature/mlx5-next', path: '~/src/wt/mlx5-next', state: '3 changes', head: '8be1c04', dot: 'var(--warn)', icon: 'ph-folder-open', mark: 'transparent'},
+      {branch: 'release/6.18.y', path: '~/src/wt/6.18.y', state: 'clean', head: 'b0c4e83', dot: 'var(--add)', icon: 'ph-folder-open', mark: 'transparent'},
+      {branch: '(detached at v6.19-rc2)', path: '~/src/wt/bisect', state: 'bisecting', head: '2d77a19', dot: 'var(--iris)', icon: 'ph-folder-open', mark: 'transparent'},
+      {group: 'Locked', branch: 'feature/perf-tui', path: '/Volumes/ext/wt/perf-tui', state: 'locked — “ext disk offline”', head: '91ff2d6', dot: 'var(--color-accent)', icon: 'ph-lock', mark: 'transparent'},
+      {group: 'Prunable / stale', branch: 'fix/kbuild-clang', path: '~/src/wt/kbuild (missing)', state: 'directory missing', head: '—', dot: 'var(--del)', icon: 'ph-warning', mark: 'transparent'}
+    ].map(w => ({...w, stateColor: w.state === 'clean' ? 'var(--fg3)' : (w.dot === 'var(--del)' ? 'var(--del)' : 'var(--warn)'),
+      menu: (e) => this.openMenu(e, w.path, [
+        {label: 'Open in this window', run: this.act('Open worktree')},
+        {label: 'Open in new window', run: this.act('Open worktree in new window')},
+        {label: 'Reveal in Finder', run: this.act('Reveal')},
+        {label: 'Open terminal here', run: this.act('Open terminal')},
+        {sep: true},
+        {label: w.state.indexOf('locked') === 0 ? 'Unlock' : 'Lock…', run: this.act('Lock worktree')},
+        {label: 'Add worktree from this branch…', run: this.act('Worktree add')},
+        {sep: true},
+        {label: 'Remove worktree', danger: true, run: () => this.confirm('Remove worktree?', 'The directory ' + w.path + ' is unregistered from the repository. Files stay on disk.', 'git worktree remove ' + w.path, 'Remove', this.act('Remove worktree'))},
+        {label: 'Force remove (discard changes)', danger: true, run: () => this.confirm('Force remove worktree?', '3 uncommitted changes in this worktree will be destroyed. This cannot be undone.', 'git worktree remove --force ' + w.path, 'Force remove', this.act('Force remove'))}
+      ])}));
+
+    const sm = [
+      {group: 'Needs attention', groupColor: 'var(--warn)', path: 'tools/lib/bpf', url: 'https://github.com/libbpf/libbpf.git', state: 'out of sync — recorded 2f8a1c4', sha: '9b41ac2', dot: 'var(--warn)', icon: 'ph-warning-circle', mark: 'var(--warn)'},
+      {path: 'tools/testing/selftests/bpf/bpftool', url: 'https://github.com/libbpf/bpftool.git', state: 'modified content', sha: '77de1b0', dot: 'var(--warn)', icon: 'ph-warning-circle', mark: 'var(--warn)'},
+      {group: 'Clean', groupColor: 'var(--fg3)', path: 'Documentation/sphinx-static', url: 'https://git.kernel.org/pub/scm/docs/sphinx.git', state: 'up to date', sha: '4c1f9ab', dot: 'var(--add)', icon: 'ph-package', mark: 'transparent'},
+      {path: 'scripts/dtc/libfdt', url: 'https://github.com/dgibson/dtc.git', state: 'up to date', sha: 'a80e4b6', dot: 'var(--add)', icon: 'ph-package', mark: 'transparent'},
+      {group: 'Uninitialized', groupColor: 'var(--fg3)', path: 'tools/perf/pmu-events/jevents', url: 'https://github.com/intel/perfmon.git', state: 'not initialized', sha: '—', dot: 'var(--fg3)', icon: 'ph-package', mark: 'transparent'},
+      {group: 'Nested', groupColor: 'var(--fg3)', path: 'tools/lib/bpf/xsk', url: 'https://github.com/xdp-project/xsk.git', state: 'up to date', sha: 'd59f2c1', dot: 'var(--add)', icon: 'ph-package', mark: 'transparent', pad: 34}
+    ].map(m => ({...m, pad: m.pad || 14, stateColor: m.dot === 'var(--warn)' ? 'var(--warn)' : 'var(--fg3)',
+      menu: (e) => this.openMenu(e, m.path, [
+        {label: 'Init', run: this.act('Submodule init', 'submodule init ' + m.path)},
+        {label: 'Update', run: this.act('Submodule update', 'submodule update ' + m.path)},
+        {label: 'Update --recursive', run: () => this.updateAll()},
+        {label: 'Sync URL', run: this.act('Submodule sync')},
+        {sep: true},
+        {label: 'Checkout recorded commit', run: this.act('Checkout recorded commit')},
+        {label: 'Pull tracked branch', run: this.act('Pull submodule')},
+        {label: 'Show pointer diff', run: () => this.setState({view: 'diff', menu: null})},
+        {label: 'Stage pointer change', run: this.act('Stage pointer')},
+        {label: 'Open in new window', run: this.act('Open submodule')},
+        {sep: true},
+        {label: 'Deinit', danger: true, run: () => this.confirm('Deinit ' + m.path + '?', 'The submodule working tree is removed. Unpushed commits inside it will be lost.', 'git submodule deinit -f ' + m.path, 'Deinit', this.act('Deinit'))}
+      ])}));
+
+    const R = React.createElement;
+    const inp = (v, w) => R('input', {defaultValue: v, className: 'input', style: {width: w || 220, minHeight: 0, height: 26, fontSize: 12, fontFamily: 'var(--font-mono)'}});
+    const sel1 = (opts) => R('select', {className: 'input', style: {width: 'auto', minHeight: 0, height: 26, fontSize: 12}}, opts.map(o => R('option', {key: o}, o)));
+    const chk = (on, label) => R('label', {className: 'radio', style: {fontSize: 12, color: 'var(--fg2)'}}, R('input', {type: 'checkbox', defaultChecked: on}), R('span', {className: 'dot'}), label);
+    const area = (v) => R('textarea', {defaultValue: v, rows: 4, className: 'input', style: {maxWidth: 420, minHeight: 84, fontFamily: 'var(--font-mono)', fontSize: 11.5}});
+
+    const settingsSections = [
+      {id: 'git', title: 'Git executable', rows: [
+        {label: 'Git executable path', hint: 'Blank resolves from PATH', control: inp('/opt/homebrew/bin/git', 300)},
+        {label: 'Command timeout', hint: 'Seconds before a git process is killed', control: inp('30', 90)},
+        {label: 'Environment', hint: 'Extra variables passed to every invocation', control: inp('GIT_SSH_COMMAND=ssh -i ~/.ssh/id_ed25519', 300)}]},
+      {id: 'graph', title: 'Graph & history', rows: [
+        {label: 'Graph page size', hint: 'Commits loaded per “Load more”', control: sel1(['100', '250', '500', '1000'])},
+        {label: 'Recent branches count', hint: 'Entries kept in the Recent group', control: inp('8', 90)},
+        {label: 'Virtualize commit list', hint: 'Render only visible rows — required above ~5k commits', control: chk(true, 'Enabled')},
+        {label: 'Default layout', hint: 'Rows or grouped by day', control: sel1(['Rows', 'Grouped by day'])}]},
+      {id: 'perf', title: 'Performance', rows: [
+        {label: 'Filter debounce', hint: 'Milliseconds before live filters re-run', control: inp('180', 90)},
+        {label: 'Status poll interval', hint: 'Working-tree refresh cadence', control: inp('2000', 90)},
+        {label: 'Max concurrent git processes', hint: '', control: inp('4', 90)}]},
+      {id: 'compare', title: 'Compare & export', rows: [
+        {label: 'Export format', hint: 'Two CSVs or one workbook with two sheets', control: sel1(['Excel workbook (.xlsx)', 'Two CSV files'])},
+        {label: 'Default compare layout', hint: '', control: sel1(['Side by side', 'Stacked', 'Graph'])},
+        {label: 'Compare-with-revision direction', hint: 'Which side the picked revision lands on', control: sel1(['Revision → working tree', 'Working tree → revision'])},
+        {label: 'Remember recent compare pairs', hint: '', control: chk(true, 'Keep last 10 pairs')}]},
+      {id: 'commit', title: 'Commit', rows: [
+        {label: 'Message templates', hint: 'Placeholders: {branch} {ticket} {scope} {cursor}', control: area('{scope}: {cursor}\n\nRefs: {ticket}\nSigned-off-by: Jakub Kicinski <kuba@kernel.org>')},
+        {label: 'Ticket pattern', hint: 'Regex used to extract {ticket} from branch names', control: inp('([A-Z]{2,8}-\\d+)', 220)},
+        {label: 'AI generate timeout', hint: 'Seconds before generation is cancelled', control: inp('20', 90)},
+        {label: 'Wrap message body', hint: '', control: inp('72', 90)}]},
+      {id: 'diff', title: 'Diff & merge', rows: [
+        {label: 'Default diff view', hint: '', control: sel1(['Unified', 'Split'])},
+        {label: 'Whitespace', hint: '', control: sel1(['Show all', 'Ignore trailing', 'Ignore all'])},
+        {label: 'Gutter markers', hint: 'Change markers and their thresholds', control: chk(true, 'Show, warn above 400 changed lines')},
+        {label: 'Merge tool', hint: '', control: sel1(['Built-in 3-way', 'External: kdiff3'])}]}
+    ];
+
+    const consoleLines = (s.consoleLines || this.seedLog()).map(l => ({
+      text: l[0], color: l[1] === 'cmd' ? 'var(--color-accent)' : l[1] === 'err' ? 'var(--del)' : l[1] === 'warn' ? 'var(--warn)' : l[1] === 'ok' ? 'var(--add)' : 'var(--fg2)'
+    }));
+
+    const menuItems = (s.menu ? s.menu.items : []).map(m => m.sep
+      ? {label: '', hint: '', h: 1, margin: '4px 6px', padding: '0', bg: 'var(--line)', color: 'transparent', cursor: 'default', run: () => {}}
+      : {label: m.label, hint: m.hint || '', h: 25, margin: '0', padding: '0 9px', bg: 'transparent', color: m.danger ? 'var(--del)' : 'var(--fg)', cursor: 'pointer', run: m.run});
+
+    const pq = s.paletteQ.toLowerCase();
+    const paletteItems = this.paletteAll().filter(p => !pq || (p.group + ' ' + p.label).toLowerCase().indexOf(pq) >= 0)
+      .map((p, i) => ({...p, hint: p.hint || '', bg: i === 0 ? 'var(--sel)' : 'transparent'}));
+
+    const fileList = (n) => ({
+      staged: [
+        {path: 'drivers/net/ethernet/mellanox/mlx5/core/en_tx.c', status: 'M', add: 7, del: 2},
+        {path: 'drivers/net/ethernet/mellanox/mlx5/core/en/params.c', status: 'M', add: 21, del: 4},
+        {path: 'drivers/net/ethernet/mellanox/mlx5/core/en/tunnel.h', status: 'A', add: 88, del: 0},
+        {path: 'Documentation/networking/device_drivers/mlx5.rst', status: 'M', add: 12, del: 1}
+      ],
+      unstaged: [
+        {path: 'kernel/sched/fair.c', status: 'M', add: 34, del: 12},
+        {path: 'kernel/sched/core.c', status: 'M', add: 9, del: 9},
+        {path: 'mm/slub.c', status: 'M', add: 4, del: 1},
+        {path: 'include/linux/sched.h', status: 'M', add: 2, del: 0},
+        {path: 'scripts/checkpatch.pl', status: 'M', add: 1, del: 1},
+        {path: 'tools/testing/selftests/net/mlx5_tunnel.sh', status: '?', add: 140, del: 0},
+        {path: 'MAINTAINERS', status: 'M', add: 3, del: 0},
+        {path: 'drivers/gpu/drm/amd/amdgpu/vcn_v5_0.c', status: 'D', add: 0, del: 62}
+      ]
+    })[n].map(f => ({
+      ...f, color: this.statusColor(f.status === '?' ? 'A' : f.status), stat: '+' + f.add + ' −' + f.del,
+      click: S({view: 'diff'}),
+      shelve: (e) => { e.stopPropagation(); this.toastRun('Shelving file', f.path.split('/').pop()); },
+      menu: (e) => this.openMenu(e, f.path, [
+        {label: n === 'staged' ? 'Unstage file' : 'Stage file', run: this.act('Stage')},
+        {label: 'Stage selected hunks…', run: this.act('Stage hunks')},
+        {label: 'Open diff', run: () => this.setState({view: 'diff', menu: null})},
+        {label: 'Compare with Revision…', run: this.act('Compare with revision')},
+        {label: 'Shelve this file', run: this.act('Shelve file')},
+        {sep: true},
+        {label: 'Discard changes', danger: true, run: () => this.confirm('Discard changes in ' + f.path.split('/').pop() + '?', 'Local modifications are permanently lost — there is no undo for this action.', 'git checkout -- ' + f.path, 'Discard', this.act('Discard'))}
+      ])
+    }));
+
+    const stashes = [
+      {ref: 'stash@{0}', msg: 'WIP on feature/mlx5-next: tunnel steering spike', branch: 'feature/mlx5-next', files: '6 files', when: '2h ago'},
+      {ref: 'stash@{1}', msg: 'sched: util_est experiment (keep-index)', branch: 'main', files: '3 files', when: 'yesterday'},
+      {ref: 'stash@{2}', msg: 'shelved: kernel/sched/fair.c', branch: 'main', files: '1 file', when: '2 days ago'},
+      {ref: 'stash@{3}', msg: 'WIP: bisect scratch (untracked included)', branch: 'detached', files: '11 files', when: '5 days ago'}
+    ].map(st => ({...st, menu: (e) => this.openMenu(e, st.ref, [
+      {label: 'Apply', run: this.act('Stash apply')},
+      {label: 'Pop', run: this.act('Stash pop')},
+      {label: 'Unshelve into working tree', run: this.act('Unshelve')},
+      {label: 'Preview patch', run: () => this.setState({view: 'diff', menu: null})},
+      {label: 'Rename…', run: this.act('Rename stash')},
+      {sep: true},
+      {label: 'Drop', danger: true, run: () => this.confirm('Drop ' + st.ref + '?', 'The stashed changes are deleted and cannot be recovered from the UI.', 'git stash drop ' + st.ref, 'Drop stash', this.act('Drop stash'))}
+    ])}));
+
+    const op = s.op;
+    return {
+      themeIcon: s.theme === 'light' ? 'ph-moon' : 'ph-sun',
+      toggleTheme: () => this.toggleTheme(),
+      toggleDock: S({dock: !s.dock}), dock: s.dock, dockBtnBg: s.dock ? 'var(--sel)' : 'transparent',
+      nav, goSettings: S({view: 'settings'}), setBg: view === 'settings' ? 'var(--sel)' : 'transparent',
+      openPalette: S({palette: true, paletteQ: ''}), doFetch: () => this.doFetch(), doPull: () => this.doPull(), doPush: () => this.doPush(),
+      menuRepo: (e) => this.openMenu(e, 'Recent repositories', [
+        {label: 'linux — ~/src/torvalds/linux', run: this.act('Switch repo')},
+        {label: 'llvm-project — ~/src/llvm', run: this.act('Switch repo')},
+        {label: 'systemd — ~/src/systemd', run: this.act('Switch repo')},
+        {sep: true},
+        {label: 'Open repository…', hint: '⌘O', run: this.act('Open repository')},
+        {label: 'Clone…', run: this.act('Clone')}
+      ]),
+      menuBranchChip: (e) => this.openMenu(e, 'main', [
+        {label: 'Checkout other branch…', hint: '⌘B', run: () => this.setState({view: 'branches', menu: null})},
+        {label: 'New branch from main…', run: this.act('Create branch')},
+        {label: 'Set upstream…', run: this.act('Set upstream')},
+        {sep: true},
+        {label: 'Fetch with prune', run: () => this.doFetch()},
+        {label: 'Pull — preview 12 incoming', run: () => this.doPull()},
+        {label: 'Push — preview 3 outgoing', run: () => this.doPush()}
+      ]),
+
+      isBranches: view === 'branches', isGraph: view === 'graph', isDetails: view === 'details',
+      isCompare: view === 'compare', isDiff: view === 'diff', isWorktrees: view === 'worktrees',
+      isSubmodules: view === 'submodules', isSettings: view === 'settings', isComponents: view === 'components',
+
+      branchRows, branchQ: s.branchQ, setBranchQ: (e) => this.setState({branchQ: e.target.value}),
+      newBranch: this.act('Create branch'), addRemote: this.act('Add remote'),
+      menuRemotes: (e) => this.openMenu(e, 'Remotes', [
+        {label: 'origin — git@github.com:torvalds/linux.git', run: this.act('Edit remote')},
+        {label: 'stable — git://git.kernel.org/…/linux-stable.git', run: this.act('Edit remote')},
+        {label: 'net-next — git@github.com:netdev/net-next.git', run: this.act('Edit remote')},
+        {sep: true},
+        {label: 'Add remote…', run: this.act('Add remote')},
+        {label: 'Edit URL…', run: this.act('Edit remote URL')},
+        {label: 'Delete remote…', danger: true, run: () => this.confirm('Delete remote “net-next”?', 'All remote-tracking branches under net-next/ are removed from this repository.', 'git remote remove net-next', 'Delete remote', this.act('Delete remote'))}
+      ]),
+      branchPreview: [6, 7, 8].map(i => ({short: this.hash(i), subject: this.RAW[i][0], author: this.RAW[i][1], date: this.RAW[i][2].slice(5, 10)})),
+      branchActionChips: ['Checkout', 'Create', 'Rename', 'Track upstream', 'Merge into current', 'Rebase onto', 'Compare', 'Open in Git Graph', 'Reset soft/mixed', 'Reset hard', 'Delete']
+        .map(l => ({label: l, cls: (l === 'Reset hard' || l === 'Delete') ? 'tag-outline' : 'tag-neutral'})),
+      compareWithCurrent: S({view: 'compare'}), mergeIntoCurrent: this.act('Merge feature/mlx5-next into main', 'merge feature/mlx5-next'),
+
+      graphRows, graphW: g.width, shownCount: this.RAW.length,
+      loadMore: this.act('Load more commits', 'log --skip=31 -n 250'),
+      toggleFilter: S({filterOpen: !s.filterOpen}), filterOpen: s.filterOpen,
+      filterBtnBg: s.filterOpen ? 'var(--sel)' : 'transparent',
+      filterCount: Object.keys(s.f).filter(k => s.f[k]).length ? '(' + Object.keys(s.f).filter(k => s.f[k]).length + ')' : '',
+      matchLabel: this.RAW.filter((_, i) => this.matches(i)).length + ' of ' + this.RAW.length + ' match',
+      selLabel: sel.length > 1 ? sel.length + ' commits selected — range details' : '1 selected',
+      setLayoutRows: S({graphLayout: 'rows'}), setLayoutGrouped: S({graphLayout: 'grouped'}),
+      lrFg: onFg(s.graphLayout === 'rows'), lrRing: ring(s.graphLayout === 'rows'),
+      lgFg: onFg(s.graphLayout === 'grouped'), lgRing: ring(s.graphLayout === 'grouped'),
+      f_ref: s.f.ref, f_author: s.f.author, f_msg: s.f.msg, f_from: s.f.from, f_to: s.f.to,
+      setFRef: (e) => this.setState({f: {...s.f, ref: e.target.value}}),
+      setFAuthor: (e) => this.setState({f: {...s.f, author: e.target.value}}),
+      setFMsg: (e) => this.setState({f: {...s.f, msg: e.target.value}}),
+      setFFrom: (e) => this.setState({f: {...s.f, from: e.target.value}}),
+      setFTo: (e) => this.setState({f: {...s.f, to: e.target.value}}),
+
+      detailKicker: sel.length > 1 ? 'Merged range — ' + sel.length + ' commits, net changes' : 'Commit',
+      detailSubject: sel.length > 1 ? this.RAW[sel[sel.length - 1]][0] + '  …  ' + this.RAW[sel[0]][0] : this.RAW[detailIdx][0],
+      detailAuthor: sel.length > 1 ? new Set(sel.map(i => this.RAW[i][1])).size + ' authors' : this.RAW[detailIdx][1],
+      detailDate: this.RAW[detailIdx][2],
+      detailHash: sel.length > 1 ? this.hash(sel[sel.length - 1]) + '..' + this.hash(sel[0]) : this.hash(detailIdx),
+      detailTree, selFileCount: 2,
+      openSelectedDiffs: S({view: 'diff'}), revertSelected: this.act('Revert selected changes'),
+      cherrySelected: this.act('Cherry-pick selected changes'), createPatch: this.act('Create patch'),
+      diffPane: this.diffPane(),
+
+      cmpIsList: s.compareMode === 'list', cmpIsGraph: s.compareMode === 'graph',
+      cmpList: S({compareMode: 'list'}), cmpGraph: S({compareMode: 'graph'}),
+      cmListFg: onFg(s.compareMode === 'list'), cmListRing: ring(s.compareMode === 'list'),
+      cmGraphFg: onFg(s.compareMode === 'graph'), cmGraphRing: ring(s.compareMode === 'graph'),
+      cmpSide: S({compareLayout: 'side'}), cmpStack: S({compareLayout: 'stack'}),
+      cmSideFg: onFg(s.compareLayout === 'side'), cmSideRing: ring(s.compareLayout === 'side'),
+      cmStackFg: onFg(s.compareLayout === 'stack'), cmStackRing: ring(s.compareLayout === 'stack'),
+      cmpCols: s.compareLayout === 'side' ? '1fr 1fr' : '1fr', cmpRows: s.compareLayout === 'side' ? '1fr' : '1fr 1fr',
+      cmpA: [6, 7, 8].map(i => this.cmpRow(i, selMap, sel)),
+      cmpB: [1, 2, 4, 5, 9, 10, 11].map(i => this.cmpRow(i, selMap, sel)),
+      c_msg: s.cf.msg, c_author: s.cf.author, c_excl: s.cf.excl, c_from: s.cf.from, c_to: s.cf.to,
+      setCMsg: (e) => this.setState({cf: {...s.cf, msg: e.target.value}}),
+      setCAuthor: (e) => this.setState({cf: {...s.cf, author: e.target.value}}),
+      setCExcl: (e) => this.setState({cf: {...s.cf, excl: e.target.value}}),
+      setCFrom: (e) => this.setState({cf: {...s.cf, from: e.target.value}}),
+      setCTo: (e) => this.setState({cf: {...s.cf, to: e.target.value}}),
+      toggleNoMerges: S({cf: {...s.cf, noMerges: !s.cf.noMerges}}), noMergesRing: ring(s.cf.noMerges),
+      toggleMatching: S({cf: {...s.cf, matching: !s.cf.matching}}), matchingRing: ring(s.cf.matching),
+      swapCompare: this.act('Swap compare direction'),
+      exportCompare: (e) => this.openMenu(e, 'Export comparison', [
+        {label: 'Two CSV files (A→B, B→A)', run: this.act('Export CSV')},
+        {label: 'Excel workbook — two sheets', run: this.act('Export XLSX')},
+        {label: 'Copy summary to clipboard', run: this.act('Copy summary')},
+        {sep: true},
+        {label: 'Recent pair: main ↔ release/6.18.y', run: this.act('Open recent pair')},
+        {label: 'Recent pair: main ↔ origin/main', run: this.act('Open recent pair')}
+      ]),
+      compareGraph: this.compareGraphSvg(),
+
+      diffTabs: [['work', 'Working tree ↔ HEAD'], ['index', 'Index ↔ HEAD'], ['parent', 'Commit ↔ parent'], ['refs', 'main ↔ feature/mlx5-next'], ['merge', '3-way merge — 2 conflicts'], ['sources', 'Compare two text sources']]
+        .map(t => ({label: t[1], click: S({diffTab: t[0]}), fg: onFg(s.diffTab === t[0]), ring: ring(s.diffTab === t[0])})),
+      swapDiff: this.act('Swap diff direction'), compareRevision: this.act('Compare with revision'),
+
+      worktrees: wt, submodules: sm,
+      previewPrune: () => this.confirm('Prune 1 stale worktree?', '~/src/wt/kbuild is registered but its directory is missing. Pruning removes the administrative entry.', 'git worktree prune --dry-run', 'Prune', this.act('Prune worktrees')),
+      addWorktree: (e) => this.openMenu(e, 'Add worktree', [
+        {label: 'From local branch…', run: this.act('Worktree add')},
+        {label: 'From remote branch (create tracking)…', run: this.act('Worktree add')},
+        {label: 'From tag…', run: this.act('Worktree add')},
+        {label: 'From typed revision…', run: this.act('Worktree add')},
+        {sep: true},
+        {label: 'Also create new branch', run: this.act('Worktree add -b')},
+        {label: 'Detached HEAD', run: this.act('Worktree add --detach')},
+        {sep: true},
+        {label: 'Destination: empty folder → use as-is', run: this.act('Pick destination')},
+        {label: 'Destination: non-empty → auto-named child', run: this.act('Pick destination')}
+      ]),
+      initAll: this.act('Init all submodules', 'submodule init'), syncAll: this.act('Sync submodule URLs', 'submodule sync --recursive'), updateAll: () => this.updateAll(),
+
+      settingsNav: [['git', 'Git executable'], ['graph', 'Graph & history'], ['perf', 'Performance'], ['compare', 'Compare & export'], ['commit', 'Commit'], ['diff', 'Diff & merge']].map(x => ({href: '#' + x[0], label: x[1]})),
+      settingsSections, specCards: this.spec(),
+
+      scChanges: S({scTab: 'changes'}), scStash: S({scTab: 'stash'}),
+      scIsChanges: s.scTab === 'changes', scIsStash: s.scTab === 'stash',
+      scChFg: onFg(s.scTab === 'changes'), scChRing: ring(s.scTab === 'changes'),
+      scStFg: onFg(s.scTab === 'stash'), scStRing: ring(s.scTab === 'stash'),
+      staged: fileList('staged'), unstaged: fileList('unstaged'), stashes,
+      stageAll: this.act('Stage all', 'add -A'), unstageAll: this.act('Unstage all', 'reset HEAD'),
+      stageHunk: this.act('Stage hunk'), createStash: this.act('Create stash', 'stash push -u'),
+      commitMsg: s.commitMsg, setCommitMsg: (e) => this.setState({commitMsg: e.target.value}),
+      commit: this.act('Commit staged changes', 'commit'), aiMessage: () => this.aiMessage(),
+      pickTemplate: (e) => this.openMenu(e, 'Message templates', [
+        {label: '{scope}: {cursor}', hint: 'kernel', run: this.act('Apply template')},
+        {label: 'fix({scope}): {cursor} — Refs {ticket}', hint: 'conventional', run: this.act('Apply template')},
+        {label: '[{branch}] {cursor}', hint: 'branch-tagged', run: this.act('Apply template')},
+        {sep: true},
+        {label: 'Edit templates…', run: () => this.setState({view: 'settings', menu: null})}
+      ]),
+
+      consoleOpen: s.consoleOpen, consoleLines, toggleConsole: S({consoleOpen: !s.consoleOpen}),
+      consoleChevron: s.consoleOpen ? 'ph-caret-down' : 'ph-caret-up', clearConsole: () => this.setState({consoleLines: []}),
+      consoleStatus: 'exit 0 · 4.2s',
+      statusBg: op ? 'var(--raised)' : 'var(--panel)',
+      opActive: !!op, opIdle: !op,
+      opName: op ? op.name : '', opStep: op ? 'Step ' + op.step + ' of ' + op.total : '', opDetail: op ? op.detail : '',
+      opContinue: () => { if (!op) return; const n = op.step + 1; if (n > op.total) { this.setState({op: null}); this.toastRun('Rebase complete', '5 commits replayed onto main'); } else this.setState({op: {...op, step: n}}); },
+      opSkip: () => { if (op) this.setState({op: {...op, step: Math.min(op.step + 1, op.total)}}); },
+      opAbort: () => this.confirm('Abort rebase?', 'The rebase is aborted and the branch reset to its pre-rebase state. Conflict resolutions made so far are discarded.', 'git rebase --abort', 'Abort rebase', () => { this.setState({op: null, dialog: null}); this.toastRun('Rebase aborted', 'HEAD restored to f3a9c21'); }),
+
+      menuOpen: !!s.menu, menuX: s.menu ? s.menu.x : 0, menuY: s.menu ? s.menu.y : 0,
+      menuTitle: s.menu ? s.menu.title : '', menuItems,
+      closeMenu: (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({menu: null}); },
+      paletteOpen: s.palette, paletteQ: s.paletteQ, paletteItems,
+      setPaletteQ: (e) => this.setState({paletteQ: e.target.value}),
+      closePalette: S({palette: false}), stop: (e) => e.stopPropagation(),
+      dialogOpen: !!s.dialog, dialogTitle: s.dialog ? s.dialog.title : '', dialogBody: s.dialog ? s.dialog.body : '',
+      dialogCmd: s.dialog ? s.dialog.cmd : '', dialogAction: s.dialog ? s.dialog.action : '',
+      closeDialog: S({dialog: null}),
+      confirmDialog: () => { const d = s.dialog; this.setState({dialog: null}); if (d && d.run) d.run(); },
+      toastOpen: !!s.toast, toastTitle: s.toast ? s.toast.title : '', toastDetail: s.toast ? s.toast.detail : '',
+      toastPct: s.toastPct,
+      cancelToast: () => { clearInterval(this._t); this.setState({toast: null}); this.log([['^C  operation cancelled by user', 'warn']]); }
+    };
+  }
+
+  cmpRow(i, selMap, sel) {
+    const r = this.RAW[i], ok = this.cmpMatch(i);
+    return {
+      short: this.hash(i), subject: r[0], author: r[1], date: r[2].slice(5, 10),
+      picked: this.state.cf.matching && (i === 7 || i === 2),
+      bg: selMap[i] ? 'var(--sel)' : 'transparent', dim: ok ? 1 : 0.26,
+      click: (e) => { const add = e.shiftKey || e.metaKey || e.ctrlKey; this.setState({sel: add ? (selMap[i] ? sel.filter(x => x !== i) : sel.concat(i)) : [i]}); },
+      menu: this.commitMenu(i)
+    };
+  }
+
+  specCards() {
+    const R = React.createElement;
+    const mono = {fontFamily: 'var(--font-mono)'};
+    const row = (icon, label, meta, bg) => R('div', {style: {display: 'flex', alignItems: 'center', gap: 8, height: 24, padding: '0 8px', borderRadius: 4, background: bg || 'transparent', ...mono, fontSize: 11.5}},
+      R('i', {className: 'ph ' + icon, style: {fontSize: 13, color: 'var(--color-accent)'}}), R('span', {style: {flex: 1}}, label), R('span', {style: {color: 'var(--fg3)', fontSize: 11}}, meta));
+    const tag = (t, cls) => R('span', {key: t, className: 'tag ' + cls, style: {...mono, fontSize: 10.5, padding: '1px 6px'}}, t);
+    const btn = (t, cls, style) => R('button', {className: 'btn ' + cls, style: {height: 24, fontSize: 11.5, ...(style || {})}}, t);
+    return [
+      {title: 'Tree row', tag: '24px · mono', note: 'Indent 12px per depth, Phosphor leading icon, right-aligned meta. Selection is a 20% accent tint with a 2px accent inset — never a fill.', demo: [row('ph-git-branch', 'feature/mlx5-next', '3 ahead', 'var(--sel)'), row('ph-git-branch', 'release/6.18.y', ''), row('ph-tag', 'v6.19-rc4', 'tag')]},
+      {title: 'Ref badge', tag: '.tag', note: 'HEAD uses .tag-accent, local branches .tag-accent-2, remotes .tag-neutral, tags .tag-outline. Straight from the ramps.', demo: [R('div', {style: {display: 'flex', gap: 6, flexWrap: 'wrap'}}, tag('HEAD → main', 'tag-accent'), tag('feature/mlx5-next', 'tag-accent-2'), tag('origin/main', 'tag-neutral'), tag('v6.19-rc4', 'tag-outline'))]},
+      {title: 'Context menu', tag: 'surface + shadow-lg', note: 'Mono title naming the object acted on, 25px items, hairline separators, destructive items in the red status colour and always routed through the confirm dialog.', demo: [R('div', {style: {borderRadius: 'var(--radius-md)', background: 'var(--color-surface)', boxShadow: 'var(--shadow-md)', padding: 5, width: 220}},
+        R('div', {style: {padding: '4px 9px 6px', ...mono, fontSize: 11, color: 'var(--fg3)', borderBottom: '1px solid var(--line)', marginBottom: 4}}, 'feature/mlx5-next'),
+        R('div', {style: {padding: '3px 9px', fontSize: 12.5, borderRadius: 4, background: 'var(--sel)'}}, 'Checkout'),
+        R('div', {style: {padding: '3px 9px', fontSize: 12.5}}, 'Merge into main'),
+        R('div', {style: {height: 1, background: 'var(--line)', margin: '4px 6px'}}),
+        R('div', {style: {padding: '3px 9px', fontSize: 12.5, color: 'var(--del)'}}, 'Delete branch'))]},
+      {title: 'Buttons', tag: '.btn', note: 'Nocturne outlines its primaries — accent border on transparent, never an accent flood. Destructive actions borrow the same outline in the red status colour.', demo: [R('div', {style: {display: 'flex', gap: 8, flexWrap: 'wrap'}}, btn('Commit', 'btn-primary'), btn('Fetch', 'btn-secondary'), btn('Force remove', 'btn-primary', {color: 'var(--del)', borderColor: 'var(--del)'}), btn('Cancel', 'btn-ghost'))]},
+      {title: 'Status bar', tag: '26px', note: 'Idle shows branch, ahead/behind and working-tree counts; during an operation the same strip becomes the operation controller.', demo: [
+        R('div', {style: {display: 'flex', alignItems: 'center', gap: 8, height: 26, padding: '0 8px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: 5, fontSize: 11.5, ...mono, color: 'var(--fg2)'}}, R('i', {className: 'ph ph-git-branch', style: {color: 'var(--color-accent)'}}), 'main', R('span', {style: {color: 'var(--add)'}}, '↓12'), R('span', {style: {color: 'var(--warn)'}}, '↑3')),
+        R('div', {style: {display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 8px', background: 'var(--raised)', border: '1px solid var(--line)', borderRadius: 5, fontSize: 11}},
+          R('span', {className: 'tag tag-outline', style: {fontSize: 10, padding: '0 6px', color: 'var(--warn)', borderColor: 'var(--warn)'}}, 'REBASING'), 'Step 2 of 5', R('span', {style: {flex: 1}}),
+          btn('Continue', 'btn-primary', {height: 18, fontSize: 10.5}), btn('Abort', 'btn-primary', {height: 18, fontSize: 10.5, color: 'var(--del)', borderColor: 'var(--del)'}))]},
+      {title: 'Progress toast', tag: '.card .elev-md', note: 'Bottom-right, always cancellable; the detail line mirrors the streamed console output.', demo: [R('div', {className: 'card elev-md'},
+        R('div', {style: {display: 'flex', gap: 8}}, R('span', {style: {flex: 1, fontSize: 12.5, fontWeight: 500}}, 'Updating 7 submodules'), btn('Cancel', 'btn-secondary', {height: 19, fontSize: 10.5})),
+        R('div', {style: {...mono, fontSize: 11, color: 'var(--fg3)'}}, 'tools/lib/bpf — receiving objects 42%'),
+        R('div', {style: {height: 3, borderRadius: 2, background: 'var(--raised2)'}}, R('div', {style: {height: '100%', width: '42%', background: 'var(--color-accent)', borderRadius: 2}})))]},
+      {title: 'Confirm dialog', tag: '.dialog', note: 'Destructive actions only. States the consequence in plain language and shows the exact git command that will run.', demo: [R('div', {className: 'dialog elev-lg', style: {width: '100%', padding: 'var(--space-3)'}},
+        R('div', {className: 'dialog-title', style: {fontSize: 15}}, 'Hard reset main to origin/main?'),
+        R('div', {className: 'dialog-body', style: {fontSize: 12}}, '12 modified files will be permanently discarded.'),
+        R('div', {style: {padding: '6px 9px', border: '1px solid var(--line)', borderRadius: 6, background: 'var(--color-bg)', ...mono, fontSize: 11, color: 'var(--fg2)'}}, 'git reset --hard origin/main'),
+        R('div', {className: 'dialog-actions'}, btn('Cancel', 'btn-secondary'), btn('Reset --hard', 'btn-primary', {color: 'var(--del)', borderColor: 'var(--del)'})))]},
+      {title: 'Diff line', tag: '18px line box', note: 'Two 46px gutters, hairline separator. The add/remove tints are the only saturated surfaces in the app — 13% of a status hue, never a flood.', demo: [R('div', {style: {...mono, fontSize: 11.5, border: '1px solid var(--line)', borderRadius: 6, overflow: 'hidden'}},
+        R('div', {style: {background: 'var(--raised)', color: 'var(--fg3)', padding: '2px 8px'}}, '@@ -412,9 +412,14 @@'),
+        R('div', {style: {background: 'var(--delbg)', color: 'var(--del)', padding: '2px 8px'}}, '− if (unlikely(!priv->channels.num))'),
+        R('div', {style: {background: 'var(--addbg)', color: 'var(--add)', padding: '2px 8px'}}, '+ if (unlikely(!priv->channels.num ||'))]},
+      {title: 'Graph lane', tag: '15px pitch', note: 'Seven lane hues at one OKLCH lightness and chroma — the accent hue leads, the rest are its neighbours. Merge commits are hollow, ordinary commits filled.', demo: [R('div', {style: {display: 'flex', alignItems: 'center', gap: 12}},
+        this.rowSvg({lane: 0, edges: [{from: 0, to: 0, y0: 0, y1: 15, color: this.COLORS[0]}, {from: 0, to: 0, y0: 15, y1: 30, color: this.COLORS[0]}, {from: 0, to: 1, y0: 15, y1: 30, color: this.COLORS[1]}, {from: 2, to: 2, y0: 0, y1: 30, color: this.COLORS[2]}]}, true, 70),
+        R('span', {style: {fontSize: 11.5, color: 'var(--fg3)'}}, 'merge commit, lane 0 → lanes 0 + 1'))]}
+    ];
+  }
+}
+</script>
+</body>
+</html>
