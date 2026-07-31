@@ -1,1 +1,3 @@
 .thumbnail
+node_modules/
+dist/
