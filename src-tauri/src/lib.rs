@@ -1,5 +1,7 @@
 mod git_backend;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -32,6 +34,11 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      if let Some(main_window) = app.get_webview_window("main") {
+        let _ = main_window.maximize();
+      }
+
       Ok(())
     })
     .run(tauri::generate_context!())
