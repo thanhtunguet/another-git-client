@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from "@tauri-apps/api/core";
 
 export interface GitCommandResult {
   stdout: string;
@@ -13,7 +13,7 @@ export interface BranchRef {
   ahead: number;
   behind: number;
   current: boolean;
-  kind: 'local' | 'remote' | string;
+  kind: "local" | "remote" | string;
   lastCommitEpoch?: number;
 }
 
@@ -66,25 +66,41 @@ export interface SubmoduleEntry {
   status: string;
 }
 
+export interface StashEntry {
+  index: number;
+  stashRef: string;
+  sha: string;
+  message: string;
+  branch: string;
+  date: string;
+}
+
+export interface CommitFileChange {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+}
+
 export const tauriGitBackend = {
   isRepo(repoPath: string) {
-    return invoke<boolean>('git_is_repo', { repoPath });
+    return invoke<boolean>("git_is_repo", { repoPath });
   },
 
   getBranches(repoPath: string) {
-    return invoke<BranchRef[]>('git_get_branches', { repoPath });
+    return invoke<BranchRef[]>("git_get_branches", { repoPath });
   },
 
   getCurrentBranch(repoPath: string) {
-    return invoke<string>('git_get_current_branch', { repoPath });
+    return invoke<string>("git_get_current_branch", { repoPath });
   },
 
   getTags(repoPath: string) {
-    return invoke<TagRef[]>('git_get_tags', { repoPath });
+    return invoke<TagRef[]>("git_get_tags", { repoPath });
   },
 
   getGraph(repoPath: string, options?: { maxCount?: number; skip?: number; allRefs?: boolean }) {
-    return invoke<GraphCommitRow[]>('git_get_graph', {
+    return invoke<GraphCommitRow[]>("git_get_graph", {
       repoPath,
       maxCount: options?.maxCount,
       skip: options?.skip,
@@ -93,31 +109,59 @@ export const tauriGitBackend = {
   },
 
   getChangedFiles(repoPath: string) {
-    return invoke<ChangedFile[]>('git_get_changed_files', { repoPath });
+    return invoke<ChangedFile[]>("git_get_changed_files", { repoPath });
   },
 
   getWorktrees(repoPath: string) {
-    return invoke<WorktreeEntry[]>('git_get_worktrees', { repoPath });
+    return invoke<WorktreeEntry[]>("git_get_worktrees", { repoPath });
   },
 
   getSubmodules(repoPath: string, recursive = true) {
-    return invoke<SubmoduleEntry[]>('git_get_submodules', { repoPath, recursive });
+    return invoke<SubmoduleEntry[]>("git_get_submodules", { repoPath, recursive });
   },
 
   checkoutBranch(repoPath: string, branch: string) {
-    return invoke<GitCommandResult>('git_checkout_branch', { repoPath, branch });
+    return invoke<GitCommandResult>("git_checkout_branch", { repoPath, branch });
   },
 
   createBranch(repoPath: string, branch: string, base?: string) {
-    return invoke<GitCommandResult>('git_create_branch', { repoPath, branch, base });
+    return invoke<GitCommandResult>("git_create_branch", { repoPath, branch, base });
+  },
+
+  renameBranch(repoPath: string, newName: string, oldName?: string) {
+    return invoke<GitCommandResult>("git_rename_branch", { repoPath, oldName, newName });
+  },
+
+  deleteBranch(repoPath: string, branch: string, isRemote = false, force = true) {
+    return invoke<GitCommandResult>("git_delete_branch", { repoPath, branch, isRemote, force });
+  },
+
+  setUpstream(repoPath: string, options?: { branch?: string; upstream?: string }) {
+    return invoke<GitCommandResult>("git_set_upstream", {
+      repoPath,
+      branch: options?.branch,
+      upstream: options?.upstream
+    });
+  },
+
+  mergeBranch(repoPath: string, reference: string) {
+    return invoke<GitCommandResult>("git_merge_branch", { repoPath, reference });
+  },
+
+  rebaseBranch(repoPath: string, reference: string) {
+    return invoke<GitCommandResult>("git_rebase_branch", { repoPath, reference });
+  },
+
+  resetHead(repoPath: string, reference: string, mode: "soft" | "mixed" | "hard" = "mixed") {
+    return invoke<GitCommandResult>("git_reset", { repoPath, reference, mode });
   },
 
   cloneRepo(url: string, destination: string) {
-    return invoke<GitCommandResult>('git_clone_repo', { url, destination });
+    return invoke<GitCommandResult>("git_clone_repo", { url, destination });
   },
 
   fetch(repoPath: string, options?: { remote?: string; prune?: boolean }) {
-    return invoke<GitCommandResult>('git_fetch', {
+    return invoke<GitCommandResult>("git_fetch", {
       repoPath,
       remote: options?.remote,
       prune: options?.prune
@@ -125,7 +169,7 @@ export const tauriGitBackend = {
   },
 
   pull(repoPath: string, options?: { remote?: string; branch?: string }) {
-    return invoke<GitCommandResult>('git_pull', {
+    return invoke<GitCommandResult>("git_pull", {
       repoPath,
       remote: options?.remote,
       branch: options?.branch
@@ -133,7 +177,7 @@ export const tauriGitBackend = {
   },
 
   push(repoPath: string, options?: { remote?: string; branch?: string; setUpstream?: boolean }) {
-    return invoke<GitCommandResult>('git_push', {
+    return invoke<GitCommandResult>("git_push", {
       repoPath,
       remote: options?.remote,
       branch: options?.branch,
@@ -141,8 +185,64 @@ export const tauriGitBackend = {
     });
   },
 
+  getCommitFiles(repoPath: string, sha: string) {
+    return invoke<CommitFileChange[]>("git_get_commit_files", { repoPath, sha });
+  },
+
+  getCommitDiff(repoPath: string, sha: string, filePath?: string) {
+    return invoke<string>("git_get_commit_diff", { repoPath, sha, filePath });
+  },
+
+  cherryPick(repoPath: string, sha: string) {
+    return invoke<GitCommandResult>("git_cherry_pick", { repoPath, sha });
+  },
+
+  revertCommit(repoPath: string, sha: string) {
+    return invoke<GitCommandResult>("git_revert_commit", { repoPath, sha });
+  },
+
+  createTag(repoPath: string, tagName: string, sha?: string) {
+    return invoke<GitCommandResult>("git_create_tag", { repoPath, tagName, sha });
+  },
+
+  deleteTag(repoPath: string, tagName: string) {
+    return invoke<GitCommandResult>("git_delete_tag", { repoPath, tagName });
+  },
+
+  stageFile(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_stage_file", { repoPath, path });
+  },
+
+  stageAll(repoPath: string) {
+    return invoke<GitCommandResult>("git_stage_all", { repoPath });
+  },
+
+  unstageFile(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_unstage_file", { repoPath, path });
+  },
+
+  unstageAll(repoPath: string) {
+    return invoke<GitCommandResult>("git_unstage_all", { repoPath });
+  },
+
+  discardChanges(repoPath: string, path: string, isUntracked = false) {
+    return invoke<GitCommandResult>("git_discard_changes", { repoPath, path, isUntracked });
+  },
+
+  discardAll(repoPath: string) {
+    return invoke<GitCommandResult>("git_discard_all", { repoPath });
+  },
+
+  commit(repoPath: string, message: string, amend = false) {
+    return invoke<GitCommandResult>("git_commit", { repoPath, message, amend });
+  },
+
+  getStashes(repoPath: string) {
+    return invoke<StashEntry[]>("git_get_stashes", { repoPath });
+  },
+
   createStash(repoPath: string, options?: { message?: string; includeUntracked?: boolean }) {
-    return invoke<GitCommandResult>('git_create_stash', {
+    return invoke<GitCommandResult>("git_create_stash", {
       repoPath,
       message: options?.message,
       includeUntracked: options?.includeUntracked
@@ -150,11 +250,15 @@ export const tauriGitBackend = {
   },
 
   applyStash(repoPath: string, stashRef: string, pop = false) {
-    return invoke<GitCommandResult>('git_apply_stash', { repoPath, stashRef, pop });
+    return invoke<GitCommandResult>("git_apply_stash", { repoPath, stashRef, pop });
   },
 
   dropStash(repoPath: string, stashRef: string) {
-    return invoke<GitCommandResult>('git_drop_stash', { repoPath, stashRef });
+    return invoke<GitCommandResult>("git_drop_stash", { repoPath, stashRef });
+  },
+
+  showFileDiff(repoPath: string, path: string, staged = false) {
+    return invoke<string>("git_show_file_diff", { repoPath, path, staged });
   },
 
   addWorktree(
@@ -162,7 +266,7 @@ export const tauriGitBackend = {
     path: string,
     options?: { reference?: string; newBranch?: string; detach?: boolean }
   ) {
-    return invoke<GitCommandResult>('git_worktree_add', {
+    return invoke<GitCommandResult>("git_worktree_add", {
       repoPath,
       path,
       reference: options?.reference,
@@ -172,14 +276,14 @@ export const tauriGitBackend = {
   },
 
   removeWorktree(repoPath: string, path: string, force = false) {
-    return invoke<GitCommandResult>('git_worktree_remove', { repoPath, path, force });
+    return invoke<GitCommandResult>("git_worktree_remove", { repoPath, path, force });
   },
 
   updateSubmodule(
     repoPath: string,
     options?: { path?: string; init?: boolean; recursive?: boolean }
   ) {
-    return invoke<GitCommandResult>('git_submodule_update', {
+    return invoke<GitCommandResult>("git_submodule_update", {
       repoPath,
       path: options?.path,
       init: options?.init,
@@ -188,7 +292,7 @@ export const tauriGitBackend = {
   },
 
   syncSubmodule(repoPath: string, options?: { path?: string; recursive?: boolean }) {
-    return invoke<GitCommandResult>('git_submodule_sync', {
+    return invoke<GitCommandResult>("git_submodule_sync", {
       repoPath,
       path: options?.path,
       recursive: options?.recursive
@@ -196,6 +300,6 @@ export const tauriGitBackend = {
   },
 
   deinitSubmodule(repoPath: string, path: string, force = false) {
-    return invoke<GitCommandResult>('git_submodule_deinit', { repoPath, path, force });
+    return invoke<GitCommandResult>("git_submodule_deinit", { repoPath, path, force });
   }
 };

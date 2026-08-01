@@ -1,3 +1,4 @@
+import { tauriGitBackend } from "../../services/tauriGitBackend";
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useGitClient,
@@ -85,6 +86,13 @@ export const GraphView: React.FC = () => {
     setF,
     commits,
     getCommitHash,
+    getCommitFullSha,
+    checkoutBranch,
+    createTag,
+    cherryPickCommit,
+    revertCommit,
+    resetToRef,
+    toastRun,
     graphData,
     graphHasMore,
     graphLoading,
@@ -96,12 +104,9 @@ export const GraphView: React.FC = () => {
     toggleExpandCommit,
     getFileList,
     matchesFilter,
-    act,
     openMenu,
     setView,
-    setOp,
-    log
-  } = useGitClient();
+    } = useGitClient();
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
@@ -155,45 +160,61 @@ export const GraphView: React.FC = () => {
 
   const handleCommitMenu = (e: React.MouseEvent, i: number) => {
     const hash = getCommitHash(i);
+    const fullSha = getCommitFullSha(i);
     const title = `${hash}  ${commits[i][0].slice(0, 32)}`;
     openMenu(e, title, [
       {
-        label: 'Open in Commit Details',
-        hint: '↵',
+        label: "Open in Commit Details",
+        hint: "↵",
         run: () => {
-          setView('details');
+          setView("details");
           toggleSelCommit(i, false);
         }
       },
-      { label: 'Diff vs parent', run: () => setView('diff') },
+      { label: "Diff vs parent", run: () => setView("diff") },
       { sep: true },
-      { label: 'Checkout (detached)', run: act(`Checkout ${hash}`, `checkout ${hash}`) },
-      { label: 'Create branch here…', run: act('Create branch') },
-      { label: 'Create tag here…', run: act('Create tag') },
-      { sep: true },
-      { label: 'Cherry-pick', run: act('Cherry-pick', `cherry-pick ${hash}`) },
-      { label: 'Revert', run: act('Revert', `revert ${hash}`) },
-      { label: 'Create patch…', run: act('Create patch') },
+      { label: "Checkout (detached)", run: () => void checkoutBranch(fullSha) },
       {
-        label: 'Start interactive rebase from here',
+        label: "Create branch here…",
         run: () => {
-          setOp({
-            name: 'REBASING',
-            step: 2,
-            total: 5,
-            detail: 'pick 8be1c04 mm/slub: fix kmalloc_nolock()'
-          });
-          log([
-            { text: `$ git rebase -i ${hash}^`, type: 'cmd' },
-            { text: `Stopped at ${hash}... edit`, type: 'warn' }
-          ]);
+          const name = window.prompt("Create branch at commit " + hash, "branch-" + hash);
+          if (name && name.trim()) {
+            void tauriGitBackend.createBranch(commits[0] ? "" : "", name.trim(), fullSha).then(() => {
+              void checkoutBranch(name.trim());
+            });
+          }
+        }
+      },
+      {
+        label: "Create tag here…",
+        run: () => {
+          const tagName = window.prompt("Tag name for commit " + hash, "v1.0.0");
+          if (tagName && tagName.trim()) {
+            void createTag(tagName.trim(), fullSha);
+          }
         }
       },
       { sep: true },
-      { label: 'Compare with current', run: () => setView('compare') },
-      { label: 'Directory timeline for this path…', run: act('Directory timeline') },
-      { label: 'Jump to first parent', hint: '⌥↑', run: act('Jump to parent') },
-      { label: 'Copy hash', hint: '⌘C', run: act('Copy hash') }
+      { label: "Cherry-pick", run: () => void cherryPickCommit(fullSha) },
+      { label: "Revert commit", run: () => void revertCommit(fullSha) },
+      { sep: true },
+      { label: "Reset HEAD to here — soft", run: () => void resetToRef(fullSha, "soft") },
+      { label: "Reset HEAD to here — mixed", run: () => void resetToRef(fullSha, "mixed") },
+      {
+        label: "Reset HEAD to here — hard",
+        danger: true,
+        run: () => void resetToRef(fullSha, "hard")
+      },
+      { sep: true },
+      { label: "Compare with current", run: () => setView("compare") },
+      {
+        label: "Copy hash",
+        hint: "⌘C",
+        run: () => {
+          void navigator.clipboard.writeText(fullSha);
+          toastRun("Copied hash", hash);
+        }
+      }
     ]);
   };
 

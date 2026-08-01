@@ -1,18 +1,46 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGitClient, statusColor } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { DiffFile } from '../../types/git-client';
 
 export const CommitDetailsView: React.FC = () => {
-  const { sel, commits, getCommitHash, getFileList, setView, act, openMenu, diffTab, setDiffTab } =
-    useGitClient();
+  const {
+    sel,
+    commits,
+    getCommitHash,
+    getCommitFullSha,
+    getFileList,
+    fetchCommitFiles,
+    cherryPickCommit,
+    revertCommit,
+    setView,
+    act,
+    openMenu,
+    diffTab,
+    setDiffTab
+  } = useGitClient();
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
   const isMulti = sel.length > 1;
 
-  const dfiles: DiffFile[] = isMulti
-    ? sel.slice(0, 4).flatMap(i => getFileList(i))
-    : getFileList(detailIdx);
+  const [realFiles, setRealFiles] = useState<DiffFile[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const sha = getCommitFullSha(detailIdx);
+    if (!sha) {
+      setRealFiles([]);
+      return;
+    }
+    void fetchCommitFiles(sha).then(files => {
+      if (active) setRealFiles(files);
+    });
+    return () => { active = false; };
+  }, [detailIdx, getCommitFullSha, fetchCommitFiles]);
+
+  const dfiles: DiffFile[] = realFiles.length ? realFiles : (
+    isMulti ? sel.slice(0, 4).flatMap(i => getFileList(i)) : getFileList(detailIdx)
+  );
 
   const dirs: Record<string, DiffFile[]> = {};
   dfiles.forEach(f => {
@@ -404,14 +432,14 @@ export const CommitDetailsView: React.FC = () => {
           <Button
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
-            onClick={act('Revert selected changes')}
+            onClick={() => void revertCommit(getCommitFullSha(detailIdx))}
           >
             Revert selected
           </Button>
           <Button
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
-            onClick={act('Cherry-pick selected changes')}
+            onClick={() => void cherryPickCommit(getCommitFullSha(detailIdx))}
           >
             Cherry-pick selected
           </Button>

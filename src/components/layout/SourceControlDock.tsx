@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { Textarea, Checkbox } from '../common/FormControls';
@@ -20,67 +20,47 @@ export const SourceControlDock: React.FC = () => {
     aiMessage,
     stagedFiles,
     unstagedFiles,
-    untrackedFiles
+    untrackedFiles,
+    stashes,
+    stageFile,
+    stageAll,
+    unstageFile,
+    unstageAll,
+    discardChanges,
+    commitChanges,
+    createStash,
+    applyStash,
+    dropStash
   } = useGitClient();
+
+  const [amend, setAmend] = useState(false);
 
   if (!dock) return null;
 
-  const stashes = [
-    {
-      ref: 'stash@{0}',
-      msg: 'WIP on feature/mlx5-next: tunnel steering spike',
-      branch: 'feature/mlx5-next',
-      files: '6 files',
-      when: '2h ago'
-    },
-    {
-      ref: 'stash@{1}',
-      msg: 'sched: util_est experiment (keep-index)',
-      branch: 'main',
-      files: '3 files',
-      when: 'yesterday'
-    },
-    {
-      ref: 'stash@{2}',
-      msg: 'shelved: kernel/sched/fair.c',
-      branch: 'main',
-      files: '1 file',
-      when: '2 days ago'
-    },
-    {
-      ref: 'stash@{3}',
-      msg: 'WIP: bisect scratch (untracked included)',
-      branch: 'detached',
-      files: '11 files',
-      when: '5 days ago'
-    }
-  ];
+
 
   const handleFileMenu = (e: React.MouseEvent, f: DiffFile, isStaged: boolean) => {
     openMenu(e, f.path, [
-      { label: isStaged ? 'Unstage file' : 'Stage file', run: act('Stage') },
-      { label: 'Stage selected hunks…', run: act('Stage hunks') },
-      { label: 'Open diff', run: () => setView('diff') },
-      { label: 'Compare with Revision…', run: act('Compare with revision') },
-      { label: 'Shelve this file', run: act('Shelve file') },
+      {
+        label: isStaged ? "Unstage file" : "Stage file",
+        run: () => void (isStaged ? unstageFile(f.path) : stageFile(f.path))
+      },
+      { label: "Open diff", run: () => setView("diff") },
       { sep: true },
       {
-        label: 'Discard changes',
+        label: "Discard changes",
         danger: true,
-        run: act('Discard')
+        run: () => void discardChanges(f.path, f.status === "?")
       }
     ]);
   };
 
-  const handleStashMenu = (e: React.MouseEvent, st: (typeof stashes)[0]) => {
-    openMenu(e, st.ref, [
-      { label: 'Apply', run: act('Stash apply') },
-      { label: 'Pop', run: act('Stash pop') },
-      { label: 'Unshelve into working tree', run: act('Unshelve') },
-      { label: 'Preview patch', run: () => setView('diff') },
-      { label: 'Rename…', run: act('Rename stash') },
+  const handleStashMenu = (e: React.MouseEvent, st: { stashRef: string }) => {
+    openMenu(e, st.stashRef, [
+      { label: "Apply", run: () => void applyStash(st.stashRef, false) },
+      { label: "Pop", run: () => void applyStash(st.stashRef, true) },
       { sep: true },
-      { label: 'Drop', danger: true, run: act('Drop stash') }
+      { label: "Drop", danger: true, run: () => void dropStash(st.stashRef) }
     ]);
   };
 
@@ -132,7 +112,7 @@ export const SourceControlDock: React.FC = () => {
             boxShadow: scTab === 'stash' ? 'inset 0 0 0 1px var(--color-accent)' : 'none'
           }}
         >
-          Stash 4
+          Stash {stashes.length}
         </Button>
       </div>
 
@@ -168,7 +148,7 @@ export const SourceControlDock: React.FC = () => {
               <Button
                 variant="ghost"
                 style={{ height: '18px', width: '20px', padding: 0 }}
-                onClick={act('Unstage all', 'reset HEAD')}
+                onClick={() => void unstageAll()}
                 title="Unstage all"
                 aria-label="Unstage all"
               >
@@ -246,7 +226,7 @@ export const SourceControlDock: React.FC = () => {
               <Button
                 variant="ghost"
                 style={{ height: '18px', width: '20px', padding: 0 }}
-                onClick={act('Stage all', 'add -A')}
+                onClick={() => void stageAll()}
                 title="Stage all"
                 aria-label="Stage all"
               >
@@ -335,7 +315,7 @@ export const SourceControlDock: React.FC = () => {
               <Button
                 variant="ghost"
                 style={{ height: '18px', width: '20px', padding: 0 }}
-                onClick={act('Stage untracked', 'add .')}
+                onClick={() => void stageAll()}
                 title="Stage all"
                 aria-label="Stage all"
               >
@@ -504,12 +484,17 @@ export const SourceControlDock: React.FC = () => {
                 marginTop: 'var(--space-2)'
               }}
             >
-              <Checkbox label="Amend" style={{ fontSize: '11px', color: 'var(--fg2)' }} />
+              <Checkbox
+                label="Amend"
+                checked={amend}
+                onChange={e => setAmend(e.target.checked)}
+                style={{ fontSize: "11px", color: "var(--fg2)" }}
+              />
               <div style={{ flex: 1 }} />
               <Button
                 variant="primary"
-                style={{ height: '26px' }}
-                onClick={act('Commit staged changes', 'commit')}
+                style={{ height: "26px" }}
+                onClick={() => void commitChanges(commitMsg, amend)}
               >
                 Commit ⌘↵
               </Button>
@@ -545,7 +530,10 @@ export const SourceControlDock: React.FC = () => {
             <Button
               variant="ghost"
               style={{ height: '18px', width: '20px', padding: 0 }}
-              onClick={act('Create stash', 'stash push -u')}
+              onClick={() => {
+                const msg = window.prompt("Stash message (optional)");
+                if (msg !== null) void createStash(msg.trim() || undefined, true);
+              }}
               title="Create stash"
               aria-label="Create stash"
             >
@@ -558,51 +546,54 @@ export const SourceControlDock: React.FC = () => {
               onClick={e => handleStashMenu(e, st)}
               onContextMenu={e => handleStashMenu(e, st)}
               style={{
-                padding: 'var(--space-3)',
-                marginBottom: '6px',
-                cursor: 'pointer',
-                gap: '5px'
+                padding: "var(--space-3)",
+                marginBottom: "6px",
+                cursor: "pointer",
+                gap: "5px"
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)" }}>
                 <span
                   style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11px',
-                    color: 'var(--color-accent)'
+                    fontFamily: "var(--font-mono)",
+                    fontSize: "11px",
+                    color: "var(--color-accent)"
                   }}
                 >
-                  {st.ref}
+                  {st.stashRef}
                 </span>
                 <span
                   style={{
                     flex: 1,
-                    fontSize: '12px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
+                    fontSize: "12px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap"
                   }}
                 >
-                  {st.msg}
+                  {st.message}
                 </span>
               </div>
               <div
                 style={{
-                  display: 'flex',
-                  gap: 'var(--space-2)',
-                  fontSize: '10.5px',
-                  color: 'var(--fg3)',
-                  fontFamily: 'var(--font-mono)'
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  fontSize: "10.5px",
+                  color: "var(--fg3)",
+                  fontFamily: "var(--font-mono)"
                 }}
               >
                 <span>{st.branch}</span>
                 <span>·</span>
-                <span>{st.files}</span>
-                <span>·</span>
-                <span>{st.when}</span>
+                <span>{st.date}</span>
               </div>
             </Card>
           ))}
+          {!stashes.length && (
+            <div style={{ padding: "12px", color: "var(--fg3)", fontFamily: "var(--font-mono)", fontSize: "11.5px" }}>
+              No stashes in working tree.
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -143,7 +143,25 @@ function formatBranchMeta(branch: BranchNode): string {
 }
 
 export const BranchesView: React.FC = () => {
-  const { branchQ, setBranchQ, act, openMenu, confirm, setView, commits, repoPath } = useGitClient();
+  const {
+    branchQ,
+    setBranchQ,
+    act,
+    openMenu,
+    confirm,
+    setView,
+    commits,
+    repoPath,
+    currentBranch,
+    checkoutBranch,
+    renameBranch,
+    deleteBranch,
+    setUpstream,
+    mergeBranch,
+    rebaseBranch,
+    resetToRef,
+    createBranch
+  } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -276,49 +294,79 @@ export const BranchesView: React.FC = () => {
 
   const handleBranchMenu = (e: React.MouseEvent, branch: BranchNode) => {
     const name = branch.name;
-    const remoteName = branch.remoteName || 'origin';
+    const remoteName = branch.remoteName || "origin";
     const remoteShort = branch.shortName;
 
     openMenu(e, name, [
-      { label: 'Checkout', hint: '↵', run: act(`Checkout ${name}`, `checkout ${name}`) },
-      { label: `New branch from '${name}'…`, run: act('Create branch') },
-      { label: 'Rename…', run: act('Rename branch') },
-      { sep: true },
-      { label: `Merge ${name} into main`, run: act('Merge', `merge ${name}`) },
-      { label: `Rebase main onto ${name}`, run: act('Rebase') },
-      { label: 'Compare with current', run: () => setView('compare') },
-      { label: 'Open in Git Graph', run: () => setView('graph') },
-      { sep: true },
-      { label: 'Reset current to here — soft', run: act('Soft reset', `reset --soft ${name}`) },
-      { label: 'Reset current to here — mixed', run: act('Mixed reset', `reset --mixed ${name}`) },
+      { label: "Checkout", hint: "↵", run: () => checkoutBranch(name) },
       {
-        label: 'Reset current to here — hard',
+        label: `New branch from '${name}'…`,
+        run: () => {
+          const newBranch = window.prompt(`Create new branch from ${name}`, `${name}-copy`);
+          if (newBranch && newBranch.trim()) {
+            void tauriGitBackend.createBranch(repoPath, newBranch.trim(), name).then(() => {
+              void checkoutBranch(newBranch.trim());
+            });
+          }
+        }
+      },
+      {
+        label: "Rename…",
+        run: () => {
+          const newName = window.prompt(`Rename branch ${name}`, name);
+          if (newName && newName.trim() && newName.trim() !== name) {
+            void renameBranch(name, newName.trim());
+          }
+        }
+      },
+      { sep: true },
+      { label: `Merge ${name} into ${currentBranch}`, run: () => mergeBranch(name) },
+      { label: `Rebase ${currentBranch} onto ${name}`, run: () => rebaseBranch(name) },
+      { label: "Compare with current", run: () => setView("compare") },
+      { label: "Open in Git Graph", run: () => setView("graph") },
+      { sep: true },
+      { label: "Reset current to here — soft", run: () => resetToRef(name, "soft") },
+      { label: "Reset current to here — mixed", run: () => resetToRef(name, "mixed") },
+      {
+        label: "Reset current to here — hard",
         danger: true,
         run: () =>
           confirm(
-            `Hard reset main to ${name}?`,
-            'All uncommitted changes in the working tree and index are permanently discarded — 12 modified files will be lost.',
+            `Hard reset ${currentBranch} to ${name}?`,
+            "All uncommitted changes in the working tree and index will be permanently discarded.",
             `git reset --hard ${name}`,
-            'Reset --hard',
-            act('Hard reset')
+            "Reset --hard",
+            () => void resetToRef(name, "hard")
           )
       },
       { sep: true },
-      { label: branch.kind === 'remote' ? 'Untrack upstream' : 'Set upstream…', run: act('Set upstream') },
+      {
+        label: branch.kind === "remote" ? "Untrack upstream" : "Set upstream…",
+        run: () => {
+          if (branch.kind === "remote") {
+            void setUpstream(currentBranch, undefined);
+          } else {
+            const upstream = window.prompt(`Set upstream for ${name}`, `origin/${name}`);
+            if (upstream !== null) {
+              void setUpstream(name, upstream.trim() || undefined);
+            }
+          }
+        }
+      },
       {
         label: `Delete ${name}`,
         danger: true,
         run: () =>
           confirm(
             `Delete branch ${name}?`,
-            branch.kind === 'remote'
-              ? 'This deletes the branch on the remote for everyone.'
-              : 'The branch has 3 commits not merged into main.',
-            branch.kind === 'remote'
+            branch.kind === "remote"
+              ? "This deletes the branch on the remote server."
+              : "This branch will be deleted from your local repository.",
+            branch.kind === "remote"
               ? `git push ${remoteName} --delete ${remoteShort}`
               : `git branch -D ${name}`,
-            'Delete branch',
-            act('Delete branch')
+            "Delete branch",
+            () => void deleteBranch(name, branch.kind === "remote", true)
           )
       }
     ]);
@@ -387,7 +435,7 @@ export const BranchesView: React.FC = () => {
           />
           <Button
             variant="secondary"
-            onClick={act('Create branch')}
+            onClick={() => createBranch()}
             title="New branch"
             style={{ width: '25px', height: '25px', padding: 0 }}
           >
@@ -602,15 +650,15 @@ export const BranchesView: React.FC = () => {
           </Button>
           <Button
             variant="primary"
-            style={{ height: '25px', padding: '0 10px' }}
+            style={{ height: "25px", padding: "0 10px" }}
             onClick={
               selectedBranch
-                ? act(`Merge ${selectedBranch.name} into main`, `merge ${selectedBranch.name}`)
+                ? () => void mergeBranch(selectedBranch.name)
                 : undefined
             }
             disabled={!selectedBranch}
           >
-            <i className="ph ph-git-merge" style={{ fontSize: '14px' }} /> Merge into main
+            <i className="ph ph-git-merge" style={{ fontSize: "14px" }} /> Merge into {currentBranch}
           </Button>
         </div>
 

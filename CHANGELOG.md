@@ -22,3 +22,12 @@
 - Added a current-branch fallback command so the toolbar branch label no longer stays stuck on "No branch" when the branch list fetch fails.
 - Made the top-bar branch button open the existing Branches view instead of duplicating branch-list logic in the toolbar.
 - Added a fallback branch loader in the VS Code extension so the branch/tag picker can still populate when the split local/remote refresh path yields no refs.
+- Implemented Rust backend commands for branch actions (rename, delete, set-upstream, merge, rebase, reset).
+- Implemented Rust backend commands for commit operations (commit files, diff retrieval, cherry-pick, revert, create/delete tag).
+- Implemented Rust backend commands for file staging (stage, unstage, stage-all, unstage-all, discard, discard-all, commit with amend) and live stash list (`git stash list`).
+- Extended frontend service `tauriGitBackend.ts` with strongly typed wrappers for all new Git commands.
+- Updated `GitClientContext.tsx` with live stash state, full SHA access, and action handlers that automatically re-hydrate branch summary, working-tree changes, graph rows, and stashes.
+- Wired `BranchesView.tsx` right-click context menu and toolbar buttons to live backend actions for checkout, create, rename, merge into current branch, rebase, soft/mixed/hard reset, set/untrack upstream, and local/remote branch deletion.
+- Wired `GraphView.tsx` commit context menu to live detached checkout, branch/tag creation at commit, cherry-pick, revert, soft/mixed/hard reset, and clipboard hash copy.
+- Updated `CommitDetailsView.tsx` to fetch live changed files for commits via `fetchCommitFiles` and wired Revert / Cherry-pick selected actions.
+- Wired `SourceControlDock.tsx` file staging, unstaging, discard, commit (with amend), and live Stash list rendering with Create Stash, Apply, Pop, and Drop stash context menu actions.

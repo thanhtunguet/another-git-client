@@ -208,7 +208,7 @@ pub fn git_is_repo(repo_path: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
   let repo = canonical_repo_path(&repo_path)?;
-  let format = "%(*refname:short)%x1f%(refname:short)%x1f%(refname)%x1f%(upstream:short)%x1f%(upstream:track)%x1f%(HEAD)%x1f%(committerdate:unix)";
+  let format = "%(*refname:short)%x1f%(refname:short)%x1f%(refname)%x1f%(upstream:short)%x1f%(upstream:track)%x1f%(HEAD)%x1f%(committerdate:unix)%x1f%(symref)";
   let args = vec![
     "for-each-ref".to_string(),
     "refs/heads".to_string(),
@@ -222,6 +222,14 @@ pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
   for line in output.lines().map(str::trim).filter(|line| !line.is_empty()) {
     let parts: Vec<&str> = line.split('\u{1f}').collect();
     if parts.len() < 7 {
+      continue;
+    }
+
+    // Skip symbolic refs such as refs/remotes/origin/HEAD — they mirror another
+    // ref rather than naming a real branch and would otherwise show up as a
+    // phantom leaf (e.g. an "origin" entry inside the "origin" remote folder).
+    let is_symref = parts.get(7).is_some_and(|symref| !symref.is_empty());
+    if is_symref {
       continue;
     }
 
@@ -843,4 +851,353 @@ pub fn git_submodule_deinit(
   args.push("--".to_string());
   args.push(path);
   run_git(&repo, &args)
+}
+
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StashEntry {
+  pub index: usize,
+  pub stash_ref: String,
+  pub sha: String,
+  pub message: String,
+  pub branch: String,
+  pub date: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitFileChange {
+  pub path: String,
+  pub status: String,
+  pub additions: i32,
+  pub deletions: i32,
+}
+
+#[tauri::command]
+pub fn git_rename_branch(
+  repo_path: String,
+  old_name: Option<String>,
+  new_name: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["branch".to_string(), "-m".to_string()];
+  if let Some(old) = old_name {
+    if !old.trim().is_empty() {
+      args.push(old);
+    }
+  }
+  args.push(new_name);
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_delete_branch(
+  repo_path: String,
+  branch: String,
+  is_remote: Option<bool>,
+  force: Option<bool>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  if is_remote.unwrap_or(false) {
+    let parts: Vec<&str> = branch.splitn(2, "/").collect();
+    if parts.len() == 2 {
+      let remote_name = parts[0];
+      let branch_name = parts[1];
+      run_git(&repo, &["push".to_string(), remote_name.to_string(), "--delete".to_string(), branch_name.to_string()])
+    } else {
+      Err(format!("Invalid remote branch name: {branch}"))
+    }
+  } else {
+    let flag = if force.unwrap_or(true) { "-D" } else { "-d" };
+    run_git(&repo, &["branch".to_string(), flag.to_string(), branch])
+  }
+}
+
+#[tauri::command]
+pub fn git_set_upstream(
+  repo_path: String,
+  branch: Option<String>,
+  upstream: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["branch".to_string()];
+  if let Some(up) = upstream {
+    if up.trim().is_empty() {
+      args.push("--unset-upstream".to_string());
+    } else {
+      args.push(format!("--set-upstream-to={up}"));
+    }
+  } else {
+    args.push("--unset-upstream".to_string());
+  }
+  if let Some(b) = branch {
+    if !b.trim().is_empty() {
+      args.push(b);
+    }
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_merge_branch(
+  repo_path: String,
+  reference: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["merge".to_string(), reference])
+}
+
+#[tauri::command]
+pub fn git_rebase_branch(
+  repo_path: String,
+  reference: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["rebase".to_string(), reference])
+}
+
+#[tauri::command]
+pub fn git_reset(
+  repo_path: String,
+  reference: String,
+  mode: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let flag = match mode.as_deref().unwrap_or("mixed") {
+    "soft" => "--soft",
+    "hard" => "--hard",
+    _ => "--mixed",
+  };
+  run_git(&repo, &["reset".to_string(), flag.to_string(), reference])
+}
+
+#[tauri::command]
+pub fn git_get_commit_files(
+  repo_path: String,
+  sha: String,
+) -> Result<Vec<CommitFileChange>, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec![
+    "show".to_string(),
+    "--numstat".to_string(),
+    "--format=".to_string(),
+    sha,
+  ];
+  let output = run_git(&repo, &args)?.stdout;
+  let mut files = Vec::new();
+
+  for line in output.lines().map(str::trim).filter(|l| !l.is_empty()) {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() >= 3 {
+      let add = parts[0].parse::<i32>().unwrap_or(0);
+      let del = parts[1].parse::<i32>().unwrap_or(0);
+      let path = parts[2..].join(" ");
+      let status = if add > 0 && del == 0 {
+        "A".to_string()
+      } else if add == 0 && del > 0 {
+        "D".to_string()
+      } else {
+        "M".to_string()
+      };
+      files.push(CommitFileChange {
+        path,
+        status,
+        additions: add,
+        deletions: del,
+      });
+    }
+  }
+
+  Ok(files)
+}
+
+#[tauri::command]
+pub fn git_get_commit_diff(
+  repo_path: String,
+  sha: String,
+  file_path: Option<String>,
+) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["show".to_string(), sha];
+  if let Some(path) = file_path {
+    if !path.trim().is_empty() {
+      args.push("--".to_string());
+      args.push(path);
+    }
+  }
+  let result = run_git(&repo, &args)?;
+  Ok(result.stdout)
+}
+
+#[tauri::command]
+pub fn git_cherry_pick(
+  repo_path: String,
+  sha: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["cherry-pick".to_string(), sha])
+}
+
+#[tauri::command]
+pub fn git_revert_commit(
+  repo_path: String,
+  sha: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["revert".to_string(), "--no-edit".to_string(), sha])
+}
+
+#[tauri::command]
+pub fn git_create_tag(
+  repo_path: String,
+  tag_name: String,
+  sha: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["tag".to_string(), tag_name];
+  if let Some(target_sha) = sha {
+    if !target_sha.trim().is_empty() {
+      args.push(target_sha);
+    }
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_delete_tag(
+  repo_path: String,
+  tag_name: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["tag".to_string(), "-d".to_string(), tag_name])
+}
+
+#[tauri::command]
+pub fn git_stage_file(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["add".to_string(), "--".to_string(), path])
+}
+
+#[tauri::command]
+pub fn git_stage_all(repo_path: String) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["add".to_string(), "-A".to_string()])
+}
+
+#[tauri::command]
+pub fn git_unstage_file(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["restore".to_string(), "--staged".to_string(), "--".to_string(), path])
+}
+
+#[tauri::command]
+pub fn git_unstage_all(repo_path: String) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["restore".to_string(), "--staged".to_string(), ".".to_string()])
+}
+
+#[tauri::command]
+pub fn git_discard_changes(
+  repo_path: String,
+  path: String,
+  is_untracked: Option<bool>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  if is_untracked.unwrap_or(false) {
+    run_git(&repo, &["clean".to_string(), "-fd".to_string(), "--".to_string(), path])
+  } else {
+    run_git(&repo, &["restore".to_string(), "--".to_string(), path])
+  }
+}
+
+#[tauri::command]
+pub fn git_discard_all(repo_path: String) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let _ = run_git_allow_failure(&repo, &["restore".to_string(), ".".to_string()]);
+  let _ = run_git_allow_failure(&repo, &["clean".to_string(), "-fd".to_string()]);
+  Ok(GitCommandResult {
+    stdout: "All working tree changes discarded".to_string(),
+    stderr: String::new(),
+    exit_code: 0,
+  })
+}
+
+#[tauri::command]
+pub fn git_commit(
+  repo_path: String,
+  message: String,
+  amend: Option<bool>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["commit".to_string(), "-m".to_string(), message];
+  if amend.unwrap_or(false) {
+    args.push("--amend".to_string());
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_get_stashes(repo_path: String) -> Result<Vec<StashEntry>, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let format = "%gd%x1f%H%x1f%gs%x1f%cr";
+  let args = vec!["stash".to_string(), "list".to_string(), format!("--format={format}")];
+
+  let output = run_git_allow_failure(&repo, &args)?;
+  if output.exit_code != 0 {
+    return Ok(Vec::new());
+  }
+
+  let mut stashes = Vec::new();
+  for (idx, line) in output.stdout.lines().enumerate() {
+    let parts: Vec<&str> = line.split("\u{1f}").collect();
+    if parts.len() < 4 {
+      continue;
+    }
+
+    let stash_ref = parts[0].to_string();
+    let sha = parts[1].to_string();
+    let raw_msg = parts[2].to_string();
+    let date = parts[3].to_string();
+
+    let (branch, message) = if let Some((b, m)) = raw_msg.split_once(": ") {
+      (b.trim_start_matches("WIP on ").trim_start_matches("On ").to_string(), m.to_string())
+    } else {
+      ("main".to_string(), raw_msg)
+    };
+
+    stashes.push(StashEntry {
+      index: idx,
+      stash_ref,
+      sha,
+      message,
+      branch,
+      date,
+    });
+  }
+
+  Ok(stashes)
+}
+
+#[tauri::command]
+pub fn git_show_file_diff(
+  repo_path: String,
+  path: String,
+  staged: Option<bool>,
+) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["diff".to_string()];
+  if staged.unwrap_or(false) {
+    args.push("--staged".to_string());
+  }
+  args.push("--".to_string());
+  args.push(path);
+  let result = run_git(&repo, &args)?;
+  Ok(result.stdout)
 }
