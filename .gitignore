@@ -1,3 +1,4 @@
 .thumbnail
 node_modules/
 dist/
+.worktrees/
