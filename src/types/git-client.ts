@@ -159,6 +159,7 @@ export interface DialogState {
   body: string;
   cmd: string;
   action: string;
+  kind?: 'confirm' | 'clone';
   run?: () => void;
 }
 

@@ -16,6 +16,7 @@ export const TopBar: React.FC = () => {
     createBranch,
     openRepository,
     cloneRepository,
+    actionBusy,
     toggleTheme,
     theme,
     toggleDock,
@@ -46,19 +47,23 @@ export const TopBar: React.FC = () => {
       <Button
         variant="secondary"
         onClick={handleRepoMenu}
+        disabled={actionBusy}
         style={{ height: '28px', gap: '8px', fontSize: '12.5px' }}
       >
         <i className="ph ph-git-fork" style={{ fontSize: '14px', color: 'var(--color-accent)' }} />
         <span style={{ fontWeight: 500 }}>{repoName}</span>
-        <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-          {repoPath}
-        </span>
+        {repoPath ? (
+          <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+            {repoPath}
+          </span>
+        ) : null}
         <i className="ph ph-caret-down" style={{ fontSize: '11px', color: 'var(--fg3)' }} />
       </Button>
 
       <Button
         variant="secondary"
         onClick={handleBranchMenu}
+        disabled={actionBusy}
         style={{ height: '28px', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
       >
         <i
@@ -112,6 +117,7 @@ export const TopBar: React.FC = () => {
           variant="ghost"
           style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
           onClick={doFetch}
+          disabled={actionBusy}
         >
           Fetch
         </Button>
@@ -119,6 +125,7 @@ export const TopBar: React.FC = () => {
           variant="ghost"
           style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
           onClick={doPull}
+          disabled={actionBusy}
         >
           Pull
         </Button>
@@ -126,6 +133,7 @@ export const TopBar: React.FC = () => {
           variant="ghost"
           style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
           onClick={doPush}
+          disabled={actionBusy}
         >
           Push
         </Button>

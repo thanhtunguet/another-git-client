@@ -19,6 +19,7 @@ import {
   GitClientProps,
   MenuItem
 } from '../types/git-client';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { tauriGitBackend, type GitCommandResult } from '../services/tauriGitBackend';
 
 export const COLORS = [
@@ -295,6 +296,10 @@ interface GitClientContextType {
   confirm: (title: string, body: string, cmd: string, action: string, run?: () => void) => void;
   closeDialog: () => void;
   confirmDialog: () => void;
+  cloneDialogUrl: string;
+  setCloneDialogUrl: (value: string) => void;
+  cloneDialogUseGit: boolean;
+  setCloneDialogUseGit: (value: boolean) => void;
   toast: ToastState | null;
   toastPct: number;
   toastRun: (title: string, detail: string, done?: () => void) => void;
@@ -344,6 +349,7 @@ interface GitClientContextType {
   createBranch: () => void;
   openRepository: () => void;
   cloneRepository: () => void;
+  actionBusy: boolean;
   aiMessage: () => void;
   updateAll: () => void;
   paletteAll: () => PaletteItem[];
@@ -374,6 +380,8 @@ export const GitClientProvider: React.FC<{
   const [toast, setToast] = useState<ToastState | null>(null);
   const [toastPct, setToastPct] = useState<number>(0);
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [cloneDialogUrl, setCloneDialogUrl] = useState<string>('');
+  const [cloneDialogUseGit, setCloneDialogUseGit] = useState<boolean>(false);
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
@@ -402,11 +410,12 @@ export const GitClientProvider: React.FC<{
   );
 
   const commits = RAW_COMMITS;
-  const [repoPath, setRepoPath] = useState<string>(props.repoPath || '~/src/torvalds/linux');
-  const [repoName, setRepoName] = useState<string>(props.repoName || 'linux');
-  const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'main');
-  const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 3);
-  const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 12);
+  const [repoPath, setRepoPath] = useState<string>(props.repoPath || '');
+  const [repoName, setRepoName] = useState<string>(props.repoName || 'Open a repository');
+  const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'No branch');
+  const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 0);
+  const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 0);
+  const [actionBusy, setActionBusy] = useState<boolean>(false);
 
   const graphData = useMemo(() => buildGraphData(commits), [commits]);
 
@@ -441,6 +450,62 @@ export const GitClientProvider: React.FC<{
     const parts = cleaned.split(/[\\/]/).filter(Boolean);
     return parts[parts.length - 1] || pathValue;
   }, []);
+
+  const getRepoDirNameFromUrl = useCallback((urlValue: string): string => {
+    const normalized = urlValue.trim().replace(/\/+$/g, '');
+    const slashSegment = normalized.split('/').pop() || normalized;
+    const colonSegment = slashSegment.split(':').pop() || slashSegment;
+    const name = colonSegment.endsWith('.git') ? colonSegment.slice(0, -4) : colonSegment;
+    return name || 'repository';
+  }, []);
+
+  const joinPath = useCallback((basePath: string, child: string): string => {
+    const sep = basePath.includes('\\') ? '\\' : '/';
+    const cleaned = basePath.replace(/[\\/]+$/g, '');
+    return `${cleaned}${sep}${child}`;
+  }, []);
+
+  const toGitSshUrl = useCallback((urlValue: string): string => {
+    const value = urlValue.trim();
+    if (!value) {
+      return value;
+    }
+    if (value.startsWith('git@') || value.startsWith('ssh://')) {
+      return value;
+    }
+    if (!(value.startsWith('https://') || value.startsWith('http://'))) {
+      return value;
+    }
+    try {
+      const parsed = new URL(value);
+      const host = parsed.host;
+      let path = parsed.pathname.replace(/^\/+/, '').replace(/\/+$/g, '');
+      if (path.endsWith('.git')) {
+        path = path.slice(0, -4);
+      }
+      if (!path) {
+        return value;
+      }
+      return `git@${host}:${path}.git`;
+    } catch {
+      return value;
+    }
+  }, []);
+
+  const runWithActionLock = useCallback(
+    async (task: () => Promise<void>) => {
+      if (actionBusy) {
+        return;
+      }
+      setActionBusy(true);
+      try {
+        await task();
+      } finally {
+        setActionBusy(false);
+      }
+    },
+    [actionBusy]
+  );
 
   const appendCommandResult = useCallback((result: GitCommandResult) => {
     const lines: LogEntry[] = [];
@@ -510,7 +575,7 @@ export const GitClientProvider: React.FC<{
 
   const confirm = useCallback(
     (title: string, body: string, cmd: string, action: string, run?: () => void) => {
-      setDialog({ title, body, cmd, action, run });
+      setDialog({ title, body, cmd, action, kind: 'confirm', run });
       setMenu(null);
     },
     []
@@ -518,13 +583,74 @@ export const GitClientProvider: React.FC<{
 
   const closeDialog = useCallback(() => {
     setDialog(null);
+    setCloneDialogUrl('');
+    setCloneDialogUseGit(false);
   }, []);
+
+  const runCloneFromDialog = useCallback(() => {
+    const rawUrl = cloneDialogUrl.trim();
+    if (!rawUrl) {
+      log([{ text: 'Clone URL is required', type: 'err' }]);
+      return;
+    }
+    const cloneUrl = cloneDialogUseGit ? toGitSshUrl(rawUrl) : rawUrl;
+
+    void (async () => {
+      let destinationBase = '';
+      try {
+        const selected = await openDialog({
+          directory: true,
+          multiple: false,
+          title: 'Select Destination Folder'
+        });
+        if (typeof selected === 'string') {
+          destinationBase = selected.trim();
+        }
+      } catch {
+        // Fallback to text prompt in non-tauri contexts.
+      }
+
+      if (!destinationBase) {
+        const fallbackPath = window.prompt('Clone destination parent folder', '');
+        if (!fallbackPath || !fallbackPath.trim()) {
+          return;
+        }
+        destinationBase = fallbackPath.trim();
+      }
+
+      const repoDirName = getRepoDirNameFromUrl(cloneUrl);
+      const destinationPath = joinPath(destinationBase, repoDirName);
+      setDialog(null);
+
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git clone ${cloneUrl} ${destinationPath}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.cloneRepo(cloneUrl, destinationPath);
+          appendCommandResult(result);
+          await setActiveRepository(destinationPath);
+          toastRun('Clone complete', destinationPath);
+        } catch (error) {
+          log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        } finally {
+          setCloneDialogUrl('');
+          setCloneDialogUseGit(false);
+        }
+      });
+    })();
+  }, [cloneDialogUrl, cloneDialogUseGit, log, toGitSshUrl, getRepoDirNameFromUrl, joinPath, runWithActionLock, appendCommandResult, setActiveRepository, toastRun]);
 
   const confirmDialog = useCallback(() => {
     const d = dialog;
+    if (!d) {
+      return;
+    }
+    if (d.kind === 'clone') {
+      runCloneFromDialog();
+      return;
+    }
     setDialog(null);
-    if (d && d.run) d.run();
-  }, [dialog]);
+    if (d.run) d.run();
+  }, [dialog, runCloneFromDialog]);
 
   const openMenu = useCallback(
     (e: React.MouseEvent | MouseEvent, title: string, items: MenuItem[]) => {
@@ -599,59 +725,65 @@ export const GitClientProvider: React.FC<{
   );
 
   const openRepository = useCallback(() => {
-    const pickedPath = window.prompt('Open repository path', repoPath);
-    if (!pickedPath || !pickedPath.trim()) {
-      return;
-    }
-    const nextPath = pickedPath.trim();
     void (async () => {
-      try {
-        const isRepo = await tauriGitBackend.isRepo(nextPath);
-        if (!isRepo) {
-          log([{ text: `Not a git repository: ${nextPath}`, type: 'err' }]);
-          return;
+      await runWithActionLock(async () => {
+        let nextPath = '';
+        try {
+          const selected = await openDialog({
+            directory: true,
+            multiple: false,
+            title: 'Open Repository'
+          });
+          if (typeof selected === 'string') {
+            nextPath = selected.trim();
+          }
+        } catch {
+          // Fallback to text prompt in non-tauri contexts.
         }
-        await setActiveRepository(nextPath);
-        toastRun('Repository opened', nextPath);
-      } catch (error) {
-        log([{ text: `Open repository failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-      }
+
+        if (!nextPath) {
+          const fallbackPath = window.prompt('Open repository path', repoPath);
+          if (!fallbackPath || !fallbackPath.trim()) {
+            return;
+          }
+          nextPath = fallbackPath.trim();
+        }
+
+        try {
+          const isRepo = await tauriGitBackend.isRepo(nextPath);
+          if (!isRepo) {
+            log([{ text: `Not a git repository: ${nextPath}`, type: 'err' }]);
+            return;
+          }
+          await setActiveRepository(nextPath);
+          toastRun('Repository opened', nextPath);
+        } catch (error) {
+          log([{ text: `Open repository failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
     })();
-  }, [repoPath, log, setActiveRepository, toastRun]);
+  }, [repoPath, log, setActiveRepository, toastRun, runWithActionLock]);
 
   const cloneRepository = useCallback(() => {
-    const cloneUrl = window.prompt('Clone URL', '');
-    if (!cloneUrl || !cloneUrl.trim()) {
+    if (actionBusy) {
       return;
     }
-    const destination = window.prompt('Clone destination path', '');
-    if (!destination || !destination.trim()) {
-      return;
-    }
-    const url = cloneUrl.trim();
-    const destinationPath = destination.trim();
-    confirm(
-      `Clone ${url}?`,
-      `This will clone into ${destinationPath}.`,
-      `git clone ${url} ${destinationPath}`,
-      'Clone',
-      () => {
-        void (async () => {
-          try {
-            log([{ text: `$ git clone ${url} ${destinationPath}`, type: 'cmd' }]);
-            const result = await tauriGitBackend.cloneRepo(url, destinationPath);
-            appendCommandResult(result);
-            await setActiveRepository(destinationPath);
-            toastRun('Clone complete', destinationPath);
-          } catch (error) {
-            log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-          }
-        })();
-      }
-    );
-  }, [confirm, log, appendCommandResult, setActiveRepository, toastRun]);
+    setCloneDialogUrl('');
+    setCloneDialogUseGit(false);
+    setDialog({
+      title: 'Clone repository',
+      body: 'Enter the repository URL, then choose the destination folder after pressing Clone.',
+      cmd: '',
+      action: 'Clone',
+      kind: 'clone'
+    });
+    setMenu(null);
+  }, [actionBusy, setMenu]);
 
   const createBranch = useCallback(() => {
+    if (actionBusy) {
+      return;
+    }
     const branchName = window.prompt('Create new branch', 'feature/new-branch');
     if (!branchName || !branchName.trim()) {
       return;
@@ -664,28 +796,33 @@ export const GitClientProvider: React.FC<{
       'Create branch',
       () => {
         void (async () => {
-          try {
-            log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
-            const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
-            appendCommandResult(createResult);
-            log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
-            const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
-            appendCommandResult(checkoutResult);
-            await refreshBranchSummary(repoPath);
-            toastRun('Branch created', nextBranch);
-          } catch (error) {
-            log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-          }
+          await runWithActionLock(async () => {
+            try {
+              log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
+              const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
+              appendCommandResult(createResult);
+              log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
+              const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
+              appendCommandResult(checkoutResult);
+              await refreshBranchSummary(repoPath);
+              toastRun('Branch created', nextBranch);
+            } catch (error) {
+              log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            }
+          });
         })();
       }
     );
-  }, [confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, toastRun]);
+  }, [actionBusy, confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, toastRun, runWithActionLock]);
 
   useEffect(() => {
     void refreshBranchSummary(repoPath);
   }, [repoPath, refreshBranchSummary]);
 
   const doFetch = useCallback(() => {
+    if (actionBusy) {
+      return;
+    }
     confirm(
       'Fetch all remotes with prune?',
       'This updates all remote tracking refs and prunes refs that no longer exist on the remote.',
@@ -693,23 +830,28 @@ export const GitClientProvider: React.FC<{
       'Fetch',
       () => {
         void (async () => {
-          try {
-            setPaletteOpen(false);
-            log([{ text: '$ git fetch --prune', type: 'cmd' }]);
-            const result = await tauriGitBackend.fetch(repoPath, { prune: true });
-            appendCommandResult(result);
-            await refreshBranchSummary(repoPath);
-            toastRun('Fetch complete', 'Fetched with prune');
-            if (props.onFetch) props.onFetch();
-          } catch (error) {
-            log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-          }
+          await runWithActionLock(async () => {
+            try {
+              setPaletteOpen(false);
+              log([{ text: '$ git fetch --prune', type: 'cmd' }]);
+              const result = await tauriGitBackend.fetch(repoPath, { prune: true });
+              appendCommandResult(result);
+              await refreshBranchSummary(repoPath);
+              toastRun('Fetch complete', 'Fetched with prune');
+              if (props.onFetch) props.onFetch();
+            } catch (error) {
+              log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            }
+          });
         })();
       }
     );
-  }, [confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary]);
+  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, runWithActionLock]);
 
   const doPull = useCallback(() => {
+    if (actionBusy) {
+      return;
+    }
     confirm(
       'Pull latest changes?',
       `Incoming preview: ${behindCount} commits. This updates ${currentBranch} from its upstream branch.`,
@@ -717,22 +859,27 @@ export const GitClientProvider: React.FC<{
       'Pull',
       () => {
         void (async () => {
-          try {
-            log([{ text: '$ git pull', type: 'cmd' }]);
-            const result = await tauriGitBackend.pull(repoPath);
-            appendCommandResult(result);
-            await refreshBranchSummary(repoPath);
-            toastRun('Pull complete', 'Local branch updated from remote');
-            if (props.onPull) props.onPull();
-          } catch (error) {
-            log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-          }
+          await runWithActionLock(async () => {
+            try {
+              log([{ text: '$ git pull', type: 'cmd' }]);
+              const result = await tauriGitBackend.pull(repoPath);
+              appendCommandResult(result);
+              await refreshBranchSummary(repoPath);
+              toastRun('Pull complete', 'Local branch updated from remote');
+              if (props.onPull) props.onPull();
+            } catch (error) {
+              log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            }
+          });
         })();
       }
     );
-  }, [confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch]);
+  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch, runWithActionLock]);
 
   const doPush = useCallback(() => {
+    if (actionBusy) {
+      return;
+    }
     confirm(
       `Push ${aheadCount} commits from ${currentBranch}?`,
       `Outgoing preview: ${aheadCount} commits. Remote branch is ${behindCount} commits ahead.`,
@@ -740,20 +887,22 @@ export const GitClientProvider: React.FC<{
       'Push',
       () => {
         void (async () => {
-          try {
-            log([{ text: '$ git push', type: 'cmd' }]);
-            const result = await tauriGitBackend.push(repoPath);
-            appendCommandResult(result);
-            await refreshBranchSummary(repoPath);
-            toastRun('Push complete', `${currentBranch} updated on remote`);
-            if (props.onPush) props.onPush();
-          } catch (error) {
-            log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-          }
+          await runWithActionLock(async () => {
+            try {
+              log([{ text: '$ git push', type: 'cmd' }]);
+              const result = await tauriGitBackend.push(repoPath);
+              appendCommandResult(result);
+              await refreshBranchSummary(repoPath);
+              toastRun('Push complete', `${currentBranch} updated on remote`);
+              if (props.onPush) props.onPush();
+            } catch (error) {
+              log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            }
+          });
         })();
       }
     );
-  }, [confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun]);
+  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun, runWithActionLock]);
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
@@ -930,6 +1079,10 @@ export const GitClientProvider: React.FC<{
         confirm,
         closeDialog,
         confirmDialog,
+        cloneDialogUrl,
+        setCloneDialogUrl,
+        cloneDialogUseGit,
+        setCloneDialogUseGit,
         toast,
         toastPct,
         toastRun,
@@ -979,6 +1132,7 @@ export const GitClientProvider: React.FC<{
         createBranch,
         openRepository,
         cloneRepository,
+        actionBusy,
         aiMessage,
         updateAll,
         paletteAll,

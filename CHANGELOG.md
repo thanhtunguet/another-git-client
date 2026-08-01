@@ -1,0 +1,9 @@
+# Changelog
+
+## 2026-08-01
+- Wired header repository and branch actions to real Tauri backend Git operations.
+- Added native dialog plugin support for repository folder selection and clone destination.
+- Added backend clone/create-branch commands and action-lock hardening for reliable operation execution.
+- Added clone dialog form with repository URL input and HTTPS-to-Git SSH conversion checkbox.
+- Fixed Clone click flow to open dialog-based UX directly without relying on browser prompt.
+- Replaced initial Linux placeholder in header with "Open a repository" neutral state.
