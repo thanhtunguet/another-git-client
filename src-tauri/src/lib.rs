@@ -49,6 +49,16 @@ pub fn run() {
       git_backend::git_submodule_update,
       git_backend::git_submodule_sync,
       git_backend::git_submodule_deinit,
+      git_backend::git_worktree_lock,
+      git_backend::git_worktree_unlock,
+      git_backend::git_worktree_prune,
+      git_backend::git_open_path_in_file_manager,
+      git_backend::git_open_path_in_terminal,
+      git_backend::git_submodule_init,
+      git_backend::git_submodule_pointer_diff,
+      git_backend::git_submodule_stage_pointer,
+      git_backend::git_submodule_checkout_recorded,
+      git_backend::git_submodule_pull_tracked,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

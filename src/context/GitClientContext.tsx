@@ -26,7 +26,9 @@ import {
   type ChangedFile as BackendChangedFile,
   type GitCommandResult,
   type GraphCommitRow as BackendGraphCommitRow,
-  type StashEntry
+  type StashEntry,
+  type WorktreeEntry,
+  type SubmoduleEntry
 } from '../services/tauriGitBackend';
 
 export const COLORS = [
@@ -359,6 +361,25 @@ interface GitClientContextType {
   unstagedFiles: DiffFile[];
   untrackedFiles: DiffFile[];
   stashes: StashEntry[];
+  worktrees: WorktreeEntry[];
+  submodules: SubmoduleEntry[];
+  refreshWorktrees: (targetPath?: string) => Promise<void>;
+  refreshSubmodules: (targetPath?: string) => Promise<void>;
+  addWorktree: (path: string, options?: { reference?: string; newBranch?: string; detach?: boolean }) => Promise<void>;
+  removeWorktree: (path: string, force?: boolean) => Promise<void>;
+  lockWorktree: (path: string, reason?: string) => Promise<void>;
+  unlockWorktree: (path: string) => Promise<void>;
+  pruneWorktrees: (dryRun?: boolean) => Promise<void>;
+  openPathInFileManager: (path: string) => Promise<void>;
+  openPathInTerminal: (path: string) => Promise<void>;
+  initSubmodule: (path?: string) => Promise<void>;
+  updateSubmodule: (options?: { path?: string; init?: boolean; recursive?: boolean }) => Promise<void>;
+  syncSubmodule: (options?: { path?: string; recursive?: boolean }) => Promise<void>;
+  deinitSubmodule: (path: string, force?: boolean) => Promise<void>;
+  checkoutRecordedSubmoduleCommit: (path: string) => Promise<void>;
+  pullSubmoduleTrackedBranch: (path: string) => Promise<void>;
+  getSubmodulePointerDiff: (path: string) => Promise<string>;
+  stageSubmodulePointer: (path: string) => Promise<void>;
   checkoutBranch: (branch: string) => Promise<void>;
   renameBranch: (oldName: string, newName: string) => Promise<void>;
   deleteBranch: (branch: string, isRemote?: boolean, force?: boolean) => Promise<void>;
@@ -478,6 +499,8 @@ export const GitClientProvider: React.FC<{
   const [unstagedFiles, setUnstagedFiles] = useState<DiffFile[]>([]);
   const [untrackedFiles, setUntrackedFiles] = useState<DiffFile[]>([]);
   const [stashes, setStashes] = useState<StashEntry[]>([]);
+  const [worktrees, setWorktrees] = useState<WorktreeEntry[]>([]);
+  const [submodules, setSubmodules] = useState<SubmoduleEntry[]>([]);
   const [selectedRepoPath, setSelectedRepoPath] = useState<string>(
     props.repoPath || persistedStore?.repositories.selectedRepoPath || ''
   );
@@ -728,20 +751,26 @@ export const GitClientProvider: React.FC<{
 
       setGraphLoading(true);
       try {
-        const [rows, changed, stashList] = await Promise.all([
+        const [rows, changed, stashList, wtList, subList] = await Promise.all([
           tauriGitBackend.getGraph(pathValue, { maxCount: GRAPH_PAGE_SIZE, skip: 0, allRefs: true }),
           tauriGitBackend.getChangedFiles(pathValue),
-          tauriGitBackend.getStashes(pathValue).catch(() => [])
+          tauriGitBackend.getStashes(pathValue).catch(() => []),
+          tauriGitBackend.getWorktrees(pathValue).catch(() => []),
+          tauriGitBackend.getSubmodules(pathValue, true).catch(() => [])
         ]);
         setGraphRows(rows);
         setGraphHasMore(rows.length === GRAPH_PAGE_SIZE);
         applyChangedFiles(changed);
         setStashes(stashList);
+        setWorktrees(wtList);
+        setSubmodules(subList);
       } catch {
         setGraphRows([]);
         setGraphHasMore(false);
         applyChangedFiles([]);
         setStashes([]);
+        setWorktrees([]);
+        setSubmodules([]);
       } finally {
         setGraphLoading(false);
       }
@@ -1771,6 +1800,298 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
 
+
+  const refreshWorktrees = useCallback(
+    async (pathValue?: string) => {
+      const target = pathValue || repoPath;
+      if (!target) {
+        setWorktrees([]);
+        return;
+      }
+      try {
+        const list = await tauriGitBackend.getWorktrees(target);
+        setWorktrees(list);
+      } catch {
+        setWorktrees([]);
+      }
+    },
+    [repoPath]
+  );
+
+  const refreshSubmodules = useCallback(
+    async (pathValue?: string) => {
+      const target = pathValue || repoPath;
+      if (!target) {
+        setSubmodules([]);
+        return;
+      }
+      try {
+        const list = await tauriGitBackend.getSubmodules(target, true);
+        setSubmodules(list);
+      } catch {
+        setSubmodules([]);
+      }
+    },
+    [repoPath]
+  );
+
+  const addWorktree = useCallback(
+    async (path: string, options?: { reference?: string; newBranch?: string; detach?: boolean }) => {
+      await runWithActionLock(async () => {
+        try {
+          let cmdStr = `git worktree add ${path}`;
+          if (options?.newBranch) cmdStr = `git worktree add -b ${options.newBranch} ${path}`;
+          if (options?.reference) cmdStr += ` ${options.reference}`;
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.addWorktree(repoPath, path, options);
+          appendCommandResult(result);
+          await refreshWorktrees(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Worktree added', path);
+        } catch (error) {
+          log([{ text: `Add worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+  );
+
+  const removeWorktree = useCallback(
+    async (path: string, force = false) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git worktree remove${force ? ' --force' : ''} ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.removeWorktree(repoPath, path, force);
+          appendCommandResult(result);
+          await refreshWorktrees(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Worktree removed', path);
+        } catch (error) {
+          log([{ text: `Remove worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+  );
+
+  const lockWorktree = useCallback(
+    async (path: string, reason?: string) => {
+      await runWithActionLock(async () => {
+        try {
+          const cmdStr = reason ? `git worktree lock --reason "${reason}" ${path}` : `git worktree lock ${path}`;
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.lockWorktree(repoPath, path, reason);
+          appendCommandResult(result);
+          await refreshWorktrees(repoPath);
+          toastRun('Worktree locked', path);
+        } catch (error) {
+          log([{ text: `Lock worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, toastRun]
+  );
+
+  const unlockWorktree = useCallback(
+    async (path: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git worktree unlock ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.unlockWorktree(repoPath, path);
+          appendCommandResult(result);
+          await refreshWorktrees(repoPath);
+          toastRun('Worktree unlocked', path);
+        } catch (error) {
+          log([{ text: `Unlock worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, toastRun]
+  );
+
+  const pruneWorktrees = useCallback(
+    async (dryRun = false) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git worktree prune${dryRun ? ' --dry-run' : ''}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.pruneWorktrees(repoPath, dryRun);
+          appendCommandResult(result);
+          await refreshWorktrees(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun(dryRun ? 'Prune previewed' : 'Worktrees pruned', result.stdout.trim() || 'Done');
+        } catch (error) {
+          log([{ text: `Prune worktrees failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+  );
+
+  const openPathInFileManager = useCallback(
+    async (path: string) => {
+      try {
+        await tauriGitBackend.openPathInFileManager(path);
+      } catch (error) {
+        log([{ text: `Open file manager failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      }
+    },
+    [log]
+  );
+
+  const openPathInTerminal = useCallback(
+    async (path: string) => {
+      try {
+        await tauriGitBackend.openPathInTerminal(path);
+      } catch (error) {
+        log([{ text: `Open terminal failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      }
+    },
+    [log]
+  );
+
+  const initSubmodule = useCallback(
+    async (path?: string) => {
+      await runWithActionLock(async () => {
+        try {
+          const cmdStr = path ? `git submodule init -- ${path}` : 'git submodule init';
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.initSubmodule(repoPath, path);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          toastRun('Submodule initialized', path || 'All submodules');
+        } catch (error) {
+          log([{ text: `Submodule init failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, toastRun]
+  );
+
+  const updateSubmodule = useCallback(
+    async (options?: { path?: string; init?: boolean; recursive?: boolean }) => {
+      await runWithActionLock(async () => {
+        try {
+          const pathArg = options?.path ? ` -- ${options.path}` : '';
+          const recArg = options?.recursive ? ' --recursive' : '';
+          log([{ text: `$ git submodule update --init${recArg}${pathArg}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.updateSubmodule(repoPath, options);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Submodules updated', options?.path || 'All submodules');
+        } catch (error) {
+          log([{ text: `Submodule update failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+  );
+
+  const syncSubmodule = useCallback(
+    async (options?: { path?: string; recursive?: boolean }) => {
+      await runWithActionLock(async () => {
+        try {
+          const pathArg = options?.path ? ` -- ${options.path}` : '';
+          const recArg = options?.recursive ? ' --recursive' : '';
+          log([{ text: `$ git submodule sync${recArg}${pathArg}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.syncSubmodule(repoPath, options);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          toastRun('Submodule synced', options?.path || 'All submodules');
+        } catch (error) {
+          log([{ text: `Submodule sync failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, toastRun]
+  );
+
+  const deinitSubmodule = useCallback(
+    async (path: string, force = false) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git submodule deinit${force ? ' --force' : ''} -- ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.deinitSubmodule(repoPath, path, force);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          toastRun('Submodule deinitialized', path);
+        } catch (error) {
+          log([{ text: `Submodule deinit failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, toastRun]
+  );
+
+  const checkoutRecordedSubmoduleCommit = useCallback(
+    async (path: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git submodule update -- ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.checkoutRecordedSubmoduleCommit(repoPath, path);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Submodule checked out recorded commit', path);
+        } catch (error) {
+          log([{ text: `Submodule checkout recorded commit failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+  );
+
+  const pullSubmoduleTrackedBranch = useCallback(
+    async (path: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git -C ${path} pull`, type: 'cmd' }]);
+          const result = await tauriGitBackend.pullSubmoduleTrackedBranch(repoPath, path);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Submodule pulled tracked branch', path);
+        } catch (error) {
+          log([{ text: `Submodule pull tracked branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+  );
+
+  const getSubmodulePointerDiff = useCallback(
+    async (path: string): Promise<string> => {
+      try {
+        log([{ text: `$ git diff --submodule=log -- ${path}`, type: 'cmd' }]);
+        const diff = await tauriGitBackend.getSubmodulePointerDiff(repoPath, path);
+        log([{ text: diff || 'No submodule pointer diff', type: 'out' }]);
+        return diff;
+      } catch (error) {
+        log([{ text: `Submodule pointer diff failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        return '';
+      }
+    },
+    [repoPath, log]
+  );
+
+  const stageSubmodulePointer = useCallback(
+    async (path: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git add -- ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.stageSubmodulePointer(repoPath, path);
+          appendCommandResult(result);
+          await refreshSubmodules(repoPath);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun('Staged submodule pointer', path);
+        } catch (error) {
+          log([{ text: `Stage submodule pointer failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+  );
+
   return (
     <GitClientContext.Provider
       value={{
@@ -1852,6 +2173,25 @@ export const GitClientProvider: React.FC<{
         unstagedFiles,
         untrackedFiles,
         stashes,
+        worktrees,
+        submodules,
+        refreshWorktrees,
+        refreshSubmodules,
+        addWorktree,
+        removeWorktree,
+        lockWorktree,
+        unlockWorktree,
+        pruneWorktrees,
+        openPathInFileManager,
+        openPathInTerminal,
+        initSubmodule,
+        updateSubmodule,
+        syncSubmodule,
+        deinitSubmodule,
+        checkoutRecordedSubmoduleCommit,
+        pullSubmoduleTrackedBranch,
+        getSubmodulePointerDiff,
+        stageSubmodulePointer,
         checkoutBranch,
         renameBranch,
         deleteBranch,

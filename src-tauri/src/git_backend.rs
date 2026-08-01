@@ -70,6 +70,9 @@ pub struct WorktreeEntry {
   pub locked: bool,
   pub lock_reason: Option<String>,
   pub prunable_reason: Option<String>,
+  pub is_current: bool,
+  pub is_dirty: bool,
+  pub head_subject: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -78,9 +81,14 @@ pub struct SubmoduleEntry {
   pub path: String,
   pub name: Option<String>,
   pub url: Option<String>,
+  pub branch: Option<String>,
   pub sha: Option<String>,
+  pub recorded_sha: Option<String>,
   pub initialized: bool,
   pub status: String,
+  pub is_dirty: bool,
+  pub ahead: i32,
+  pub behind: i32,
 }
 
 fn canonical_repo_path(repo_path: &str) -> Result<PathBuf, String> {
@@ -160,8 +168,8 @@ fn parse_ahead_behind(track: &str) -> (i32, i32) {
   (ahead, behind)
 }
 
-fn parse_submodule_map(raw: &str) -> HashMap<String, (Option<String>, Option<String>)> {
-  let mut by_name: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
+fn parse_submodule_full_map(raw: &str) -> HashMap<String, (Option<String>, Option<String>, Option<String>)> {
+  let mut by_name: HashMap<String, (Option<String>, Option<String>, Option<String>)> = HashMap::new();
 
   for line in raw.lines().map(str::trim).filter(|line| !line.is_empty()) {
     let mut parts = line.splitn(2, ' ');
@@ -172,19 +180,21 @@ fn parse_submodule_map(raw: &str) -> HashMap<String, (Option<String>, Option<Str
       let mut sub_parts = rest.split('.');
       let name = sub_parts.next().unwrap_or_default().to_string();
       let field = sub_parts.next().unwrap_or_default();
-      let entry = by_name.entry(name).or_insert((None, None));
+      let entry = by_name.entry(name).or_insert((None, None, None));
       if field == "path" {
         entry.0 = Some(value);
       } else if field == "url" {
         entry.1 = Some(value);
+      } else if field == "branch" {
+        entry.2 = Some(value);
       }
     }
   }
 
-  let mut by_path: HashMap<String, (Option<String>, Option<String>)> = HashMap::new();
-  for (name, (path, url)) in by_name {
+  let mut by_path: HashMap<String, (Option<String>, Option<String>, Option<String>)> = HashMap::new();
+  for (name, (path, url, branch)) in by_name {
     if let Some(path_value) = path {
-      by_path.insert(path_value, (Some(name), url));
+      by_path.insert(path_value, (Some(name), url, branch));
     }
   }
 
@@ -484,6 +494,9 @@ pub fn git_get_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>, String
         locked: false,
         lock_reason: None,
         prunable_reason: None,
+        is_current: false,
+        is_dirty: false,
+        head_subject: None,
       });
       continue;
     }
@@ -529,6 +542,29 @@ pub fn git_get_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>, String
     entries.push(entry);
   }
 
+  for entry in &mut entries {
+    let wt_path = PathBuf::from(&entry.path);
+    if let Ok(canon_wt) = wt_path.canonicalize() {
+      entry.is_current = canon_wt == repo;
+    } else {
+      entry.is_current = entry.path == repo_path || entry.path == repo.to_string_lossy();
+    }
+
+    if wt_path.exists() && wt_path.is_dir() {
+      if let Ok(st) = run_git_allow_failure(&wt_path, &["status".to_string(), "--porcelain=v1".to_string()]) {
+        entry.is_dirty = !st.stdout.trim().is_empty();
+      }
+      if let Ok(log_out) = run_git_allow_failure(&wt_path, &["log".to_string(), "-1".to_string(), "--format=%s".to_string()]) {
+        let subj = log_out.stdout.trim().to_string();
+        if !subj.is_empty() {
+          entry.head_subject = Some(subj);
+        }
+      }
+    } else if entry.prunable_reason.is_none() {
+      entry.prunable_reason = Some("directory missing".to_string());
+    }
+  }
+
   Ok(entries)
 }
 
@@ -549,11 +585,11 @@ pub fn git_get_submodules(repo_path: String, recursive: Option<bool>) -> Result<
       "--file".to_string(),
       ".gitmodules".to_string(),
       "--get-regexp".to_string(),
-      "^submodule\\..*\\.(path|url)$".to_string(),
+      "^submodule\\..*\\.(path|url|branch)$".to_string(),
     ],
   )?;
 
-  let mapping = parse_submodule_map(&module_output.stdout);
+  let mapping = parse_submodule_full_map(&module_output.stdout);
   let mut out = Vec::new();
 
   for raw_line in status_output.stdout.lines() {
@@ -571,16 +607,51 @@ pub fn git_get_submodules(repo_path: String, recursive: Option<bool>) -> Result<
       continue;
     }
 
-    let (name, url) = mapping
+    let (name, url, branch) = mapping
       .get(&path)
       .cloned()
-      .unwrap_or((None, None));
+      .unwrap_or((None, None, None));
 
     let initialized = flag != '-';
+
+    let recorded_sha = if let Ok(ls_out) = run_git_allow_failure(&repo, &["ls-files".to_string(), "-s".to_string(), "--".to_string(), path.clone()]) {
+      let first_line = ls_out.stdout.lines().next().unwrap_or_default();
+      let parts: Vec<&str> = first_line.split_whitespace().collect();
+      if parts.len() >= 2 {
+        Some(parts[1].to_string())
+      } else {
+        None
+      }
+    } else {
+      None
+    };
+
+    let sub_dir = repo.join(&path);
+    let mut is_dirty = false;
+    let mut ahead = 0;
+    let mut behind = 0;
+
+    if initialized && sub_dir.exists() && sub_dir.is_dir() {
+      if let Ok(st) = run_git_allow_failure(&sub_dir, &["status".to_string(), "--porcelain=v1".to_string(), "--branch".to_string()]) {
+        let lines: Vec<&str> = st.stdout.lines().collect();
+        if let Some(branch_line) = lines.first() {
+          let (a, b) = parse_ahead_behind(branch_line);
+          ahead = a;
+          behind = b;
+        }
+        if lines.len() > 1 {
+          is_dirty = lines[1..].iter().any(|l| !l.trim().is_empty());
+        }
+      }
+    }
+
+    let is_pointer_mismatch = flag == '+' || (sha.is_some() && recorded_sha.is_some() && sha != recorded_sha);
+
     let status = match flag {
       '-' => "uninitialized",
-      '+' => "pointer-mismatch",
       'U' => "merge-conflict",
+      _ if is_pointer_mismatch => "out-of-sync",
+      _ if is_dirty => "modified-content",
       _ => "clean",
     }
     .to_string();
@@ -589,9 +660,14 @@ pub fn git_get_submodules(repo_path: String, recursive: Option<bool>) -> Result<
       path,
       name,
       url,
+      branch,
       sha,
+      recorded_sha,
       initialized,
       status,
+      is_dirty,
+      ahead,
+      behind,
     });
   }
 
@@ -1200,4 +1276,165 @@ pub fn git_show_file_diff(
   args.push(path);
   let result = run_git(&repo, &args)?;
   Ok(result.stdout)
+}
+
+
+#[tauri::command]
+pub fn git_worktree_lock(
+  repo_path: String,
+  path: String,
+  reason: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["worktree".to_string(), "lock".to_string()];
+  if let Some(r) = reason {
+    if !r.trim().is_empty() {
+      args.push("--reason".to_string());
+      args.push(r);
+    }
+  }
+  args.push(path);
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_worktree_unlock(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["worktree".to_string(), "unlock".to_string(), path];
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_worktree_prune(
+  repo_path: String,
+  dry_run: Option<bool>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["worktree".to_string(), "prune".to_string()];
+  if dry_run.unwrap_or(false) {
+    args.push("--dry-run".to_string());
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_open_path_in_file_manager(path: String) -> Result<GitCommandResult, String> {
+  let target = Path::new(&path);
+  if !target.exists() {
+    return Err(format!("Path does not exist: {path}"));
+  }
+
+  #[cfg(target_os = "macos")]
+  let mut cmd = Command::new("open");
+  #[cfg(target_os = "windows")]
+  let mut cmd = Command::new("explorer");
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  let mut cmd = Command::new("xdg-open");
+
+  cmd.arg(path);
+
+  let output = cmd.output().map_err(|e| format!("Failed to open file manager: {e}"))?;
+  Ok(GitCommandResult {
+    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    exit_code: output.status.code().unwrap_or(-1),
+  })
+}
+
+#[tauri::command]
+pub fn git_open_path_in_terminal(path: String) -> Result<GitCommandResult, String> {
+  let target = Path::new(&path);
+  if !target.exists() {
+    return Err(format!("Path does not exist: {path}"));
+  }
+
+  #[cfg(target_os = "macos")]
+  let mut cmd = {
+    let mut c = Command::new("open");
+    c.args(&["-a", "Terminal"]);
+    c.arg(&path);
+    c
+  };
+  #[cfg(target_os = "windows")]
+  let mut cmd = {
+    let mut c = Command::new("cmd");
+    c.args(&["/c", "start", "cmd"]);
+    c.current_dir(&path);
+    c
+  };
+  #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+  let mut cmd = {
+    let mut c = Command::new("x-terminal-emulator");
+    c.current_dir(&path);
+    c
+  };
+
+  let output = cmd.output().map_err(|e| format!("Failed to open terminal: {e}"))?;
+  Ok(GitCommandResult {
+    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    exit_code: output.status.code().unwrap_or(-1),
+  })
+}
+
+#[tauri::command]
+pub fn git_submodule_init(
+  repo_path: String,
+  path: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["submodule".to_string(), "init".to_string()];
+  if let Some(p) = path {
+    args.push("--".to_string());
+    args.push(p);
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_submodule_pointer_diff(
+  repo_path: String,
+  path: String,
+) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["diff".to_string(), "--submodule=log".to_string(), "--".to_string(), path];
+  let result = run_git(&repo, &args)?;
+  Ok(result.stdout)
+}
+
+#[tauri::command]
+pub fn git_submodule_stage_pointer(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["add".to_string(), "--".to_string(), path];
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_submodule_checkout_recorded(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["submodule".to_string(), "update".to_string(), "--".to_string(), path];
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_submodule_pull_tracked(
+  repo_path: String,
+  path: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let sub_dir = repo.join(&path);
+  if sub_dir.exists() && sub_dir.is_dir() {
+    run_git(&sub_dir, &["pull".to_string()])
+  } else {
+    run_git(&repo, &["submodule".to_string(), "update".to_string(), "--remote".to_string(), "--".to_string(), path])
+  }
 }

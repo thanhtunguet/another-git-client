@@ -55,15 +55,23 @@ export interface WorktreeEntry {
   locked: boolean;
   lockReason?: string;
   prunableReason?: string;
+  isCurrent: boolean;
+  isDirty: boolean;
+  headSubject?: string;
 }
 
 export interface SubmoduleEntry {
   path: string;
   name?: string;
   url?: string;
+  branch?: string;
   sha?: string;
+  recordedSha?: string;
   initialized: boolean;
   status: string;
+  isDirty: boolean;
+  ahead: number;
+  behind: number;
 }
 
 export interface StashEntry {
@@ -301,5 +309,45 @@ export const tauriGitBackend = {
 
   deinitSubmodule(repoPath: string, path: string, force = false) {
     return invoke<GitCommandResult>("git_submodule_deinit", { repoPath, path, force });
-  }
+  },
+
+  lockWorktree(repoPath: string, path: string, reason?: string) {
+    return invoke<GitCommandResult>("git_worktree_lock", { repoPath, path, reason });
+  },
+
+  unlockWorktree(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_worktree_unlock", { repoPath, path });
+  },
+
+  pruneWorktrees(repoPath: string, dryRun = false) {
+    return invoke<GitCommandResult>("git_worktree_prune", { repoPath, dryRun });
+  },
+
+  openPathInFileManager(path: string) {
+    return invoke<GitCommandResult>("git_open_path_in_file_manager", { path });
+  },
+
+  openPathInTerminal(path: string) {
+    return invoke<GitCommandResult>("git_open_path_in_terminal", { path });
+  },
+
+  initSubmodule(repoPath: string, path?: string) {
+    return invoke<GitCommandResult>("git_submodule_init", { repoPath, path });
+  },
+
+  getSubmodulePointerDiff(repoPath: string, path: string) {
+    return invoke<string>("git_submodule_pointer_diff", { repoPath, path });
+  },
+
+  stageSubmodulePointer(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_submodule_stage_pointer", { repoPath, path });
+  },
+
+  checkoutRecordedSubmoduleCommit(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_submodule_checkout_recorded", { repoPath, path });
+  },
+
+  pullSubmoduleTrackedBranch(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_submodule_pull_tracked", { repoPath, path });
+  },
 };
