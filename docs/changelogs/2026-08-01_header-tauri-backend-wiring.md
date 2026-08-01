@@ -126,3 +126,10 @@
 ## Validation (Graph + Changes)
 - `npx tsc -p tsconfig.json --noEmit`: pass
 - `cargo check --manifest-path src-tauri/Cargo.toml`: pass
+
+## Follow-up (VSCode-like Stage/Unstage Icons)
+- Updated Source Control section header actions in src/components/layout/SourceControlDock.tsx:
+  - Replaced text buttons (`Stage all`, `Unstage all`) with icon-only buttons.
+  - Moved action text to tooltips (`title`) and accessibility labels (`aria-label`).
+  - Kept existing action handlers/commands unchanged.
+  - Replaced stash tab create action with icon-only header button (`Create stash`) and tooltip text.

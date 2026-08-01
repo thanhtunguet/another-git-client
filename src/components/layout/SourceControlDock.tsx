@@ -167,10 +167,12 @@ export const SourceControlDock: React.FC = () => {
               <div style={{ flex: 1 }} />
               <Button
                 variant="ghost"
-                style={{ height: '18px', fontSize: '10.5px' }}
+                style={{ height: '18px', width: '20px', padding: 0 }}
                 onClick={act('Unstage all', 'reset HEAD')}
+                title="Unstage all"
+                aria-label="Unstage all"
               >
-                Unstage all
+                <i className="ph ph-minus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
             {stagedFiles.map((f, i) => (
@@ -243,10 +245,12 @@ export const SourceControlDock: React.FC = () => {
               <div style={{ flex: 1 }} />
               <Button
                 variant="ghost"
-                style={{ height: '18px', fontSize: '10.5px' }}
+                style={{ height: '18px', width: '20px', padding: 0 }}
                 onClick={act('Stage all', 'add -A')}
+                title="Stage all"
+                aria-label="Stage all"
               >
-                Stage all
+                <i className="ph ph-plus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
             {unstagedFiles.map((f, i) => (
@@ -330,10 +334,12 @@ export const SourceControlDock: React.FC = () => {
               <div style={{ flex: 1 }} />
               <Button
                 variant="ghost"
-                style={{ height: '18px', fontSize: '10.5px' }}
+                style={{ height: '18px', width: '20px', padding: 0 }}
                 onClick={act('Stage untracked', 'add .')}
+                title="Stage all"
+                aria-label="Stage all"
               >
-                Stage all
+                <i className="ph ph-plus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
             {untrackedFiles.map((f, i) => (
@@ -512,19 +518,40 @@ export const SourceControlDock: React.FC = () => {
         </>
       ) : (
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: 'var(--space-2)' }}>
-          <Button
-            variant="secondary"
-            fullWidth
-            onClick={act('Create stash', 'stash push -u')}
+          <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
               height: '26px',
-              fontSize: '11.5px',
-              borderStyle: 'dashed',
-              margin: '0 0 var(--space-2)'
+              padding: '0 var(--space-1)',
+              background: 'var(--raised)',
+              borderTop: '1px solid var(--line)',
+              borderBottom: '1px solid var(--line)',
+              marginBottom: 'var(--space-2)'
             }}
           >
-            + Stash changes… (untracked / keep index)
-          </Button>
+            <span
+              style={{
+                fontSize: '10.5px',
+                textTransform: 'uppercase',
+                letterSpacing: '.08em',
+                color: 'var(--fg2)'
+              }}
+            >
+              Stashes ({stashes.length})
+            </span>
+            <div style={{ flex: 1 }} />
+            <Button
+              variant="ghost"
+              style={{ height: '18px', width: '20px', padding: 0 }}
+              onClick={act('Create stash', 'stash push -u')}
+              title="Create stash"
+              aria-label="Create stash"
+            >
+              <i className="ph ph-archive-box" style={{ fontSize: '12px' }} />
+            </Button>
+          </div>
           {stashes.map((st, i) => (
             <Card
               key={i}

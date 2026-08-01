@@ -17,3 +17,5 @@
 - Wired graph view to Tauri backend commits with initial 200-item load, virtualized rows, and infinite scroll pagination.
 - Replaced Source Control mock change data with live backend grouping for Staged, Unstaged, and Not in VCS (untracked).
 - Extended Rust changed-file API payload to include index/worktree status and staged/unstaged/untracked classification for UI grouping.
+- Updated Source Control Stage all / Unstage all controls to VSCode-like icon-only actions with tooltip labels.
+- Updated Stash tab create action to a VSCode-like icon-only header control with tooltip label.
