@@ -48,12 +48,6 @@ export const TopBar: React.FC = () => {
 
   return (
     <div className="gc-topbar">
-      <div className="gc-window-controls">
-        <div className="gc-dot-close" />
-        <div className="gc-dot-min" />
-        <div className="gc-dot-max" />
-      </div>
-
       <Button
         variant="secondary"
         onClick={handleRepoMenu}

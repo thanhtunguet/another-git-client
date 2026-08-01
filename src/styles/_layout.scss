@@ -30,32 +30,6 @@
   z-index: 5;
 }
 
-.gc-window-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding-right: var(--space-1);
-
-  .gc-dot-close {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #ff5f57;
-  }
-  .gc-dot-min {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #febc2e;
-  }
-  .gc-dot-max {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #28c840;
-  }
-}
-
 .gc-main-row {
   flex: 1 1 auto;
   display: flex;
