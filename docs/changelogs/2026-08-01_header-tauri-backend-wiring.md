@@ -85,3 +85,15 @@
 - Moved Tauri backend `git_fetch`, `git_pull`, and `git_push` execution onto `tauri::async_runtime::spawn_blocking` to prevent blocking the app/UI thread during long-running git network commands.
 - Added a one-frame UI flush (`requestAnimationFrame`) before invoking remote commands so spinner/progress state paints immediately after click/confirm.
 - Removed confirmation step for `Fetch` so the top-bar fetch action starts immediately and shows running state without dialog latency.
+
+## Follow-up (IntelliJ-style Branch Tree)
+- Replaced static branch mock rows in the Branches view with live branch data from the Tauri backend (`git_get_branches`).
+- Implemented hierarchical branch rendering with grouping rules:
+  - Top-level groups: `Local`, `Remote`
+  - Remote branches grouped by remote name (`origin`, etc.)
+  - Branches inside each group further grouped by slash-separated folder path segments.
+- Added expandable/collapsible folder nodes across both local and remote trees.
+- Preserved per-branch context menu actions and adapted remote delete command generation to use the actual remote name and branch short name.
+- Added branch filtering over name/short name/full ref/upstream while preserving grouped tree output.
+- Added selected-branch details in the right pane and dynamic remote count in the footer.
+- Updated top-bar branch button behavior to open the Branches view (tree) instead of showing the old 4-item action-only menu.

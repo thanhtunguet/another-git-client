@@ -10,11 +10,11 @@ export const TopBar: React.FC = () => {
     currentBranch,
     aheadCount,
     behindCount,
+    setView,
     openPalette,
     doFetch,
     doPull,
     doPush,
-    createBranch,
     openRepository,
     cloneRepository,
     selectRepository,
@@ -46,13 +46,8 @@ export const TopBar: React.FC = () => {
     ]);
   };
 
-  const handleBranchMenu = (e: React.MouseEvent) => {
-    openMenu(e, currentBranch, [
-      { label: 'Create new branch…', run: createBranch },
-      { label: 'Fetch with prune', run: doFetch },
-      { label: 'Pull', run: doPull },
-      { label: 'Push', run: doPush }
-    ]);
+  const openBranchTreeView = () => {
+    setView('branches');
   };
 
   const themeIcon = theme === 'light' ? 'ph-moon' : 'ph-sun';
@@ -93,9 +88,10 @@ export const TopBar: React.FC = () => {
 
       <Button
         variant="secondary"
-        onClick={handleBranchMenu}
+        onClick={openBranchTreeView}
         disabled={actionBusy}
         style={{ height: '28px', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
+        title="Open branch tree"
       >
         <i
           className="ph ph-git-branch"

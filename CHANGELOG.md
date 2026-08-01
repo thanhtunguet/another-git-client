@@ -13,3 +13,4 @@
 - Prevented UI freeze during Fetch/Pull/Push by running Tauri git commands on a blocking runtime worker instead of the command thread.
 - Ensured Fetch/Pull/Push loading indicator appears immediately by yielding one render frame before backend invoke.
 - Removed Fetch confirmation to start remote fetch immediately on click with instant spinner feedback.
+- Replaced branch action-only toolbar menu with IntelliJ-style branch tree access and live grouped branch hierarchy (Local/Remote/remote-name/path folders) in Branches view.

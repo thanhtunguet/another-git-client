@@ -1,51 +1,287 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useGitClient, getHash } from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { Card } from '../common/Card';
-import { BranchTreeNode, RefBadge } from '../../types/git-client';
+import { RefBadge } from '../../types/git-client';
+import { tauriGitBackend, type BranchRef } from '../../services/tauriGitBackend';
+
+type BranchKind = 'local' | 'remote';
+
+type BranchNode = {
+  name: string;
+  fullRef: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  current: boolean;
+  kind: BranchKind;
+  remoteName?: string;
+  shortName: string;
+};
+
+type TreeRow =
+  | { type: 'group'; id: string; label: string; count: number }
+  | { type: 'folder'; id: string; label: string; depth: number }
+  | { type: 'branch'; id: string; depth: number; label: string; branch: BranchNode };
+
+type PathMode = 'name' | 'shortName';
+
+function normalizeBranchRef(branch: BranchRef): BranchNode {
+  const isRemote = branch.kind === 'remote';
+  const remoteName = isRemote ? branch.name.split('/')[0] || 'remote' : undefined;
+  const shortName =
+    isRemote && branch.name.includes('/') ? branch.name.split('/').slice(1).join('/') : branch.name;
+
+  return {
+    name: branch.name,
+    fullRef: branch.fullRef,
+    upstream: branch.upstream,
+    ahead: branch.ahead,
+    behind: branch.behind,
+    current: branch.current,
+    kind: isRemote ? 'remote' : 'local',
+    remoteName,
+    shortName
+  };
+}
+
+function buildPathRows(
+  branches: BranchNode[],
+  basePath: string,
+  pathMode: PathMode,
+  idPrefix: string,
+  depth: number,
+  expandedFolders: Record<string, boolean>
+): TreeRow[] {
+  const groups = new Map<string, BranchNode[]>();
+  const leaves: TreeRow[] = [];
+
+  for (const branch of branches) {
+    const branchPath = pathMode === 'name' ? branch.name : branch.shortName;
+    const relativeName = basePath ? branchPath.slice(basePath.length + 1) : branchPath;
+
+    if (!relativeName) {
+      leaves.push({
+        type: 'branch',
+        id: `branch:${idPrefix}:${branch.name}`,
+        depth,
+        label: branchPath.split('/').at(-1) ?? branchPath,
+        branch
+      });
+      continue;
+    }
+
+    const parts = relativeName.split('/');
+    if (parts.length === 1) {
+      leaves.push({
+        type: 'branch',
+        id: `branch:${idPrefix}:${branch.name}`,
+        depth,
+        label: relativeName,
+        branch
+      });
+      continue;
+    }
+
+    const segment = parts[0];
+    const childPath = basePath ? `${basePath}/${segment}` : segment;
+    const list = groups.get(childPath) ?? [];
+    list.push(branch);
+    groups.set(childPath, list);
+  }
+
+  const rows: TreeRow[] = [];
+
+  const groupEntries = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  for (const [fullPath, groupBranches] of groupEntries) {
+    const folderId = `folder:${idPrefix}:${fullPath}`;
+    rows.push({
+      type: 'folder',
+      id: folderId,
+      depth,
+      label: fullPath.split('/').at(-1) ?? fullPath
+    });
+
+    const isExpanded = expandedFolders[folderId] !== false;
+    if (isExpanded) {
+      rows.push(
+        ...buildPathRows(groupBranches, fullPath, pathMode, idPrefix, depth + 1, expandedFolders)
+      );
+    }
+  }
+
+  leaves.sort((left, right) => {
+    if (left.type !== 'branch' || right.type !== 'branch') {
+      return 0;
+    }
+    if (left.branch.current) {
+      return -1;
+    }
+    if (right.branch.current) {
+      return 1;
+    }
+    const leftPath = pathMode === 'name' ? left.branch.name : left.branch.shortName;
+    const rightPath = pathMode === 'name' ? right.branch.name : right.branch.shortName;
+    return leftPath.localeCompare(rightPath);
+  });
+
+  rows.push(...leaves);
+  return rows;
+}
+
+function formatBranchMeta(branch: BranchNode): string {
+  const parts: string[] = [];
+  if (branch.upstream) {
+    parts.push(branch.upstream);
+  }
+  if (branch.ahead || branch.behind) {
+    parts.push(`↑${branch.ahead} ↓${branch.behind}`);
+  }
+  return parts.join(' · ');
+}
 
 export const BranchesView: React.FC = () => {
-  const { branchQ, setBranchQ, act, openMenu, confirm, setView, commits } = useGitClient();
+  const { branchQ, setBranchQ, act, openMenu, confirm, setView, commits, repoPath } = useGitClient();
 
-  const rawTreeNodes: BranchTreeNode[] = [
-    { g: 'Local' },
-    { n: 'main', d: 1, cur: true, meta: '↓12 ↑3' },
-    { n: 'feature/', d: 1, folder: true },
-    { n: 'mlx5-next', d: 2, meta: '3 ahead', full: 'feature/mlx5-next' },
-    { n: 'perf-tui', d: 2, meta: '1 ahead', full: 'feature/perf-tui' },
-    { n: 'sched-ext-rework', d: 2, meta: '12 behind', full: 'feature/sched-ext-rework' },
-    { n: 'release/', d: 1, folder: true },
-    { n: '6.18.y', d: 2, meta: '', full: 'release/6.18.y' },
-    { n: '6.17.y', d: 2, meta: 'stale', full: 'release/6.17.y' },
-    { n: 'fix/kbuild-clang', d: 1, meta: '2 ahead' },
-    { g: 'Remote' },
-    { n: 'origin', d: 1, folder: true },
-    { n: 'main', d: 2, full: 'origin/main', kind: 'remote' },
-    { n: 'feature/mlx5-next', d: 2, full: 'origin/feature/mlx5-next', kind: 'remote' },
-    { n: 'release/6.18.y', d: 2, full: 'origin/release/6.18.y', kind: 'remote' },
-    { n: 'stable', d: 1, folder: true },
-    { n: 'linux-6.18.y', d: 2, full: 'stable/linux-6.18.y', kind: 'remote' },
-    { g: 'Tags' },
-    { n: 'v6.19-rc4', d: 1, tag: true },
-    { n: 'v6.19-rc3', d: 1, tag: true },
-    { n: 'v6.19-rc2', d: 1, tag: true },
-    { g: 'Recent' },
-    { n: 'feature/mlx5-next', d: 1, meta: '4m ago' },
-    { n: 'release/6.18.y', d: 1, meta: '2h ago' },
-    { n: 'main', d: 1, meta: 'yesterday' }
-  ];
+  const [branches, setBranches] = useState<BranchNode[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [selectedBranchName, setSelectedBranchName] = useState<string>('');
 
-  const q = branchQ.toLowerCase();
-  const filteredNodes = rawTreeNodes.filter(
-    r => !q || r.g || (r.full || r.n || '').toLowerCase().indexOf(q) >= 0
+  useEffect(() => {
+    if (!repoPath) {
+      setBranches([]);
+      setSelectedBranchName('');
+      return;
+    }
+
+    let disposed = false;
+    setIsLoading(true);
+
+    void (async () => {
+      try {
+        const refs = await tauriGitBackend.getBranches(repoPath);
+        if (disposed) {
+          return;
+        }
+        setBranches(refs.map(normalizeBranchRef));
+      } catch {
+        if (!disposed) {
+          setBranches([]);
+        }
+      } finally {
+        if (!disposed) {
+          setIsLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      disposed = true;
+    };
+  }, [repoPath]);
+
+  useEffect(() => {
+    if (!branches.length) {
+      setSelectedBranchName('');
+      return;
+    }
+
+    const selectedStillExists = branches.some(branch => branch.name === selectedBranchName);
+    if (selectedStillExists) {
+      return;
+    }
+
+    const current = branches.find(branch => branch.current) ?? branches[0];
+    setSelectedBranchName(current.name);
+  }, [branches, selectedBranchName]);
+
+  const filteredBranches = useMemo(() => {
+    const q = branchQ.trim().toLowerCase();
+    if (!q) {
+      return branches;
+    }
+
+    return branches.filter(branch => {
+      return (
+        branch.name.toLowerCase().includes(q) ||
+        branch.shortName.toLowerCase().includes(q) ||
+        branch.fullRef.toLowerCase().includes(q) ||
+        (branch.upstream || '').toLowerCase().includes(q)
+      );
+    });
+  }, [branchQ, branches]);
+
+  const localBranches = useMemo(
+    () => filteredBranches.filter(branch => branch.kind === 'local'),
+    [filteredBranches]
+  );
+  const remoteBranches = useMemo(
+    () => filteredBranches.filter(branch => branch.kind === 'remote'),
+    [filteredBranches]
   );
 
-  const handleBranchMenu = (e: React.MouseEvent, name: string, kind?: string) => {
+  const remoteGroups = useMemo(() => {
+    const byRemote = new Map<string, BranchNode[]>();
+    for (const branch of remoteBranches) {
+      const remoteName = branch.remoteName || 'remote';
+      const list = byRemote.get(remoteName) ?? [];
+      list.push(branch);
+      byRemote.set(remoteName, list);
+    }
+
+    return Array.from(byRemote.entries()).sort(([left], [right]) => left.localeCompare(right));
+  }, [remoteBranches]);
+
+  const treeRows = useMemo(() => {
+    const rows: TreeRow[] = [];
+
+    rows.push({ type: 'group', id: 'group:local', label: 'Local', count: localBranches.length });
+    rows.push(...buildPathRows(localBranches, '', 'name', 'local', 1, expandedFolders));
+
+    rows.push({ type: 'group', id: 'group:remote', label: 'Remote', count: remoteBranches.length });
+    for (const [remoteName, groupBranches] of remoteGroups) {
+      const remoteFolderId = `folder:remote:${remoteName}`;
+      rows.push({ type: 'folder', id: remoteFolderId, label: remoteName, depth: 1 });
+      if (expandedFolders[remoteFolderId] !== false) {
+        rows.push(
+          ...buildPathRows(
+            groupBranches,
+            '',
+            'shortName',
+            `remote:${remoteName}`,
+            2,
+            expandedFolders
+          )
+        );
+      }
+    }
+
+    return rows;
+  }, [expandedFolders, localBranches, remoteBranches, remoteGroups]);
+
+  const selectedBranch = useMemo(
+    () => branches.find(branch => branch.name === selectedBranchName),
+    [branches, selectedBranchName]
+  );
+
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [folderId]: prev[folderId] === false
+    }));
+  };
+
+  const handleBranchMenu = (e: React.MouseEvent, branch: BranchNode) => {
+    const name = branch.name;
+    const remoteName = branch.remoteName || 'origin';
+    const remoteShort = branch.shortName;
+
     openMenu(e, name, [
       { label: 'Checkout', hint: '↵', run: act(`Checkout ${name}`, `checkout ${name}`) },
-      { label: `New branch from ${name}…`, run: act('Create branch') },
+      { label: `New branch from '${name}'…`, run: act('Create branch') },
       { label: 'Rename…', run: act('Rename branch') },
       { sep: true },
       { label: `Merge ${name} into main`, run: act('Merge', `merge ${name}`) },
@@ -68,18 +304,18 @@ export const BranchesView: React.FC = () => {
           )
       },
       { sep: true },
-      { label: kind === 'remote' ? 'Untrack upstream' : 'Set upstream…', run: act('Set upstream') },
+      { label: branch.kind === 'remote' ? 'Untrack upstream' : 'Set upstream…', run: act('Set upstream') },
       {
         label: `Delete ${name}`,
         danger: true,
         run: () =>
           confirm(
             `Delete branch ${name}?`,
-            kind === 'remote'
+            branch.kind === 'remote'
               ? 'This deletes the branch on the remote for everyone.'
               : 'The branch has 3 commits not merged into main.',
-            kind === 'remote'
-              ? `git push origin --delete ${name.replace('origin/', '')}`
+            branch.kind === 'remote'
+              ? `git push ${remoteName} --delete ${remoteShort}`
               : `git branch -D ${name}`,
             'Delete branch',
             act('Delete branch')
@@ -106,6 +342,14 @@ export const BranchesView: React.FC = () => {
     label: l,
     variant: l === 'Reset hard' || l === 'Delete' ? 'outline' : 'neutral'
   }));
+
+  const remoteCount = useMemo(() => {
+    return new Set(
+      branches.filter(branch => branch.kind === 'remote').map(branch => branch.remoteName || 'remote')
+    ).size;
+  }, [branches]);
+
+  const selectedBranchMeta = selectedBranch ? formatBranchMeta(selectedBranch) : '';
 
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
@@ -152,14 +396,14 @@ export const BranchesView: React.FC = () => {
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2) 0', minHeight: 0 }}>
-          {filteredNodes.map((b, i) => {
-            if (b.g) {
+          {treeRows.map(row => {
+            if (row.type === 'group') {
               return (
                 <div
-                  key={i}
+                  key={row.id}
                   style={{
                     height: '26px',
-                    paddingLeft: '10px',
+                    padding: '0 10px',
                     display: 'flex',
                     alignItems: 'center',
                     fontSize: '10.5px',
@@ -170,47 +414,79 @@ export const BranchesView: React.FC = () => {
                     userSelect: 'none'
                   }}
                 >
-                  {b.g}
+                  <span style={{ flex: 1 }}>{row.label}</span>
+                  <span>{row.count}</span>
                 </div>
               );
             }
 
-            const full = b.full || b.n || '';
-            const depth = b.d || 1;
-            const padLeft = 10 + depth * 12;
-            const iconColor = b.tag
-              ? 'var(--warn)'
-              : b.kind === 'remote'
-                ? 'var(--fg3)'
-                : 'var(--color-accent)';
-            const glyph = b.folder ? 'ph-folder' : b.tag ? 'ph-tag' : 'ph-git-branch';
-            const twisty = b.folder ? 'ph-caret-down' : '';
+            if (row.type === 'folder') {
+              const padLeft = 10 + row.depth * 12;
+              const isExpanded = expandedFolders[row.id] !== false;
+
+              return (
+                <div
+                  key={row.id}
+                  onClick={() => toggleFolder(row.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    height: '24px',
+                    paddingLeft: `${padLeft}px`,
+                    paddingRight: 'var(--space-3)',
+                    cursor: 'pointer',
+                    color: 'var(--fg2)',
+                    fontSize: '12.5px',
+                    fontFamily: 'var(--font-mono)'
+                  }}
+                >
+                  <i
+                    className={`ph ${isExpanded ? 'ph-caret-down' : 'ph-caret-right'}`}
+                    style={{ fontSize: '11px', color: 'var(--fg3)', width: '11px' }}
+                  />
+                  <i className="ph ph-folder" style={{ fontSize: '13px', color: 'var(--fg3)' }} />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                </div>
+              );
+            }
+
+            const branch = row.branch;
+            const padLeft = 10 + row.depth * 12;
+            const isSelected = selectedBranchName === branch.name;
+            const iconColor = branch.kind === 'remote' ? 'var(--fg3)' : 'var(--color-accent)';
+            const meta = formatBranchMeta(branch);
 
             return (
               <div
-                key={i}
-                onClick={b.folder ? undefined : () => setView('graph')}
-                onContextMenu={b.folder ? undefined : e => handleBranchMenu(e, full, b.kind)}
+                key={row.id}
+                onClick={() => setSelectedBranchName(branch.name)}
+                onContextMenu={e => handleBranchMenu(e, branch)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '7px',
-                  height: b.folder ? '24px' : '24px',
+                  height: '24px',
                   paddingLeft: `${padLeft}px`,
                   paddingRight: 'var(--space-3)',
-                  cursor: b.folder ? 'default' : 'pointer',
-                  background: b.cur ? 'var(--sel)' : 'transparent',
+                  cursor: 'pointer',
+                  background: isSelected ? 'var(--sel)' : 'transparent',
                   color: 'var(--fg)',
                   fontSize: '12.5px',
-                  fontWeight: b.cur ? 600 : 400,
+                  fontWeight: branch.current ? 600 : 400,
                   fontFamily: 'var(--font-mono)'
                 }}
               >
-                <i
-                  className={`ph ${twisty}`}
-                  style={{ fontSize: '11px', color: 'var(--fg3)', width: '11px' }}
-                />
-                <i className={`ph ${glyph}`} style={{ fontSize: '13px', color: iconColor }} />
+                <i className="ph ph-git-branch" style={{ fontSize: '13px', color: iconColor }} />
                 <span
                   style={{
                     flex: 1,
@@ -219,7 +495,7 @@ export const BranchesView: React.FC = () => {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  {b.n}
+                  {row.label}
                 </span>
                 <span
                   style={{
@@ -228,9 +504,9 @@ export const BranchesView: React.FC = () => {
                     color: 'var(--fg3)'
                   }}
                 >
-                  {b.meta}
+                  {meta}
                 </span>
-                {b.cur && (
+                {branch.current && (
                   <Tag
                     variant="outline"
                     style={{ fontSize: '9.5px', padding: '0 5px', letterSpacing: '.05em' }}
@@ -241,6 +517,30 @@ export const BranchesView: React.FC = () => {
               </div>
             );
           })}
+          {!treeRows.length && !isLoading && (
+            <div
+              style={{
+                padding: '12px',
+                color: 'var(--fg3)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px'
+              }}
+            >
+              No branches match the current filter.
+            </div>
+          )}
+          {isLoading && (
+            <div
+              style={{
+                padding: '12px',
+                color: 'var(--fg3)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px'
+              }}
+            >
+              Loading branches…
+            </div>
+          )}
         </div>
 
         <div
@@ -253,7 +553,9 @@ export const BranchesView: React.FC = () => {
             alignItems: 'center'
           }}
         >
-          <span style={{ fontSize: '11px', color: 'var(--fg3)', flex: 1 }}>3 remotes</span>
+          <span style={{ fontSize: '11px', color: 'var(--fg3)', flex: 1 }}>
+            {remoteCount} remote{remoteCount === 1 ? '' : 's'}
+          </span>
           <Button
             variant="secondary"
             style={{ height: '22px', fontSize: '11px' }}
@@ -284,9 +586,11 @@ export const BranchesView: React.FC = () => {
             background: 'var(--panel)'
           }}
         >
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>feature/mlx5-next</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+            {selectedBranch?.name || 'No branch selected'}
+          </span>
           <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
-            tracking origin/feature/mlx5-next · 3 ahead, 1 behind
+            {selectedBranchMeta || 'Select a branch to inspect details'}
           </span>
           <div style={{ flex: 1 }} />
           <Button
@@ -299,7 +603,12 @@ export const BranchesView: React.FC = () => {
           <Button
             variant="primary"
             style={{ height: '25px', padding: '0 10px' }}
-            onClick={act('Merge feature/mlx5-next into main', 'merge feature/mlx5-next')}
+            onClick={
+              selectedBranch
+                ? act(`Merge ${selectedBranch.name} into main`, `merge ${selectedBranch.name}`)
+                : undefined
+            }
+            disabled={!selectedBranch}
           >
             <i className="ph ph-git-merge" style={{ fontSize: '14px' }} /> Merge into main
           </Button>
