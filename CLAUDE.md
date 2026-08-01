@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **GitClientDesign** (466 symbols, 1126 relationships, 38 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **git-client-design** (497 symbols, 1179 relationships, 40 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
@@ -25,10 +25,10 @@ This project is indexed by GitNexus as **GitClientDesign** (466 symbols, 1126 re
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/GitClientDesign/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/GitClientDesign/clusters` | All functional areas |
-| `gitnexus://repo/GitClientDesign/processes` | All execution flows |
-| `gitnexus://repo/GitClientDesign/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/git-client-design/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/git-client-design/clusters` | All functional areas |
+| `gitnexus://repo/git-client-design/processes` | All execution flows |
+| `gitnexus://repo/git-client-design/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
