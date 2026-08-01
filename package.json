@@ -20,8 +20,13 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:tauri-frontend": "vite --config vite.tauri.config.ts --port 1420 --strictPort",
     "build": "tsc && tsc --declaration --emitDeclarationOnly --outDir dist && vite build",
+    "build:tauri-frontend": "vite build --config vite.tauri.config.ts --outDir dist-tauri",
     "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "typecheck": "tsc --noEmit",
     "lint": "NODE_OPTIONS=\"-r ./scripts/eslint-ts7-compat.cjs\" eslint src",
     "format": "prettier --write \"src/**/*.{ts,tsx,scss,css,json}\""
@@ -32,6 +37,7 @@
   },
   "devDependencies": {
     "@phosphor-icons/web": "^2.1.1",
+    "@tauri-apps/cli": "^2.11.4",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -49,5 +55,8 @@
     "typescript": "^7.0.2",
     "typescript6": "npm:typescript@^6.0.3",
     "vite": "^6.0.7"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1"
   }
 }
