@@ -98,6 +98,14 @@ export const tauriGitBackend = {
     return invoke<GitCommandResult>('git_checkout_branch', { repoPath, branch });
   },
 
+  createBranch(repoPath: string, branch: string, base?: string) {
+    return invoke<GitCommandResult>('git_create_branch', { repoPath, branch, base });
+  },
+
+  cloneRepo(url: string, destination: string) {
+    return invoke<GitCommandResult>('git_clone_repo', { url, destination });
+  },
+
   fetch(repoPath: string, options?: { remote?: string; prune?: boolean }) {
     return invoke<GitCommandResult>('git_fetch', {
       repoPath,

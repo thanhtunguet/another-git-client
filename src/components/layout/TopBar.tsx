@@ -13,34 +13,29 @@ export const TopBar: React.FC = () => {
     doFetch,
     doPull,
     doPush,
+    createBranch,
+    openRepository,
+    cloneRepository,
     toggleTheme,
     theme,
     toggleDock,
     dock,
-    openMenu,
-    act
+    openMenu
   } = useGitClient();
 
   const handleRepoMenu = (e: React.MouseEvent) => {
-    openMenu(e, 'Recent repositories', [
-      { label: `${repoName} — ${repoPath}`, run: act('Switch repo') },
-      { label: 'llvm-project — ~/src/llvm', run: act('Switch repo') },
-      { label: 'systemd — ~/src/systemd', run: act('Switch repo') },
-      { sep: true },
-      { label: 'Open repository…', hint: '⌘O', run: act('Open repository') },
-      { label: 'Clone…', run: act('Clone') }
+    openMenu(e, 'Repository', [
+      { label: 'Open Repository…', hint: '⌘O', run: openRepository },
+      { label: 'Clone…', run: cloneRepository }
     ]);
   };
 
   const handleBranchMenu = (e: React.MouseEvent) => {
     openMenu(e, currentBranch, [
-      { label: 'Checkout other branch…', hint: '⌘B', run: act('Checkout branch') },
-      { label: `New branch from ${currentBranch}…`, run: act('Create branch') },
-      { label: 'Set upstream…', run: act('Set upstream') },
-      { sep: true },
+      { label: 'Create new branch…', run: createBranch },
       { label: 'Fetch with prune', run: doFetch },
-      { label: `Pull — preview ${behindCount} incoming`, run: doPull },
-      { label: `Push — preview ${aheadCount} outgoing`, run: doPush }
+      { label: 'Pull', run: doPull },
+      { label: 'Push', run: doPush }
     ]);
   };
 
@@ -125,14 +120,14 @@ export const TopBar: React.FC = () => {
           style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
           onClick={doPull}
         >
-          Pull ↓{behindCount}
+          Pull
         </Button>
         <Button
           variant="ghost"
           style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
           onClick={doPush}
         >
-          Push ↑{aheadCount}
+          Push
         </Button>
       </div>
 

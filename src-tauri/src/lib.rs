@@ -14,6 +14,8 @@ pub fn run() {
       git_backend::git_get_worktrees,
       git_backend::git_get_submodules,
       git_backend::git_checkout_branch,
+      git_backend::git_create_branch,
+      git_backend::git_clone_repo,
       git_backend::git_fetch,
       git_backend::git_pull,
       git_backend::git_push,

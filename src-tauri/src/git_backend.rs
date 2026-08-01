@@ -538,6 +538,58 @@ pub fn git_checkout_branch(repo_path: String, branch: String) -> Result<GitComma
 }
 
 #[tauri::command]
+pub fn git_create_branch(
+  repo_path: String,
+  branch: String,
+  base: Option<String>,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["branch".to_string(), branch];
+  if let Some(base_ref) = base {
+    if !base_ref.trim().is_empty() {
+      args.push(base_ref);
+    }
+  }
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_clone_repo(url: String, destination: String) -> Result<GitCommandResult, String> {
+  if url.trim().is_empty() {
+    return Err("Clone URL is required".to_string());
+  }
+  if destination.trim().is_empty() {
+    return Err("Clone destination is required".to_string());
+  }
+
+  let args = vec!["clone".to_string(), url, destination];
+  let output = Command::new("git")
+    .args(&args)
+    .output()
+    .map_err(|e| format!("Failed to spawn git: {e}"))?;
+
+  let result = GitCommandResult {
+    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    exit_code: output.status.code().unwrap_or(-1),
+  };
+
+  if result.exit_code != 0 {
+    let details = if result.stderr.trim().is_empty() {
+      result.stdout.trim().to_string()
+    } else {
+      result.stderr.trim().to_string()
+    };
+    return Err(format!(
+      "git clone failed with exit code {}: {}",
+      result.exit_code, details
+    ));
+  }
+
+  Ok(result)
+}
+
+#[tauri::command]
 pub fn git_fetch(
   repo_path: String,
   remote: Option<String>,

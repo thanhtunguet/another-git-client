@@ -19,6 +19,7 @@ import {
   GitClientProps,
   MenuItem
 } from '../types/git-client';
+import { tauriGitBackend, type GitCommandResult } from '../services/tauriGitBackend';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -340,6 +341,9 @@ interface GitClientContextType {
   doFetch: () => void;
   doPull: () => void;
   doPush: () => void;
+  createBranch: () => void;
+  openRepository: () => void;
+  cloneRepository: () => void;
   aiMessage: () => void;
   updateAll: () => void;
   paletteAll: () => PaletteItem[];
@@ -398,11 +402,11 @@ export const GitClientProvider: React.FC<{
   );
 
   const commits = RAW_COMMITS;
-  const repoName = props.repoName || 'linux';
-  const repoPath = props.repoPath || '~/src/torvalds/linux';
-  const currentBranch = props.currentBranch || 'main';
-  const aheadCount = props.aheadCount !== undefined ? props.aheadCount : 3;
-  const behindCount = props.behindCount !== undefined ? props.behindCount : 12;
+  const [repoPath, setRepoPath] = useState<string>(props.repoPath || '~/src/torvalds/linux');
+  const [repoName, setRepoName] = useState<string>(props.repoName || 'linux');
+  const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'main');
+  const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 3);
+  const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 12);
 
   const graphData = useMemo(() => buildGraphData(commits), [commits]);
 
@@ -431,6 +435,50 @@ export const GitClientProvider: React.FC<{
   const clearConsole = useCallback(() => {
     setConsoleLines([]);
   }, []);
+
+  const getRepoNameFromPath = useCallback((pathValue: string): string => {
+    const cleaned = pathValue.replace(/\\+$/g, '').replace(/\/+$/g, '');
+    const parts = cleaned.split(/[\\/]/).filter(Boolean);
+    return parts[parts.length - 1] || pathValue;
+  }, []);
+
+  const appendCommandResult = useCallback((result: GitCommandResult) => {
+    const lines: LogEntry[] = [];
+    const trimmedOut = result.stdout.trim();
+    const trimmedErr = result.stderr.trim();
+    if (trimmedOut) {
+      for (const line of trimmedOut.split(/\r?\n/)) {
+        lines.push({ text: line, type: 'out' });
+      }
+    }
+    if (trimmedErr) {
+      for (const line of trimmedErr.split(/\r?\n/)) {
+        lines.push({ text: line, type: result.exitCode === 0 ? 'warn' : 'err' });
+      }
+    }
+    lines.push({ text: result.exitCode === 0 ? 'done' : `exit ${result.exitCode}`, type: result.exitCode === 0 ? 'ok' : 'err' });
+    log(lines);
+  }, [log]);
+
+  const refreshBranchSummary = useCallback(async (pathValue: string) => {
+    try {
+      const branches = await tauriGitBackend.getBranches(pathValue);
+      const current = branches.find(b => b.current) || branches.find(b => b.kind === 'local');
+      if (current) {
+        setCurrentBranch(current.name);
+        setAheadCount(current.ahead || 0);
+        setBehindCount(current.behind || 0);
+      }
+    } catch {
+      // Ignore until a valid repo is selected.
+    }
+  }, []);
+
+  const setActiveRepository = useCallback(async (pathValue: string) => {
+    setRepoPath(pathValue);
+    setRepoName(getRepoNameFromPath(pathValue));
+    await refreshBranchSummary(pathValue);
+  }, [getRepoNameFromPath, refreshBranchSummary]);
 
   const toastRun = useCallback(
     (title: string, detail: string, done?: () => void) => {
@@ -550,34 +598,162 @@ export const GitClientProvider: React.FC<{
     [log, toastRun]
   );
 
+  const openRepository = useCallback(() => {
+    const pickedPath = window.prompt('Open repository path', repoPath);
+    if (!pickedPath || !pickedPath.trim()) {
+      return;
+    }
+    const nextPath = pickedPath.trim();
+    void (async () => {
+      try {
+        const isRepo = await tauriGitBackend.isRepo(nextPath);
+        if (!isRepo) {
+          log([{ text: `Not a git repository: ${nextPath}`, type: 'err' }]);
+          return;
+        }
+        await setActiveRepository(nextPath);
+        toastRun('Repository opened', nextPath);
+      } catch (error) {
+        log([{ text: `Open repository failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      }
+    })();
+  }, [repoPath, log, setActiveRepository, toastRun]);
+
+  const cloneRepository = useCallback(() => {
+    const cloneUrl = window.prompt('Clone URL', '');
+    if (!cloneUrl || !cloneUrl.trim()) {
+      return;
+    }
+    const destination = window.prompt('Clone destination path', '');
+    if (!destination || !destination.trim()) {
+      return;
+    }
+    const url = cloneUrl.trim();
+    const destinationPath = destination.trim();
+    confirm(
+      `Clone ${url}?`,
+      `This will clone into ${destinationPath}.`,
+      `git clone ${url} ${destinationPath}`,
+      'Clone',
+      () => {
+        void (async () => {
+          try {
+            log([{ text: `$ git clone ${url} ${destinationPath}`, type: 'cmd' }]);
+            const result = await tauriGitBackend.cloneRepo(url, destinationPath);
+            appendCommandResult(result);
+            await setActiveRepository(destinationPath);
+            toastRun('Clone complete', destinationPath);
+          } catch (error) {
+            log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          }
+        })();
+      }
+    );
+  }, [confirm, log, appendCommandResult, setActiveRepository, toastRun]);
+
+  const createBranch = useCallback(() => {
+    const branchName = window.prompt('Create new branch', 'feature/new-branch');
+    if (!branchName || !branchName.trim()) {
+      return;
+    }
+    const nextBranch = branchName.trim();
+    confirm(
+      `Create branch ${nextBranch}?`,
+      `This creates ${nextBranch} from ${currentBranch} and checks it out.`,
+      `git branch ${nextBranch} ${currentBranch}\ngit checkout ${nextBranch}`,
+      'Create branch',
+      () => {
+        void (async () => {
+          try {
+            log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
+            const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
+            appendCommandResult(createResult);
+            log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
+            const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
+            appendCommandResult(checkoutResult);
+            await refreshBranchSummary(repoPath);
+            toastRun('Branch created', nextBranch);
+          } catch (error) {
+            log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          }
+        })();
+      }
+    );
+  }, [confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, toastRun]);
+
+  useEffect(() => {
+    void refreshBranchSummary(repoPath);
+  }, [repoPath, refreshBranchSummary]);
+
   const doFetch = useCallback(() => {
-    setPaletteOpen(false);
-    log([{ text: '$ git fetch --all --prune', type: 'cmd' }]);
-    toastRun('Fetching all remotes', 'git fetch --all --prune', () => {
-      log([
-        { text: '   f3a9c21..a71bd0e  master -> origin/master', type: 'out' },
-        { text: 'done', type: 'ok' }
-      ]);
-    });
-    if (props.onFetch) props.onFetch();
-  }, [log, toastRun, props]);
+    confirm(
+      'Fetch all remotes with prune?',
+      'This updates all remote tracking refs and prunes refs that no longer exist on the remote.',
+      'git fetch --prune',
+      'Fetch',
+      () => {
+        void (async () => {
+          try {
+            setPaletteOpen(false);
+            log([{ text: '$ git fetch --prune', type: 'cmd' }]);
+            const result = await tauriGitBackend.fetch(repoPath, { prune: true });
+            appendCommandResult(result);
+            await refreshBranchSummary(repoPath);
+            toastRun('Fetch complete', 'Fetched with prune');
+            if (props.onFetch) props.onFetch();
+          } catch (error) {
+            log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          }
+        })();
+      }
+    );
+  }, [confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary]);
 
   const doPull = useCallback(() => {
-    log([{ text: '$ git pull --rebase origin main', type: 'cmd' }]);
-    toastRun('Pull — 12 incoming', 'preview: 12 commits, 96 files changed');
-    if (props.onPull) props.onPull();
-  }, [log, toastRun, props]);
+    confirm(
+      'Pull latest changes?',
+      `Incoming preview: ${behindCount} commits. This updates ${currentBranch} from its upstream branch.`,
+      'git pull',
+      'Pull',
+      () => {
+        void (async () => {
+          try {
+            log([{ text: '$ git pull', type: 'cmd' }]);
+            const result = await tauriGitBackend.pull(repoPath);
+            appendCommandResult(result);
+            await refreshBranchSummary(repoPath);
+            toastRun('Pull complete', 'Local branch updated from remote');
+            if (props.onPull) props.onPull();
+          } catch (error) {
+            log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          }
+        })();
+      }
+    );
+  }, [confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch]);
 
   const doPush = useCallback(() => {
     confirm(
-      'Push 3 commits to origin/main?',
-      'Outgoing preview: 3 commits · 11 files · +212 −44. The remote is 12 commits ahead, so a non-fast-forward push will be rejected.',
-      'git push origin main',
+      `Push ${aheadCount} commits from ${currentBranch}?`,
+      `Outgoing preview: ${aheadCount} commits. Remote branch is ${behindCount} commits ahead.`,
+      'git push',
       'Push',
-      act('Push')
+      () => {
+        void (async () => {
+          try {
+            log([{ text: '$ git push', type: 'cmd' }]);
+            const result = await tauriGitBackend.push(repoPath);
+            appendCommandResult(result);
+            await refreshBranchSummary(repoPath);
+            toastRun('Push complete', `${currentBranch} updated on remote`);
+            if (props.onPush) props.onPush();
+          } catch (error) {
+            log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          }
+        })();
+      }
     );
-    if (props.onPush) props.onPush();
-  }, [confirm, act, props]);
+  }, [confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun]);
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
@@ -675,12 +851,12 @@ export const GitClientProvider: React.FC<{
       { group: 'Go to', label: 'Submodules', hint: '⌘7', run: nav('submodules') },
       { group: 'Go to', label: 'Settings', hint: '⌘,', run: nav('settings') },
       { group: 'Branch', label: 'Checkout branch…', hint: '⌘B', run: act('Checkout branch') },
-      { group: 'Branch', label: 'Create branch from HEAD…', run: act('Create branch') },
+      { group: 'Branch', label: 'Create branch from HEAD…', run: () => createBranch() },
       { group: 'Branch', label: 'Rebase current onto…', run: act('Rebase') },
       { group: 'Branch', label: 'Delete branch…', run: act('Delete branch') },
       { group: 'Remote', label: 'Fetch all with prune', hint: '⌘⇧F', run: () => doFetch() },
-      { group: 'Remote', label: 'Pull (rebase)', run: act('Pull --rebase') },
-      { group: 'Remote', label: 'Push with lease', run: act('Push --force-with-lease') },
+      { group: 'Remote', label: 'Pull', run: () => doPull() },
+      { group: 'Remote', label: 'Push', run: () => doPush() },
       { group: 'Remote', label: 'Add remote…', run: act('Add remote') },
       { group: 'Commit', label: 'Commit staged changes', hint: '⌘↵', run: act('Commit') },
       { group: 'Commit', label: 'Amend last commit', run: act('Amend') },
@@ -691,7 +867,8 @@ export const GitClientProvider: React.FC<{
       { group: 'Submodule', label: 'Update all submodules --recursive', run: () => updateAll() },
       { group: 'Diff', label: 'Compare any two text sources…', run: nav('diff') },
       { group: 'Diff', label: 'Compare file with revision…', run: act('Compare with revision') },
-      { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: act('Open repository') },
+      { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: () => openRepository() },
+      { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
       { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
       {
         group: 'View',
@@ -702,7 +879,7 @@ export const GitClientProvider: React.FC<{
         }
       }
     ];
-  }, [act, doFetch, aiMessage, updateAll, toggleTheme]);
+  }, [act, doFetch, doPull, doPush, createBranch, aiMessage, updateAll, openRepository, cloneRepository, toggleTheme]);
 
   // Keyboard navigation hotkeys
   useEffect(() => {
@@ -799,6 +976,9 @@ export const GitClientProvider: React.FC<{
         doFetch,
         doPull,
         doPush,
+        createBranch,
+        openRepository,
+        cloneRepository,
         aiMessage,
         updateAll,
         paletteAll,
