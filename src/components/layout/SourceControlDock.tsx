@@ -17,28 +17,13 @@ export const SourceControlDock: React.FC = () => {
     commitMsg,
     setCommitMsg,
     act,
-    aiMessage
+    aiMessage,
+    stagedFiles,
+    unstagedFiles,
+    untrackedFiles
   } = useGitClient();
 
   if (!dock) return null;
-
-  const stagedFiles: DiffFile[] = [
-    { path: 'drivers/net/ethernet/mellanox/mlx5/core/en_tx.c', status: 'M', add: 7, del: 2 },
-    { path: 'drivers/net/ethernet/mellanox/mlx5/core/en/params.c', status: 'M', add: 21, del: 4 },
-    { path: 'drivers/net/ethernet/mellanox/mlx5/core/en/tunnel.h', status: 'A', add: 88, del: 0 },
-    { path: 'Documentation/networking/device_drivers/mlx5.rst', status: 'M', add: 12, del: 1 }
-  ];
-
-  const unstagedFiles: DiffFile[] = [
-    { path: 'kernel/sched/fair.c', status: 'M', add: 34, del: 12 },
-    { path: 'kernel/sched/core.c', status: 'M', add: 9, del: 9 },
-    { path: 'mm/slub.c', status: 'M', add: 4, del: 1 },
-    { path: 'include/linux/sched.h', status: 'M', add: 2, del: 0 },
-    { path: 'scripts/checkpatch.pl', status: 'M', add: 1, del: 1 },
-    { path: 'tools/testing/selftests/net/mlx5_tunnel.sh', status: '?', add: 140, del: 0 },
-    { path: 'MAINTAINERS', status: 'M', add: 3, del: 0 },
-    { path: 'drivers/gpu/drm/amd/amdgpu/vcn_v5_0.c', status: 'D', add: 0, del: 62 }
-  ];
 
   const stashes = [
     {
@@ -134,7 +119,7 @@ export const SourceControlDock: React.FC = () => {
             boxShadow: scTab === 'changes' ? 'inset 0 0 0 1px var(--color-accent)' : 'none'
           }}
         >
-          Changes 12
+          Changes {stagedFiles.length + unstagedFiles.length + untrackedFiles.length}
         </Button>
         <Button
           variant="secondary"
@@ -314,6 +299,82 @@ export const SourceControlDock: React.FC = () => {
                 >
                   shelve
                 </Button>
+                <span
+                  style={{ color: 'var(--fg3)', fontSize: '11px' }}
+                >{`+${f.add} −${f.del}`}</span>
+              </div>
+            ))}
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-2)',
+                height: '26px',
+                padding: '0 var(--space-3)',
+                background: 'var(--raised)',
+                borderTop: '1px solid var(--line)',
+                borderBottom: '1px solid var(--line)'
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '10.5px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '.08em',
+                  color: 'var(--fg2)'
+                }}
+              >
+                Not in VCS ({untrackedFiles.length})
+              </span>
+              <div style={{ flex: 1 }} />
+              <Button
+                variant="ghost"
+                style={{ height: '18px', fontSize: '10.5px' }}
+                onClick={act('Stage untracked', 'add .')}
+              >
+                Stage all
+              </Button>
+            </div>
+            {untrackedFiles.map((f, i) => (
+              <div
+                key={`untracked-${i}`}
+                onClick={() => setView('diff')}
+                onContextMenu={e => handleFileMenu(e, f, false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  height: '24px',
+                  padding: '0 var(--space-3)',
+                  cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11.5px'
+                }}
+                className="gc-hover-bg"
+              >
+                <span
+                  style={{
+                    width: '11px',
+                    textAlign: 'center',
+                    color: statusColor('A'),
+                    fontWeight: 600
+                  }}
+                >
+                  ?
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    direction: 'rtl',
+                    textAlign: 'left'
+                  }}
+                >
+                  {f.path}
+                </span>
                 <span
                   style={{ color: 'var(--fg3)', fontSize: '11px' }}
                 >{`+${f.add} −${f.del}`}</span>

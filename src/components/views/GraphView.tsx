@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useGitClient,
-  getHash,
   refBadge,
   statusColor,
   COLORS
@@ -85,7 +84,12 @@ export const GraphView: React.FC = () => {
     f,
     setF,
     commits,
+    getCommitHash,
     graphData,
+    graphHasMore,
+    graphLoading,
+    graphLoadingMore,
+    loadMoreGraph,
     sel,
     toggleSelCommit,
     expanded,
@@ -99,8 +103,58 @@ export const GraphView: React.FC = () => {
     log
   } = useGitClient();
 
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(0);
+
+  const hasExpandedRows = useMemo(
+    () => Object.values(expanded).some(Boolean),
+    [expanded]
+  );
+  const enableVirtualRows = graphLayout === 'rows' && !hasExpandedRows;
+  const rowHeight = 30;
+  const overscan = 16;
+
+  const startIndex = enableVirtualRows
+    ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan)
+    : 0;
+  const endIndex = enableVirtualRows
+    ? Math.min(
+        commits.length,
+        Math.ceil((scrollTop + Math.max(viewportHeight, rowHeight)) / rowHeight) + overscan
+      )
+    : commits.length;
+  const visibleIndexes = useMemo(() => {
+    const count = Math.max(0, endIndex - startIndex);
+    return Array.from({ length: count }, (_, index) => startIndex + index);
+  }, [endIndex, startIndex]);
+
+  const topSpacerHeight = enableVirtualRows ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = enableVirtualRows ? Math.max(0, (commits.length - endIndex) * rowHeight) : 0;
+
+  const handleGraphScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      setScrollTop(target.scrollTop);
+      setViewportHeight(target.clientHeight);
+
+      const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+      if (distanceToBottom < 320 && graphHasMore && !graphLoading && !graphLoadingMore) {
+        loadMoreGraph();
+      }
+    },
+    [graphHasMore, graphLoading, graphLoadingMore, loadMoreGraph]
+  );
+
+  useEffect(() => {
+    const container = document.getElementById('gc-graph-scroll');
+    if (!container) {
+      return;
+    }
+    setViewportHeight(container.clientHeight);
+  }, [commits.length]);
+
   const handleCommitMenu = (e: React.MouseEvent, i: number) => {
-    const hash = getHash(i);
+    const hash = getCommitHash(i);
     const title = `${hash}  ${commits[i][0].slice(0, 32)}`;
     openMenu(e, title, [
       {
@@ -256,7 +310,7 @@ export const GraphView: React.FC = () => {
         </div>
       )}
 
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+      <div id="gc-graph-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} onScroll={handleGraphScroll}>
         <div
           style={{
             display: 'flex',
@@ -281,9 +335,12 @@ export const GraphView: React.FC = () => {
           <span style={{ width: '74px', flex: '0 0 auto', textAlign: 'right' }}>Commit</span>
         </div>
 
-        {commits.map((r, i) => {
+        {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
+
+        {visibleIndexes.map(i => {
+          const r = commits[i];
           const day = r[2].slice(0, 10);
-          const showHeader = graphLayout === 'grouped' && day !== lastDay;
+          const showHeader = !enableVirtualRows && graphLayout === 'grouped' && day !== lastDay;
           if (graphLayout === 'grouped') lastDay = day;
 
           const isSelected = sel.includes(i);
@@ -410,11 +467,11 @@ export const GraphView: React.FC = () => {
                     color: 'var(--iris)'
                   }}
                 >
-                  {getHash(i)}
+                  {getCommitHash(i)}
                 </span>
               </div>
 
-              {isExpanded && (
+              {!enableVirtualRows && isExpanded && (
                 <div
                   style={{
                     display: 'flex',
@@ -484,15 +541,21 @@ export const GraphView: React.FC = () => {
           );
         })}
 
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-6)' }}>
-          <Button
-            variant="secondary"
-            style={{ height: '28px' }}
-            onClick={act('Load more commits', 'log --skip=31 -n 250')}
-          >
-            {`Load 250 more commits — showing ${commits.length} of 1,284,930`}
-          </Button>
-        </div>
+        {bottomSpacerHeight > 0 ? <div style={{ height: `${bottomSpacerHeight}px` }} /> : null}
+
+        {(graphLoading || graphLoadingMore || graphHasMore) && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--space-5)' }}>
+            {graphLoading ? (
+              <span style={{ fontSize: '12px', color: 'var(--fg3)' }}>Loading commits…</span>
+            ) : graphLoadingMore ? (
+              <span style={{ fontSize: '12px', color: 'var(--fg3)' }}>Loading more commits…</span>
+            ) : (
+              <Button variant="secondary" style={{ height: '28px' }} onClick={loadMoreGraph}>
+                Load more commits
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

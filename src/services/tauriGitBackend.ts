@@ -37,6 +37,12 @@ export interface GraphCommitRow {
 
 export interface ChangedFile {
   status: string;
+  indexStatus: string;
+  worktreeStatus: string;
+  staged: boolean;
+  unstaged: boolean;
+  untracked: boolean;
+  oldPath?: string;
   path: string;
 }
 

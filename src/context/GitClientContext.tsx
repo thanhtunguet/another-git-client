@@ -21,7 +21,12 @@ import {
 } from '../types/git-client';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { loadAppStore, saveAppStore } from '../services/appStore';
-import { tauriGitBackend, type GitCommandResult } from '../services/tauriGitBackend';
+import {
+  tauriGitBackend,
+  type ChangedFile as BackendChangedFile,
+  type GitCommandResult,
+  type GraphCommitRow as BackendGraphCommitRow
+} from '../services/tauriGitBackend';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -32,6 +37,8 @@ export const COLORS = [
   'oklch(.70 .12 330)',
   'oklch(.70 .10 255)'
 ];
+
+const GRAPH_PAGE_SIZE = 200;
 
 export const RAW_COMMITS: CommitRaw[] = [
   [
@@ -339,8 +346,16 @@ interface GitClientContextType {
   commitMsg: string;
   setCommitMsg: (msg: string) => void;
   commits: CommitRaw[];
+  getCommitHash: (i: number) => string;
   graphData: GraphData;
+  graphHasMore: boolean;
+  graphLoading: boolean;
+  graphLoadingMore: boolean;
+  loadMoreGraph: () => void;
   getFileList: (i: number) => DiffFile[];
+  stagedFiles: DiffFile[];
+  unstagedFiles: DiffFile[];
+  untrackedFiles: DiffFile[];
   matchesFilter: (i: number) => boolean;
   matchesCompareFilter: (i: number) => boolean;
   act: (label: string, extra?: string) => () => void;
@@ -430,8 +445,13 @@ export const GitClientProvider: React.FC<{
   const [commitMsg, setCommitMsg] = useState<string>(
     'net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: '
   );
-
-  const commits = RAW_COMMITS;
+  const [graphRows, setGraphRows] = useState<BackendGraphCommitRow[]>([]);
+  const [graphHasMore, setGraphHasMore] = useState<boolean>(false);
+  const [graphLoading, setGraphLoading] = useState<boolean>(false);
+  const [graphLoadingMore, setGraphLoadingMore] = useState<boolean>(false);
+  const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
+  const [unstagedFiles, setUnstagedFiles] = useState<DiffFile[]>([]);
+  const [untrackedFiles, setUntrackedFiles] = useState<DiffFile[]>([]);
   const [selectedRepoPath, setSelectedRepoPath] = useState<string>(
     props.repoPath || persistedStore?.repositories.selectedRepoPath || ''
   );
@@ -462,7 +482,30 @@ export const GitClientProvider: React.FC<{
   const [actionBusy, setActionBusy] = useState<boolean>(false);
   const [activeRemoteAction, setActiveRemoteAction] = useState<'fetch' | 'pull' | 'push' | null>(null);
 
+  const commits = useMemo<CommitRaw[]>(() => {
+    if (!graphRows.length) {
+      return RAW_COMMITS;
+    }
+
+    const indexBySha = new Map<string, number>();
+    graphRows.forEach((row, index) => {
+      indexBySha.set(row.sha, index);
+    });
+
+    return graphRows.map(row => {
+      const parentIndexes = row.parents
+        .map(parent => indexBySha.get(parent))
+        .filter((index): index is number => index !== undefined);
+      const renderedDate = row.date.replace('T', ' ').replace('Z', '').slice(0, 16);
+      return [row.subject, row.author, renderedDate, parentIndexes, row.refs];
+    });
+  }, [graphRows]);
+
   const graphData = useMemo(() => buildGraphData(commits), [commits]);
+  const getCommitHash = useCallback(
+    (i: number): string => graphRows[i]?.shortSha || getHash(i),
+    [graphRows]
+  );
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
@@ -613,6 +656,87 @@ export const GitClientProvider: React.FC<{
     log(lines);
   }, [log]);
 
+  const applyChangedFiles = useCallback((entries: BackendChangedFile[]) => {
+    const mapStatus = (entry: BackendChangedFile): DiffFile['status'] => {
+      if (entry.untracked) {
+        return '?';
+      }
+      const resolved = (entry.indexStatus || entry.worktreeStatus || 'M').trim() || 'M';
+      const primary = resolved[0] || 'M';
+      if (primary === 'A' || primary === 'D' || primary === 'M' || primary === 'R' || primary === '?') {
+        return primary;
+      }
+      return 'M';
+    };
+
+    const toDiffFile = (entry: BackendChangedFile): DiffFile => ({
+      path: entry.path,
+      status: mapStatus(entry),
+      add: 0,
+      del: 0
+    });
+
+    const nextStaged = entries.filter(entry => entry.staged).map(toDiffFile);
+    const nextUnstaged = entries.filter(entry => entry.unstaged && !entry.untracked).map(toDiffFile);
+    const nextUntracked = entries.filter(entry => entry.untracked).map(toDiffFile);
+
+    setStagedFiles(nextStaged);
+    setUnstagedFiles(nextUnstaged);
+    setUntrackedFiles(nextUntracked);
+  }, []);
+
+  const refreshRepositorySnapshot = useCallback(
+    async (pathValue: string) => {
+      if (!pathValue) {
+        setGraphRows([]);
+        setGraphHasMore(false);
+        applyChangedFiles([]);
+        return;
+      }
+
+      setGraphLoading(true);
+      try {
+        const [rows, changed] = await Promise.all([
+          tauriGitBackend.getGraph(pathValue, { maxCount: GRAPH_PAGE_SIZE, skip: 0, allRefs: true }),
+          tauriGitBackend.getChangedFiles(pathValue)
+        ]);
+        setGraphRows(rows);
+        setGraphHasMore(rows.length === GRAPH_PAGE_SIZE);
+        applyChangedFiles(changed);
+      } catch {
+        setGraphRows([]);
+        setGraphHasMore(false);
+        applyChangedFiles([]);
+      } finally {
+        setGraphLoading(false);
+      }
+    },
+    [applyChangedFiles]
+  );
+
+  const loadMoreGraph = useCallback(() => {
+    if (!repoPath || graphLoading || graphLoadingMore || !graphHasMore) {
+      return;
+    }
+
+    void (async () => {
+      setGraphLoadingMore(true);
+      try {
+        const page = await tauriGitBackend.getGraph(repoPath, {
+          maxCount: GRAPH_PAGE_SIZE,
+          skip: graphRows.length,
+          allRefs: true
+        });
+        setGraphRows(prev => prev.concat(page));
+        setGraphHasMore(page.length === GRAPH_PAGE_SIZE);
+      } catch {
+        setGraphHasMore(false);
+      } finally {
+        setGraphLoadingMore(false);
+      }
+    })();
+  }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length]);
+
   const refreshBranchSummary = useCallback(async (pathValue: string) => {
     try {
       const branches = await tauriGitBackend.getBranches(pathValue);
@@ -645,8 +769,8 @@ export const GitClientProvider: React.FC<{
     const nextName = getRepoNameFromPath(pathValue);
     setRepoName(nextName);
     rememberRepository(pathValue, nextName);
-    await refreshBranchSummary(pathValue);
-  }, [getRepoNameFromPath, refreshBranchSummary, rememberRepository]);
+    await Promise.all([refreshBranchSummary(pathValue), refreshRepositorySnapshot(pathValue)]);
+  }, [getRepoNameFromPath, refreshBranchSummary, refreshRepositorySnapshot, rememberRepository]);
 
   const selectRepository = useCallback(
     (path: string) => {
@@ -937,6 +1061,7 @@ export const GitClientProvider: React.FC<{
               const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
               appendCommandResult(checkoutResult);
               await refreshBranchSummary(repoPath);
+              await refreshRepositorySnapshot(repoPath);
               toastRun('Branch created', nextBranch);
             } catch (error) {
               log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
@@ -945,11 +1070,12 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, toastRun, runWithActionLock]);
+  }, [actionBusy, confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, runWithActionLock]);
 
   useEffect(() => {
     void refreshBranchSummary(repoPath);
-  }, [repoPath, refreshBranchSummary]);
+    void refreshRepositorySnapshot(repoPath);
+  }, [repoPath, refreshBranchSummary, refreshRepositorySnapshot]);
 
   const doFetch = useCallback(() => {
     if (actionBusy) {
@@ -965,6 +1091,7 @@ export const GitClientProvider: React.FC<{
         const result = await tauriGitBackend.fetch(repoPath, { prune: true });
         appendCommandResult(result);
         await refreshBranchSummary(repoPath);
+        await refreshRepositorySnapshot(repoPath);
         toastRun('Fetch complete', 'Fetched with prune');
         if (props.onFetch) props.onFetch();
       } catch (error) {
@@ -974,7 +1101,7 @@ export const GitClientProvider: React.FC<{
         setActionBusy(false);
       }
     })();
-  }, [actionBusy, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, waitForNextPaint]);
+  }, [actionBusy, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, waitForNextPaint]);
 
   const doPull = useCallback(() => {
     if (actionBusy) {
@@ -996,6 +1123,7 @@ export const GitClientProvider: React.FC<{
             const result = await tauriGitBackend.pull(repoPath);
             appendCommandResult(result);
             await refreshBranchSummary(repoPath);
+            await refreshRepositorySnapshot(repoPath);
             toastRun('Pull complete', 'Local branch updated from remote');
             if (props.onPull) props.onPull();
           } catch (error) {
@@ -1007,7 +1135,7 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch, waitForNextPaint]);
+  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, behindCount, currentBranch, waitForNextPaint]);
 
   const doPush = useCallback(() => {
     if (actionBusy) {
@@ -1029,6 +1157,7 @@ export const GitClientProvider: React.FC<{
             const result = await tauriGitBackend.push(repoPath);
             appendCommandResult(result);
             await refreshBranchSummary(repoPath);
+            await refreshRepositorySnapshot(repoPath);
             toastRun('Push complete', `${currentBranch} updated on remote`);
             if (props.onPush) props.onPush();
           } catch (error) {
@@ -1040,7 +1169,7 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
+  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
@@ -1259,8 +1388,16 @@ export const GitClientProvider: React.FC<{
         commitMsg,
         setCommitMsg,
         commits,
+        getCommitHash,
         graphData,
+        graphHasMore,
+        graphLoading,
+        graphLoadingMore,
+        loadMoreGraph,
         getFileList,
+        stagedFiles,
+        unstagedFiles,
+        untrackedFiles,
         matchesFilter,
         matchesCompareFilter,
         act,

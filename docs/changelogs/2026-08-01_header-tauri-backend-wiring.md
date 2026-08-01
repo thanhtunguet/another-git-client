@@ -97,3 +97,32 @@
 - Added branch filtering over name/short name/full ref/upstream while preserving grouped tree output.
 - Added selected-branch details in the right pane and dynamic remote count in the footer.
 - Updated top-bar branch button behavior to open the Branches view (tree) instead of showing the old 4-item action-only menu.
+
+## Follow-up (Graph + Changes Live Wiring)
+- Extended Rust changed-file payload in src-tauri/src/git_backend.rs (`git_get_changed_files`) to expose:
+  - `indexStatus`, `worktreeStatus`
+  - `staged`, `unstaged`, `untracked`
+  - rename origin path (`oldPath`) when available
+- Updated frontend Tauri DTOs in src/services/tauriGitBackend.ts for the new changed-file shape.
+- Replaced graph mock seeding in src/context/GitClientContext.tsx with backend graph hydration:
+  - Initial graph page load via `git_get_graph` with `maxCount=200`
+  - Added paging state (`graphHasMore`, `graphLoading`, `graphLoadingMore`)
+  - Added incremental loader (`loadMoreGraph`) for infinite scrolling
+  - Kept commit row compatibility by mapping backend commits to existing `CommitRaw` view model
+- Wired repository refresh paths (open/select/clone/fetch/pull/push/create-branch) to refresh both:
+  - branch summary
+  - graph page and working-tree changes
+- Updated Graph view (src/components/views/GraphView.tsx):
+  - Uses backend short hashes from context (`getCommitHash`) instead of synthetic hash generation
+  - Added virtualized row rendering in rows layout
+  - Added near-bottom auto-load for infinite pagination and manual fallback button
+- Updated Commit Details view to use live commit hashes from graph data.
+- Replaced hardcoded Source Control change lists with live grouped sections from backend:
+  - Staged
+  - Unstaged
+  - Not in VCS (untracked)
+- Updated status bar counts to show live changed/staged totals and currently loaded commit count.
+
+## Validation (Graph + Changes)
+- `npx tsc -p tsconfig.json --noEmit`: pass
+- `cargo check --manifest-path src-tauri/Cargo.toml`: pass

@@ -50,6 +50,12 @@ pub struct GraphCommitRow {
 #[serde(rename_all = "camelCase")]
 pub struct ChangedFile {
   pub status: String,
+  pub index_status: String,
+  pub worktree_status: String,
+  pub staged: bool,
+  pub unstaged: bool,
+  pub untracked: bool,
+  pub old_path: Option<String>,
   pub path: String,
 }
 
@@ -376,17 +382,53 @@ pub fn git_get_changed_files(repo_path: String) -> Result<Vec<ChangedFile>, Stri
   let mut files = Vec::new();
 
   for line in output.lines() {
-    if line.len() < 4 {
+    if line.len() < 3 {
       continue;
     }
 
-    let status = line[0..2].trim().to_string();
-    let mut path = line[3..].trim().to_string();
-    if let Some((_, to)) = path.split_once(" -> ") {
-      path = to.to_string();
+    let status = line.get(0..2).unwrap_or("  ").to_string();
+    let index_status = line
+      .chars()
+      .next()
+      .unwrap_or(' ')
+      .to_string();
+    let worktree_status = line
+      .chars()
+      .nth(1)
+      .unwrap_or(' ')
+      .to_string();
+
+    let raw_path = line.get(3..).unwrap_or_default().trim().to_string();
+    if raw_path.is_empty() {
+      continue;
     }
 
-    files.push(ChangedFile { status, path });
+    let (old_path, path) = if let Some((from, to)) = raw_path.split_once(" -> ") {
+      (Some(from.to_string()), to.to_string())
+    } else {
+      (None, raw_path)
+    };
+
+    let x = index_status.chars().next().unwrap_or(' ');
+    let y = worktree_status.chars().next().unwrap_or(' ');
+    let untracked = x == '?' && y == '?';
+    let staged = !untracked && x != ' ' && x != '!';
+    let unstaged = !untracked && y != ' ' && y != '!';
+
+    if !staged && !unstaged && !untracked {
+      continue;
+    }
+
+    files.push(ChangedFile {
+      status,
+      index_status,
+      worktree_status,
+      staged,
+      unstaged,
+      untracked,
+      old_path,
+      path,
+    });
   }
 
   Ok(files)

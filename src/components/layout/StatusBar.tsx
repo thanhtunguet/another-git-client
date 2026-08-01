@@ -12,9 +12,15 @@ export const StatusBar: React.FC = () => {
     currentBranch,
     behindCount,
     aheadCount,
+    commits,
+    stagedFiles,
+    unstagedFiles,
+    untrackedFiles,
     consoleOpen,
     toggleConsole
   } = useGitClient();
+
+  const changedCount = stagedFiles.length + unstagedFiles.length + untrackedFiles.length;
 
   const consoleChevron = consoleOpen ? 'ph-caret-down' : 'ph-caret-up';
 
@@ -87,7 +93,7 @@ export const StatusBar: React.FC = () => {
           <span style={{ color: 'var(--add)' }}>↓{behindCount}</span>
           <span style={{ color: 'var(--warn)' }}>↑{aheadCount}</span>
           <span style={{ color: 'var(--fg3)' }}>·</span>
-          <span>12 changed, 4 staged</span>
+          <span>{`${changedCount} changed, ${stagedFiles.length} staged`}</span>
         </div>
       )}
 
@@ -104,7 +110,7 @@ export const StatusBar: React.FC = () => {
 
       <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>git 2.51.0</span>
       <span style={{ color: 'var(--fg3)' }}>·</span>
-      <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>1,284,930 commits</span>
+      <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{`${commits.length} commits`}</span>
     </div>
   );
 };

@@ -1,10 +1,11 @@
 import React from 'react';
-import { useGitClient, getHash, statusColor } from '../../context/GitClientContext';
+import { useGitClient, statusColor } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { DiffFile } from '../../types/git-client';
 
 export const CommitDetailsView: React.FC = () => {
-  const { sel, commits, getFileList, setView, act, openMenu, diffTab, setDiffTab } = useGitClient();
+  const { sel, commits, getCommitHash, getFileList, setView, act, openMenu, diffTab, setDiffTab } =
+    useGitClient();
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
   const isMulti = sel.length > 1;
@@ -29,8 +30,8 @@ export const CommitDetailsView: React.FC = () => {
     : commits[detailIdx][1];
   const detailDate = commits[detailIdx][2];
   const detailHash = isMulti
-    ? `${getHash(sel[sel.length - 1])}..${getHash(sel[0])}`
-    : getHash(detailIdx);
+    ? `${getCommitHash(sel[sel.length - 1])}..${getCommitHash(sel[0])}`
+    : getCommitHash(detailIdx);
 
   const handleFileMenu = (e: React.MouseEvent, path: string) => {
     openMenu(e, path, [
