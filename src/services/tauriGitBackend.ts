@@ -75,6 +75,10 @@ export const tauriGitBackend = {
     return invoke<BranchRef[]>('git_get_branches', { repoPath });
   },
 
+  getCurrentBranch(repoPath: string) {
+    return invoke<string>('git_get_current_branch', { repoPath });
+  },
+
   getTags(repoPath: string) {
     return invoke<TagRef[]>('git_get_tags', { repoPath });
   },

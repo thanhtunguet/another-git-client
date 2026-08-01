@@ -19,3 +19,6 @@
 - Extended Rust changed-file API payload to include index/worktree status and staged/unstaged/untracked classification for UI grouping.
 - Updated Source Control Stage all / Unstage all controls to VSCode-like icon-only actions with tooltip labels.
 - Updated Stash tab create action to a VSCode-like icon-only header control with tooltip label.
+- Added a current-branch fallback command so the toolbar branch label no longer stays stuck on "No branch" when the branch list fetch fails.
+- Made the top-bar branch button open the existing Branches view instead of duplicating branch-list logic in the toolbar.
+- Added a fallback branch loader in the VS Code extension so the branch/tag picker can still populate when the split local/remote refresh path yields no refs.

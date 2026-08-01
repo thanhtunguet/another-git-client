@@ -271,6 +271,17 @@ pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
 }
 
 #[tauri::command]
+pub fn git_get_current_branch(repo_path: String) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec![
+    "branch".to_string(),
+    "--show-current".to_string(),
+  ];
+  let output = run_git(&repo, &args)?.stdout.trim().to_string();
+  Ok(output)
+}
+
+#[tauri::command]
 pub fn git_get_tags(repo_path: String) -> Result<Vec<TagRef>, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let format = "%(refname:short)%x1f%(refname)%x1f%(objectname)%x1f%(*objectname)%x1f%(creatordate:unix)";

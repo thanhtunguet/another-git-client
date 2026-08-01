@@ -8,6 +8,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       git_backend::git_is_repo,
       git_backend::git_get_branches,
+      git_backend::git_get_current_branch,
       git_backend::git_get_tags,
       git_backend::git_get_graph,
       git_backend::git_get_changed_files,

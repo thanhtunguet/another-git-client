@@ -738,18 +738,41 @@ export const GitClientProvider: React.FC<{
   }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length]);
 
   const refreshBranchSummary = useCallback(async (pathValue: string) => {
+    let currentBranchName = '';
     try {
       const branches = await tauriGitBackend.getBranches(pathValue);
       const current = branches.find(b => b.current) || branches.find(b => b.kind === 'local');
       if (current) {
-        setCurrentBranch(current.name);
+        currentBranchName = current.name;
         setAheadCount(current.ahead || 0);
         setBehindCount(current.behind || 0);
       }
-    } catch {
-      // Ignore until a valid repo is selected.
+    } catch (error) {
+      log([
+        {
+          text: `Failed to load branches: ${error instanceof Error ? error.message : String(error)}`,
+          type: 'warn'
+        }
+      ]);
     }
-  }, []);
+
+    if (!currentBranchName) {
+      try {
+        currentBranchName = (await tauriGitBackend.getCurrentBranch(pathValue)).trim();
+      } catch (error) {
+        log([
+          {
+            text: `Failed to load current branch: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'warn'
+          }
+        ]);
+      }
+    }
+
+    if (currentBranchName) {
+      setCurrentBranch(currentBranchName);
+    }
+  }, [log]);
 
   const rememberRepository = useCallback((pathValue: string, nameValue: string) => {
     if (!pathValue) {

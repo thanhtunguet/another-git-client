@@ -24,7 +24,7 @@ export const TopBar: React.FC = () => {
     theme,
     toggleDock,
     dock,
-    openMenu
+    openMenu,
   } = useGitClient();
 
   const handleRepoMenu = (e: React.MouseEvent) => {
@@ -46,7 +46,7 @@ export const TopBar: React.FC = () => {
     ]);
   };
 
-  const openBranchTreeView = () => {
+  const handleBranchMenu = () => {
     setView('branches');
   };
 
@@ -88,10 +88,10 @@ export const TopBar: React.FC = () => {
 
       <Button
         variant="secondary"
-        onClick={openBranchTreeView}
+        onClick={handleBranchMenu}
         disabled={actionBusy}
         style={{ height: '28px', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-        title="Open branch tree"
+        title="Open branches view"
       >
         <i
           className="ph ph-git-branch"

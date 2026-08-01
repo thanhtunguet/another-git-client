@@ -1,0 +1,4 @@
+- `npx tsc -p tsconfig.json --noEmit` for TypeScript validation.
+- `cargo check --manifest-path src-tauri/Cargo.toml` for Rust/Tauri validation; may need unsandboxed execution because `~/.rustup/settings.toml` can be permission-blocked.
+- If npm cache permissions fail, use `npm_config_cache=.npm-cache`.
+- Use `git diff --check` before wrapping up edits.

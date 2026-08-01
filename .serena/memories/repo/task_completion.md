@@ -1,0 +1,3 @@
+- For frontend-only changes: run `npx tsc -p tsconfig.json --noEmit` and `git diff --check`.
+- For Tauri/Rust changes: run `cargo check --manifest-path src-tauri/Cargo.toml` as well, unsandboxed if rustup permissions block the sandbox.
+- Update `docs/changelogs/YYYY-MM-DD_*.md` and `CHANGELOG.md` before finishing user-visible work.

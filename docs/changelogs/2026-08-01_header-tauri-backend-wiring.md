@@ -127,6 +127,19 @@
 - `npx tsc -p tsconfig.json --noEmit`: pass
 - `cargo check --manifest-path src-tauri/Cargo.toml`: pass
 
+## Follow-up (Branch Toolbar Fallback)
+- Added a direct Rust command for the current Git branch name (`git_get_current_branch`).
+- Wired the frontend branch summary refresh to use the current-branch command as a fallback when the full branch list fetch fails.
+- Kept the existing branch list fetch for ahead/behind counts and tree population, but the toolbar label now recovers even if that list call errors.
+
+## Follow-up (Branch Dropdown Menu)
+- Replaced the custom top-bar branch dropdown with a direct open action to the existing Branches view.
+- The Branches view remains the shared place for live branch grouping, filtering, and selection, instead of duplicating that logic in the toolbar.
+
+## Follow-up (Extension Branch Search Fallback)
+- Added a branch-loader fallback in the VS Code extension state store so the branch/tag picker can fall back to the monolithic branch query when the split local/remote pass returns nothing.
+- This is meant to keep the search popup populated even when the phased branch refresh path fails to surface refs.
+
 ## Follow-up (VSCode-like Stage/Unstage Icons)
 - Updated Source Control section header actions in src/components/layout/SourceControlDock.tsx:
   - Replaced text buttons (`Stage all`, `Unstage all`) with icon-only buttons.

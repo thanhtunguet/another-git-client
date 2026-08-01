@@ -1,0 +1,4 @@
+- Prefer small, focused patches and keep existing UI patterns intact unless the task asks for a redesign.
+- Update both the session changelog under `docs/changelogs/` and the root `CHANGELOG.md` for user-visible changes.
+- Branch and repository state in the frontend should come from the Tauri backend rather than hardcoded mock data.
+- When a toolbar label depends on live git state, prefer a direct fallback path rather than leaving a stale placeholder visible.
