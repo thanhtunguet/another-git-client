@@ -42,3 +42,33 @@
 - Clone action now starts directly from the menu click (no browser prompt dependency), then opens the clone form.
 - Default header repository state now shows "Open a repository" with no Linux placeholder path.
 - Clone flow order updated: enter repository URL first in dialog, then select destination folder after pressing Clone.
+
+## Follow-up (Persistent Store)
+- Added a new app store module at src/services/appStore.ts using localStorage.
+- Persisted settings across app restarts:
+  - theme
+  - dock visibility
+  - active view
+  - graph layout
+  - compare mode/layout
+  - filter panel open state
+  - source-control tab
+  - diff tab
+- Persisted repository context across app restarts:
+  - selected repository path
+  - active repository path
+  - active repository name
+- Wired GitClientContext initialization from persisted values, with props still overriding when provided.
+- Updated repository activation flow to keep selected and active repository paths in sync.
+
+## Follow-up (Repository Dropdown Options)
+- Repository dropdown now lists persisted repositories as selectable options.
+- Repository toggler now displays repository name only.
+- Repository path is displayed only when dropdown is open:
+  - In dropdown header as the current path.
+  - In each option hint for quick path visibility.
+- Selecting a repository option switches the active repository and refreshes branch summary.
+- Persisted repository store now includes `repositoryList` to retain dropdown options across app restarts.
+- Dropdown header now shows the current repository directly (replacing generic Repository placeholder).
+- Current repository is removed from selectable options list.
+- The separator above actions is rendered only when there are other repositories available to select.

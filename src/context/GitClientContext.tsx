@@ -20,6 +20,7 @@ import {
   MenuItem
 } from '../types/git-client';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { loadAppStore, saveAppStore } from '../services/appStore';
 import { tauriGitBackend, type GitCommandResult } from '../services/tauriGitBackend';
 
 export const COLORS = [
@@ -349,6 +350,8 @@ interface GitClientContextType {
   createBranch: () => void;
   openRepository: () => void;
   cloneRepository: () => void;
+  knownRepositories: Array<{ name: string; path: string }>;
+  selectRepository: (path: string) => void;
   actionBusy: boolean;
   aiMessage: () => void;
   updateAll: () => void;
@@ -369,9 +372,17 @@ export const GitClientProvider: React.FC<{
   props?: GitClientProps;
   children: React.ReactNode;
 }> = ({ props = {}, children }) => {
-  const [view, setView] = useState<GitClientView>(props.initialView || 'graph');
-  const [theme, setThemeState] = useState<Theme>(props.initialTheme || 'dark');
-  const [dock, setDock] = useState<boolean>(true);
+  const persistedStore = useMemo(() => loadAppStore(), []);
+
+  const [view, setView] = useState<GitClientView>(
+    props.initialView || persistedStore?.settings.view || 'graph'
+  );
+  const [theme, setThemeState] = useState<Theme>(
+    props.initialTheme || persistedStore?.settings.theme || 'dark'
+  );
+  const [dock, setDock] = useState<boolean>(
+    persistedStore?.settings.dock !== undefined ? persistedStore.settings.dock : true
+  );
   const [consoleOpen, setConsoleOpen] = useState<boolean>(false);
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
   const [paletteQ, setPaletteQ] = useState<string>('');
@@ -385,10 +396,18 @@ export const GitClientProvider: React.FC<{
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
-  const [graphLayout, setGraphLayout] = useState<'rows' | 'grouped'>('rows');
-  const [compareMode, setCompareMode] = useState<'list' | 'graph'>('list');
-  const [compareLayout, setCompareLayout] = useState<'side' | 'stack'>('side');
-  const [filterOpen, setFilterOpen] = useState<boolean>(false);
+  const [graphLayout, setGraphLayout] = useState<'rows' | 'grouped'>(
+    persistedStore?.settings.graphLayout || 'rows'
+  );
+  const [compareMode, setCompareMode] = useState<'list' | 'graph'>(
+    persistedStore?.settings.compareMode || 'list'
+  );
+  const [compareLayout, setCompareLayout] = useState<'side' | 'stack'>(
+    persistedStore?.settings.compareLayout || 'side'
+  );
+  const [filterOpen, setFilterOpen] = useState<boolean>(
+    persistedStore?.settings.filterOpen || false
+  );
   const [f, setF] = useState<FilterState>({ ref: '', author: '', msg: '', from: '', to: '' });
   const [cf, setCf] = useState<CompareFilterState>({
     msg: '',
@@ -400,18 +419,42 @@ export const GitClientProvider: React.FC<{
     matching: true
   });
   const [branchQ, setBranchQ] = useState<string>('');
-  const [scTab, setScTab] = useState<'changes' | 'stash'>('changes');
+  const [scTab, setScTab] = useState<'changes' | 'stash'>(
+    persistedStore?.settings.scTab || 'changes'
+  );
   const [diffTab, setDiffTab] = useState<
     'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources'
-  >('work');
+  >(persistedStore?.settings.diffTab || 'work');
   const [consoleLines, setConsoleLines] = useState<LogEntry[]>(seedLog());
   const [commitMsg, setCommitMsg] = useState<string>(
     'net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: '
   );
 
   const commits = RAW_COMMITS;
-  const [repoPath, setRepoPath] = useState<string>(props.repoPath || '');
-  const [repoName, setRepoName] = useState<string>(props.repoName || 'Open a repository');
+  const [selectedRepoPath, setSelectedRepoPath] = useState<string>(
+    props.repoPath || persistedStore?.repositories.selectedRepoPath || ''
+  );
+  const [repoPath, setRepoPath] = useState<string>(
+    props.repoPath || persistedStore?.repositories.activeRepoPath || ''
+  );
+  const [repoName, setRepoName] = useState<string>(
+    props.repoName || persistedStore?.repositories.repoName || 'Open a repository'
+  );
+  const [knownRepositories, setKnownRepositories] = useState<Array<{ name: string; path: string }>>(
+    () => {
+      const persisted = persistedStore?.repositories.repositoryList || [];
+      const initialPath = props.repoPath || persistedStore?.repositories.activeRepoPath || '';
+      const initialName =
+        props.repoName || persistedStore?.repositories.repoName || 'Open a repository';
+      const deduped = persisted.filter((item, idx, arr) => {
+        return !!item.path && idx === arr.findIndex(candidate => candidate.path === item.path);
+      });
+      if (initialPath && !deduped.some(item => item.path === initialPath)) {
+        deduped.unshift({ name: initialName, path: initialPath });
+      }
+      return deduped.slice(0, 20);
+    }
+  );
   const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'No branch');
   const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 0);
   const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 0);
@@ -435,6 +478,43 @@ export const GitClientProvider: React.FC<{
       document.documentElement.style.setProperty('--color-accent', props.accent);
     }
   }, [theme, props.accent]);
+
+  useEffect(() => {
+    saveAppStore({
+      version: 1,
+      settings: {
+        theme,
+        dock,
+        view,
+        graphLayout,
+        compareMode,
+        compareLayout,
+        filterOpen,
+        scTab,
+        diffTab
+      },
+      repositories: {
+        selectedRepoPath,
+        activeRepoPath: repoPath,
+        repoName,
+        repositoryList: knownRepositories
+      }
+    });
+  }, [
+    theme,
+    dock,
+    view,
+    graphLayout,
+    compareMode,
+    compareLayout,
+    filterOpen,
+    scTab,
+    diffTab,
+    selectedRepoPath,
+    repoPath,
+    repoName,
+    knownRepositories
+  ]);
 
   const log = useCallback((lines: LogEntry[]) => {
     setConsoleLines(prev => prev.concat(lines).slice(-120));
@@ -539,11 +619,55 @@ export const GitClientProvider: React.FC<{
     }
   }, []);
 
+  const rememberRepository = useCallback((pathValue: string, nameValue: string) => {
+    if (!pathValue) {
+      return;
+    }
+    setKnownRepositories(prev => {
+      const trimmedPath = pathValue.trim();
+      const trimmedName = (nameValue || 'repository').trim();
+      const remaining = prev.filter(item => item.path !== trimmedPath);
+      return [{ name: trimmedName, path: trimmedPath }, ...remaining].slice(0, 20);
+    });
+  }, []);
+
   const setActiveRepository = useCallback(async (pathValue: string) => {
     setRepoPath(pathValue);
-    setRepoName(getRepoNameFromPath(pathValue));
+    setSelectedRepoPath(pathValue);
+    const nextName = getRepoNameFromPath(pathValue);
+    setRepoName(nextName);
+    rememberRepository(pathValue, nextName);
     await refreshBranchSummary(pathValue);
-  }, [getRepoNameFromPath, refreshBranchSummary]);
+  }, [getRepoNameFromPath, refreshBranchSummary, rememberRepository]);
+
+  const selectRepository = useCallback(
+    (path: string) => {
+      if (!path) {
+        return;
+      }
+      void (async () => {
+        await runWithActionLock(async () => {
+          try {
+            const isRepo = await tauriGitBackend.isRepo(path);
+            if (!isRepo) {
+              log([{ text: `Not a git repository: ${path}`, type: 'err' }]);
+              return;
+            }
+            await setActiveRepository(path);
+            log([{ text: `Repository selected: ${path}`, type: 'ok' }]);
+          } catch (error) {
+            log([
+              {
+                text: `Switch repository failed: ${error instanceof Error ? error.message : String(error)}`,
+                type: 'err'
+              }
+            ]);
+          }
+        });
+      })();
+    },
+    [runWithActionLock, log, setActiveRepository]
+  );
 
   const toastRun = useCallback(
     (title: string, detail: string, done?: () => void) => {
@@ -1132,6 +1256,8 @@ export const GitClientProvider: React.FC<{
         createBranch,
         openRepository,
         cloneRepository,
+        knownRepositories,
+        selectRepository,
         actionBusy,
         aiMessage,
         updateAll,

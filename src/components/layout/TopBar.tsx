@@ -6,6 +6,7 @@ export const TopBar: React.FC = () => {
   const {
     repoName,
     repoPath,
+    knownRepositories,
     currentBranch,
     aheadCount,
     behindCount,
@@ -16,6 +17,7 @@ export const TopBar: React.FC = () => {
     createBranch,
     openRepository,
     cloneRepository,
+    selectRepository,
     actionBusy,
     toggleTheme,
     theme,
@@ -25,7 +27,19 @@ export const TopBar: React.FC = () => {
   } = useGitClient();
 
   const handleRepoMenu = (e: React.MouseEvent) => {
-    openMenu(e, 'Repository', [
+    const selectableRepoItems = knownRepositories
+      .filter(item => item.path && item.path !== repoPath)
+      .map(item => ({
+      label: item.name,
+      hint: item.path,
+      run: () => selectRepository(item.path)
+    }));
+
+    const menuTitle = repoPath ? `${repoName} (current) — ${repoPath}` : 'Open a repository';
+
+    openMenu(e, menuTitle, [
+      ...selectableRepoItems,
+      ...(selectableRepoItems.length ? [{ sep: true } as const] : []),
       { label: 'Open Repository…', hint: '⌘O', run: openRepository },
       { label: 'Clone…', run: cloneRepository }
     ]);
@@ -52,11 +66,6 @@ export const TopBar: React.FC = () => {
       >
         <i className="ph ph-git-fork" style={{ fontSize: '14px', color: 'var(--color-accent)' }} />
         <span style={{ fontWeight: 500 }}>{repoName}</span>
-        {repoPath ? (
-          <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
-            {repoPath}
-          </span>
-        ) : null}
         <i className="ph ph-caret-down" style={{ fontSize: '11px', color: 'var(--fg3)' }} />
       </Button>
 

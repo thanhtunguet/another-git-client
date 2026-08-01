@@ -7,3 +7,5 @@
 - Added clone dialog form with repository URL input and HTTPS-to-Git SSH conversion checkbox.
 - Fixed Clone click flow to open dialog-based UX directly without relying on browser prompt.
 - Replaced initial Linux placeholder in header with "Open a repository" neutral state.
+- Added persistent app store for settings and selected/active repository restoration on app reopen.
+- Added repository dropdown select options with persisted repository list and path visibility in open menu.
