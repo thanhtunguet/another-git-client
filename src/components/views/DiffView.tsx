@@ -1,17 +1,132 @@
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
+import { tauriGitBackend } from '../../services/tauriGitBackend';
+
+export interface DiffLine {
+  text: string;
+  type: 'hunk' | 'add' | 'del' | 'context';
+  oldLine?: number;
+  newLine?: number;
+}
+
+export function parseDiffText(raw: string): DiffLine[] {
+  if (!raw || !raw.trim()) return [];
+  const lines = raw.split('\n');
+  const result: DiffLine[] = [];
+  let oldN = 0;
+  let newN = 0;
+
+  for (const line of lines) {
+    if (
+      line.startsWith('diff --git') ||
+      line.startsWith('index ') ||
+      line.startsWith('--- ') ||
+      line.startsWith('+++ ')
+    ) {
+      continue;
+    }
+    if (line.startsWith('@@')) {
+      const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+      if (match) {
+        oldN = parseInt(match[1], 10) - 1;
+        newN = parseInt(match[2], 10) - 1;
+      }
+      result.push({ text: line, type: 'hunk' });
+    } else if (line.startsWith('+')) {
+      newN++;
+      result.push({ text: line.slice(1), type: 'add', newLine: newN });
+    } else if (line.startsWith('-')) {
+      oldN++;
+      result.push({ text: line.slice(1), type: 'del', oldLine: oldN });
+    } else {
+      const content = line.startsWith(' ') ? line.slice(1) : line;
+      oldN++;
+      newN++;
+      result.push({ text: content, type: 'context', oldLine: oldN, newLine: newN });
+    }
+  }
+  return result;
+}
 
 export const DiffView: React.FC = () => {
-  const { diffTab, setDiffTab, act } = useGitClient();
+  const {
+    diffTab,
+    setDiffTab,
+    repoPath,
+    stagedFiles,
+    unstagedFiles,
+    untrackedFiles,
+    sel,
+    getCommitFullSha,
+    stageFile,
+        toastRun
+  } = useGitClient();
+
+  const [selectedPath, setSelectedPath] = useState<string>('');
+  const [rawDiffText, setRawDiffText] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const availableFiles = useMemo(() => {
+    if (diffTab === 'index') return stagedFiles;
+    if (diffTab === 'work') return [...unstagedFiles, ...untrackedFiles];
+    return [...stagedFiles, ...unstagedFiles, ...untrackedFiles];
+  }, [diffTab, stagedFiles, unstagedFiles, untrackedFiles]);
+
+  useEffect(() => {
+    if (availableFiles.length && !selectedPath) {
+      setSelectedPath(availableFiles[0].path);
+    }
+  }, [availableFiles, selectedPath]);
+
+  const targetPath = selectedPath || (availableFiles[0]?.path ?? '');
+
+  useEffect(() => {
+    if (!repoPath) return;
+    let active = true;
+    setLoading(true);
+
+    void (async () => {
+      try {
+        let text = '';
+        if (diffTab === 'work') {
+          if (targetPath) {
+            text = await tauriGitBackend.showFileDiff(repoPath, targetPath, false);
+          }
+        } else if (diffTab === 'index') {
+          if (targetPath) {
+            text = await tauriGitBackend.showFileDiff(repoPath, targetPath, true);
+          }
+        } else if (diffTab === 'parent' || diffTab === 'refs') {
+          const sha = getCommitFullSha(sel[0] ?? 0);
+          if (sha) {
+            text = await tauriGitBackend.getCommitDiff(repoPath, sha, targetPath || undefined);
+          }
+        }
+        if (active) {
+          setRawDiffText(text || '');
+          setLoading(false);
+        }
+      } catch {
+        if (active) {
+          setRawDiffText('');
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => { active = false; };
+  }, [repoPath, targetPath, diffTab, sel, getCommitFullSha]);
+
+  const parsedLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
 
   const tabs: [id: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources', label: string][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
     ['parent', 'Commit ↔ parent'],
-    ['refs', 'main ↔ feature/mlx5-next'],
-    ['merge', '3-way merge — 2 conflicts'],
-    ['sources', 'Compare two text sources']
+    ['refs', 'Selected commit diff'],
+    ['merge', '3-way merge / conflict'],
+    ['sources', 'Compare text sources']
   ];
 
   const monoStyle: React.CSSProperties = {
@@ -21,195 +136,39 @@ export const DiffView: React.FC = () => {
   };
 
   const renderDiffPane = () => {
-    if (diffTab === 'merge') {
-      const col = (title: string, tint: string, lines: [string, number][], fill: string) => (
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            borderRight: '1px solid var(--line)'
-          }}
-        >
-          <div
-            style={{
-              height: '26px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '0 10px',
-              background: 'var(--panel)',
-              borderBottom: '1px solid var(--line)',
-              fontSize: '11px'
-            }}
-          >
-            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: tint }} />{' '}
-            {title}
-          </div>
-          <div style={{ flex: 1, overflow: 'auto', padding: '6px 0' }}>
-            {lines.map((l, i) => (
-              <div
-                key={i}
-                style={{
-                  ...monoStyle,
-                  whiteSpace: 'pre',
-                  padding: '0 10px',
-                  background: l[1] ? fill : 'transparent',
-                  color: l[1] ? 'var(--fg)' : 'var(--fg2)'
-                }}
-              >
-                {l[0]}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-
-      const left: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['\tmlx5e_reporter_tx_err_cqe(sq);', 1],
-        ['\tqueue_work(priv->wq, &sq->recover_work);', 1]
-      ];
-      const mid: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['<<<<<<< HEAD', 1],
-        ['\tmlx5e_reporter_tx_err_cqe(sq);', 1],
-        ['=======', 1],
-        ['\tmlx5e_reporter_tx_err_cqe(sq, ctx);', 1],
-        ['>>>>>>> feature/mlx5-next', 1]
-      ];
-      const right: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['\tmlx5e_reporter_tx_err_cqe(sq, ctx);', 1],
-        ['\tmlx5e_tx_flush(sq);', 1]
-      ];
-
+    if (loading) {
       return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div
-            style={{
-              flex: '0 0 auto',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '0 12px',
-              background: 'var(--panel)',
-              borderBottom: '1px solid var(--line)'
-            }}
-          >
-            <span style={{ fontSize: '11.5px', color: 'var(--warn)' }}>2 conflicts remaining</span>
-            <span style={{ flex: 1 }} />
-            <Button
-              variant="secondary"
-              onClick={act('Previous conflict')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              ↑ Previous
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Next conflict')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              ↓ Next
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Take left')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Take left
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Take right')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Take right
-            </Button>
-            <Button
-              variant="primary"
-              onClick={act('Mark resolved')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Resolve
-            </Button>
-          </div>
-          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-            {col('Local — main', 'var(--color-accent)', left, 'var(--delbg)')}
-            {col('Result — working tree', 'var(--warn)', mid, 'var(--raised)')}
-            {col('Remote — feature/mlx5-next', 'var(--add)', right, 'var(--addbg)')}
-          </div>
+        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)' }}>
+          Loading diff…
         </div>
       );
     }
 
-    const hunk: [string, string][] = [
-      [
-        '@@ -412,9 +412,14 @@ static void mlx5e_tx_err_cqe_work(struct work_struct *recover_work)',
-        'h'
-      ],
-      [' \tstruct mlx5e_txqsq *sq = container_of(recover_work, struct mlx5e_txqsq,', ' '],
-      [' \t\t\t\t      recover_work);', ' '],
-      [' ', ' '],
-      ['-\tmlx5e_reporter_tx_err_cqe(sq);', '-'],
-      ['-\tif (unlikely(!priv->channels.num))', '-'],
-      ['+\tif (unlikely(!priv->channels.num ||', '+'],
-      ['+\t\t     !test_bit(MLX5E_STATE_OPENED, &priv->state)))', '+'],
-      ['+\t\treturn;', '+'],
-      ['+', '+'],
-      ['+\tmlx5e_reporter_tx_err_cqe(sq);', '+'],
-      [' \t\treturn;', ' '],
-      [' }', ' '],
-      [
-        '@@ -488,6 +493,8 @@ int mlx5e_open_txqsq(struct mlx5e_channel *c, u32 tisn, int txq_ix,',
-        'h'
-      ],
-      [' \tsq->stop_room = param->stop_room;', ' '],
-      ['+\tsq->tunnel_steering = MLX5_CAP_ETH(mdev, tunnel_stateless_gre);', '+'],
-      [' \tINIT_WORK(&sq->recover_work, mlx5e_tx_err_cqe_work);', ' ']
-    ];
+    if (!parsedLines.length) {
+      return (
+        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
+          {targetPath ? `No diff output for ${targetPath}` : 'No changed files found in current workspace.'}
+        </div>
+      );
+    }
 
-    let oldN = 411;
-    let newN = 411;
-
-    const rows = hunk.map((h, i) => {
-      const text = h[0];
-      const k = h[1];
+    const rows = parsedLines.map((line, i) => {
       const bg =
-        k === '+'
+        line.type === 'add'
           ? 'var(--addbg)'
-          : k === '-'
+          : line.type === 'del'
             ? 'var(--delbg)'
-            : k === 'h'
+            : line.type === 'hunk'
               ? 'var(--raised)'
               : 'transparent';
       const fg =
-        k === '+'
+        line.type === 'add'
           ? 'var(--add)'
-          : k === '-'
+          : line.type === 'del'
             ? 'var(--del)'
-            : k === 'h'
+            : line.type === 'hunk'
               ? 'var(--fg3)'
               : 'var(--fg)';
-      let ln1: string | number = '';
-      let ln2: string | number = '';
-
-      if (k === 'h') {
-        const m = /\+(\d+)/.exec(text);
-        if (m) {
-          newN = +m[1] - 1;
-          oldN = +m[1] - 1;
-        }
-      } else {
-        if (k !== '+') ln1 = ++oldN;
-        if (k !== '-') ln2 = ++newN;
-      }
 
       return (
         <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
@@ -223,7 +182,7 @@ export const DiffView: React.FC = () => {
               userSelect: 'none'
             }}
           >
-            {ln1}
+            {line.oldLine || ''}
           </span>
           <span
             style={{
@@ -236,9 +195,11 @@ export const DiffView: React.FC = () => {
               borderRight: '1px solid var(--line)'
             }}
           >
-            {ln2}
+            {line.newLine || ''}
           </span>
-          <span style={{ paddingLeft: '10px', whiteSpace: 'pre', color: fg, flex: 1 }}>{text}</span>
+          <span style={{ paddingLeft: '10px', whiteSpace: 'pre-wrap', color: fg, flex: 1 }}>
+            {line.text}
+          </span>
         </div>
       );
     });
@@ -258,29 +219,25 @@ export const DiffView: React.FC = () => {
           }}
         >
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-            drivers/net/ethernet/mellanox/mlx5/core/en_tx.c
+            {targetPath || 'Repository diff'}
           </span>
-          <span style={{ fontSize: '11px', color: 'var(--add)' }}>+7</span>
-          <span style={{ fontSize: '11px', color: 'var(--del)' }}>−2</span>
-          <span style={{ flex: 1 }} />
+          <div style={{ flex: 1 }} />
+          {targetPath && (
+            <Button
+              variant="secondary"
+              style={{ height: '22px', fontSize: '11.5px' }}
+              onClick={() => void stageFile(targetPath)}
+            >
+              Stage file
+            </Button>
+          )}
           <Button
             variant="secondary"
             style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={() => setDiffTab(diffTab === 'sources' ? 'work' : 'sources')}
-          >
-            {diffTab === 'sources' ? 'Unified' : 'Split'}
-          </Button>
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={act('Stage hunk')}
-          >
-            Stage hunk
-          </Button>
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={act('Copy patch')}
+            onClick={() => {
+              void navigator.clipboard.writeText(rawDiffText);
+              toastRun('Copied diff patch', targetPath || 'diff');
+            }}
           >
             Copy patch
           </Button>
@@ -302,6 +259,7 @@ export const DiffView: React.FC = () => {
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Top tabs */}
       <div
         style={{
           flex: '0 0 auto',
@@ -335,24 +293,54 @@ export const DiffView: React.FC = () => {
             </Button>
           );
         })}
-        <div style={{ flex: 1, minWidth: '20px' }} />
-        <Button
-          variant="secondary"
-          onClick={act('Swap diff direction')}
-          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
-        >
-          <i className="ph ph-arrows-left-right" style={{ fontSize: '13px' }} /> Swap direction
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={act('Compare with revision')}
-          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
-        >
-          Compare with Revision…
-        </Button>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {renderDiffPane()}
+
+      {/* Main split */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        {/* File selector strip */}
+        {availableFiles.length > 0 && (
+          <div
+            style={{
+              flex: '0 0 220px',
+              borderRight: '1px solid var(--line)',
+              background: 'var(--panel)',
+              overflow: 'auto',
+              padding: 'var(--space-2) 0'
+            }}
+          >
+            <div style={{ padding: '0 var(--space-3) var(--space-2)', fontSize: '10.5px', textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--fg3)' }}>
+              Changed Files ({availableFiles.length})
+            </div>
+            {availableFiles.map(f => (
+              <div
+                key={f.path}
+                onClick={() => setSelectedPath(f.path)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  height: '24px',
+                  padding: '0 var(--space-3)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontFamily: 'var(--font-mono)',
+                  background: targetPath === f.path ? 'var(--sel)' : 'transparent'
+                }}
+                className="gc-hover-bg"
+              >
+                <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>{f.status}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {f.path.split('/').pop()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Diff content */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {renderDiffPane()}
+        </div>
       </div>
     </div>
   );

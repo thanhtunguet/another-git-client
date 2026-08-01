@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-08-01
+- Added Rust backend commands `git_get_compare`, `git_create_patch`, and `git_apply_patch`.
+- Wired `CompareView.tsx` to live backend comparison, dynamic branch selection, side-by-side commit comparison, and export summary/patch.
+- Wired `CommitDetailsView.tsx` and `DiffView.tsx` to real git diff parsing and line rendering for working tree, index, and commit files.
+- Enhanced `SourceControlDock.tsx` with commit message templates, dynamic AI commit message generation based on staged/unstaged changes, and real stash/patch actions.
+- Replaced dummy palette toasts in `CommandPalette.tsx` with real git action dispatchers (checkout, rebase, delete branch, stash push/pop, commit changes).
 - Implemented Rust backend commands for Worktree operations (`git_worktree_lock`, `git_worktree_unlock`, `git_worktree_prune`, `git_open_path_in_file_manager`, `git_open_path_in_terminal`) and enriched worktree porcelain output with current status, dirty flags, and head commit subjects.
 - Implemented Rust backend commands for Submodule operations (`git_submodule_init`, `git_submodule_pointer_diff`, `git_submodule_stage_pointer`, `git_submodule_checkout_recorded`, `git_submodule_pull_tracked`) and enriched submodule state with recorded SHA in index, dirty status, branch, and ahead/behind counters.
 - Updated `tauriGitBackend.ts` and `GitClientContext.tsx` with `worktrees` and `submodules` live state, auto-snapshot rehydration, and action handlers for all worktree and submodule operations.

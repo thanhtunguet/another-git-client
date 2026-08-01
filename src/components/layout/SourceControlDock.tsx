@@ -64,17 +64,26 @@ export const SourceControlDock: React.FC = () => {
     ]);
   };
 
+  const { currentBranch } = useGitClient();
   const handleTemplateMenu = (e: React.MouseEvent) => {
-    openMenu(e, 'Message templates', [
-      { label: '{scope}: {cursor}', hint: 'kernel', run: act('Apply template') },
+    openMenu(e, "Message templates", [
       {
-        label: 'fix({scope}): {cursor} — Refs {ticket}',
-        hint: 'conventional',
-        run: act('Apply template')
+        label: "{scope}: {cursor}",
+        hint: "kernel",
+        run: () => setCommitMsg("core: update implementation\n\nSigned-off-by: Developer <dev@example.com>")
       },
-      { label: '[{branch}] {cursor}', hint: 'branch-tagged', run: act('Apply template') },
+      {
+        label: "fix({scope}): {cursor} — Refs {ticket}",
+        hint: "conventional",
+        run: () => setCommitMsg("fix(ui): resolve layout issue\n\nRefs: TASK-101")
+      },
+      {
+        label: "[{branch}] {cursor}",
+        hint: "branch-tagged",
+        run: () => setCommitMsg(`[${currentBranch}] work in progress`)
+      },
       { sep: true },
-      { label: 'Edit templates…', run: () => setView('settings') }
+      { label: "Edit templates…", run: () => setView("settings") }
     ]);
   };
 

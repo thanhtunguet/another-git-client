@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -33,7 +33,7 @@ pub struct TagRef {
   pub last_commit_epoch: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphCommitRow {
   pub graph: String,
@@ -46,7 +46,7 @@ pub struct GraphCommitRow {
   pub subject: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangedFile {
   pub status: String,
@@ -362,45 +362,7 @@ pub fn git_get_graph(
   }
 
   let output = run_git(&repo, &args)?.stdout;
-  let mut rows = Vec::new();
-
-  for row in output
-    .split('\u{1e}')
-    .map(str::trim)
-    .filter(|line| !line.is_empty())
-  {
-    let parts: Vec<&str> = row.split('\u{1f}').collect();
-    if parts.len() < 8 {
-      continue;
-    }
-
-    let refs = parts[4]
-      .split(',')
-      .map(str::trim)
-      .filter(|r| !r.is_empty())
-      .map(|r| r.to_string())
-      .collect::<Vec<_>>();
-
-    let parents = parts[3]
-      .split(' ')
-      .map(str::trim)
-      .filter(|p| !p.is_empty())
-      .map(|p| p.to_string())
-      .collect::<Vec<_>>();
-
-    rows.push(GraphCommitRow {
-      graph: parts[0].to_string(),
-      sha: parts[1].to_string(),
-      short_sha: parts[2].to_string(),
-      parents,
-      refs,
-      author: parts[5].to_string(),
-      date: parts[6].to_string(),
-      subject: parts[7].to_string(),
-    });
-  }
-
-  Ok(rows)
+  Ok(parse_graph_rows(&output))
 }
 
 #[tauri::command]
@@ -1437,4 +1399,232 @@ pub fn git_submodule_pull_tracked(
   } else {
     run_git(&repo, &["submodule".to_string(), "update".to_string(), "--remote".to_string(), "--".to_string(), path])
   }
+}
+
+
+pub fn parse_graph_rows(output: &str) -> Vec<GraphCommitRow> {
+  let mut rows = Vec::new();
+
+  for row in output
+    .split('\u{1e}')
+    .map(str::trim)
+    .filter(|line| !line.is_empty())
+  {
+    let parts: Vec<&str> = row.split('\u{1f}').collect();
+    if parts.len() < 8 {
+      continue;
+    }
+
+    let refs = parts[4]
+      .split(',')
+      .map(str::trim)
+      .filter(|r| !r.is_empty())
+      .map(|r| r.to_string())
+      .collect::<Vec<_>>();
+
+    let parents = parts[3]
+      .split(' ')
+      .map(str::trim)
+      .filter(|p| !p.is_empty())
+      .map(|p| p.to_string())
+      .collect::<Vec<_>>();
+
+    rows.push(GraphCommitRow {
+      graph: parts[0].to_string(),
+      sha: parts[1].to_string(),
+      short_sha: parts[2].to_string(),
+      parents,
+      refs,
+      author: parts[5].to_string(),
+      date: parts[6].to_string(),
+      subject: parts[7].to_string(),
+    });
+  }
+  rows
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitCompareResult {
+  pub left_ref: String,
+  pub right_ref: String,
+  pub merge_base: Option<String>,
+  pub commits_only_left: Vec<GraphCommitRow>,
+  pub commits_only_right: Vec<GraphCommitRow>,
+  pub changed_files: Vec<ChangedFile>,
+}
+
+#[tauri::command]
+pub fn git_get_compare(
+  repo_path: String,
+  left_ref: String,
+  right_ref: String,
+) -> Result<GitCompareResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+
+  let merge_base = match run_git(&repo, &["merge-base".to_string(), left_ref.clone(), right_ref.clone()]) {
+    Ok(res) => {
+      let s = res.stdout.trim().to_string();
+      if s.is_empty() { None } else { Some(s) }
+    }
+    Err(_) => None,
+  };
+
+  let left_log_args = vec![
+    "log".to_string(),
+    "--date=iso-strict".to_string(),
+    "--decorate=full".to_string(),
+    "--format=%m%x1f%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e".to_string(),
+    format!("{right_ref}..{left_ref}"),
+  ];
+  let left_out = run_git_allow_failure(&repo, &left_log_args).map(|r| r.stdout).unwrap_or_default();
+  let commits_only_left = parse_graph_rows(&left_out);
+
+  let right_log_args = vec![
+    "log".to_string(),
+    "--date=iso-strict".to_string(),
+    "--decorate=full".to_string(),
+    "--format=%m%x1f%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e".to_string(),
+    format!("{left_ref}..{right_ref}"),
+  ];
+  let right_out = run_git_allow_failure(&repo, &right_log_args).map(|r| r.stdout).unwrap_or_default();
+  let commits_only_right = parse_graph_rows(&right_out);
+
+  let diff_args = vec![
+    "diff".to_string(),
+    "--name-status".to_string(),
+    format!("{left_ref}...{right_ref}"),
+  ];
+  let diff_out = run_git_allow_failure(&repo, &diff_args).map(|r| r.stdout).unwrap_or_default();
+  let changed_files = diff_out
+    .lines()
+    .map(str::trim)
+    .filter(|line| !line.is_empty())
+    .filter_map(|line| {
+      let parts: Vec<&str> = line.split('\t').collect();
+      if parts.len() >= 2 {
+        let status = parts[0].to_string();
+        let path = parts[1].to_string();
+        Some(ChangedFile {
+          status,
+          index_status: String::new(),
+          worktree_status: String::new(),
+          staged: false,
+          unstaged: false,
+          untracked: false,
+          old_path: None,
+          path,
+        })
+      } else {
+        None
+      }
+    })
+    .collect();
+
+  Ok(GitCompareResult {
+    left_ref,
+    right_ref,
+    merge_base,
+    commits_only_left,
+    commits_only_right,
+    changed_files,
+  })
+}
+
+#[tauri::command]
+pub fn git_create_patch(
+  repo_path: String,
+  reference: String,
+  file_path: Option<String>,
+) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec!["format-patch".to_string(), "--stdout".to_string(), reference];
+  if let Some(path) = file_path {
+    if !path.trim().is_empty() {
+      args.push("--".to_string());
+      args.push(path);
+    }
+  }
+  let res = run_git(&repo, &args)?;
+  Ok(res.stdout)
+}
+
+#[tauri::command]
+pub fn git_apply_patch(
+  repo_path: String,
+  patch_content: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  use std::io::Write;
+  use std::process::{Command, Stdio};
+  let mut child = Command::new("git")
+    .args(&["apply", "-"])
+    .current_dir(&repo)
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .map_err(|e| format!("Failed to spawn git apply: {e}"))?;
+
+  if let Some(mut stdin) = child.stdin.take() {
+    let _ = stdin.write_all(patch_content.as_bytes());
+  }
+
+  let output = child.wait_with_output().map_err(|e| format!("Failed to wait for git apply: {e}"))?;
+  Ok(GitCommandResult {
+    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+    exit_code: output.status.code().unwrap_or(-1),
+  })
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteEntry {
+  pub name: String,
+  pub url: String,
+  pub kind: String,
+}
+
+#[tauri::command]
+pub fn git_add_remote(
+  repo_path: String,
+  name: String,
+  url: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["remote".to_string(), "add".to_string(), name, url];
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_delete_remote(
+  repo_path: String,
+  name: String,
+) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec!["remote".to_string(), "remove".to_string(), name];
+  run_git(&repo, &args)
+}
+
+#[tauri::command]
+pub fn git_get_remotes(
+  repo_path: String,
+) -> Result<Vec<RemoteEntry>, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let output = run_git(&repo, &["remote".to_string(), "-v".to_string()])?.stdout;
+  let mut remotes = Vec::new();
+
+  for line in output.lines().map(str::trim).filter(|l| !l.is_empty()) {
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    if parts.len() >= 3 {
+      let name = parts[0].to_string();
+      let url = parts[1].to_string();
+      let kind = parts[2].trim_matches(|c| c == '(' || c == ')').to_string();
+      remotes.push(RemoteEntry { name, url, kind });
+    }
+  }
+
+  Ok(remotes)
 }

@@ -83,6 +83,23 @@ export interface StashEntry {
   date: string;
 }
 
+
+
+export interface RemoteEntry {
+  name: string;
+  url: string;
+  kind: string;
+}
+
+export interface GitCompareResult {
+  leftRef: string;
+  rightRef: string;
+  mergeBase?: string;
+  commitsOnlyLeft: GraphCommitRow[];
+  commitsOnlyRight: GraphCommitRow[];
+  changedFiles: ChangedFile[];
+}
+
 export interface CommitFileChange {
   path: string;
   status: string;
@@ -345,9 +362,29 @@ export const tauriGitBackend = {
 
   checkoutRecordedSubmoduleCommit(repoPath: string, path: string) {
     return invoke<GitCommandResult>("git_submodule_checkout_recorded", { repoPath, path });
+  },  pullSubmoduleTrackedBranch(repoPath: string, path: string) {
+    return invoke<GitCommandResult>("git_submodule_pull_tracked", { repoPath, path });
   },
 
-  pullSubmoduleTrackedBranch(repoPath: string, path: string) {
-    return invoke<GitCommandResult>("git_submodule_pull_tracked", { repoPath, path });
+  getCompare(repoPath: string, leftRef: string, rightRef: string) {
+    return invoke<GitCompareResult>("git_get_compare", { repoPath, leftRef, rightRef });
+  },
+
+  createPatch(repoPath: string, reference: string, filePath?: string) {
+    return invoke<string>("git_create_patch", { repoPath, reference, filePath });
+  },  applyPatch(repoPath: string, patchContent: string) {
+    return invoke<GitCommandResult>("git_apply_patch", { repoPath, patchContent });
+  },
+
+  addRemote(repoPath: string, name: string, url: string) {
+    return invoke<GitCommandResult>("git_add_remote", { repoPath, name, url });
+  },
+
+  deleteRemote(repoPath: string, name: string) {
+    return invoke<GitCommandResult>("git_delete_remote", { repoPath, name });
+  },
+
+  getRemotes(repoPath: string) {
+    return invoke<RemoteEntry[]>("git_get_remotes", { repoPath });
   },
 };

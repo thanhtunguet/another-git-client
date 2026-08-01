@@ -426,6 +426,12 @@ interface GitClientContextType {
   onFetchProp?: () => void;
   onPullProp?: () => void;
   onPushProp?: () => void;
+  getCompare: (leftRef: string, rightRef: string) => Promise<import("../services/tauriGitBackend").GitCompareResult>;
+  createPatch: (reference: string, filePath?: string) => Promise<string>;
+  applyPatchText: (patchContent: string) => Promise<void>;
+  addRemote: (name: string, url: string) => Promise<void>;
+  deleteRemote: (name: string) => Promise<void>;
+  getRemotes: () => Promise<import("../services/tauriGitBackend").RemoteEntry[]>;
 }
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
@@ -1257,6 +1263,100 @@ export const GitClientProvider: React.FC<{
       }
     );
   }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
+
+
+  const getCompare = useCallback(
+    async (leftRef: string, rightRef: string) => {
+      try {
+        return await tauriGitBackend.getCompare(repoPath, leftRef, rightRef);
+      } catch (error) {
+        log([{ text: `Compare failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+        return {
+          leftRef,
+          rightRef,
+          commitsOnlyLeft: [],
+          commitsOnlyRight: [],
+          changedFiles: []
+        };
+      }
+    },
+    [repoPath, log]
+  );
+
+  const createPatch = useCallback(
+    async (reference: string, filePath?: string) => {
+      try {
+        log([{ text: `$ git format-patch --stdout ${reference}${filePath ? ` -- ${filePath}` : ""}`, type: "cmd" }]);
+        const patch = await tauriGitBackend.createPatch(repoPath, reference, filePath);
+        toastRun("Patch created", reference);
+        return patch;
+      } catch (error) {
+        log([{ text: `Create patch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+        return "";
+      }
+    },
+    [repoPath, log, toastRun]
+  );
+
+
+  const addRemote = useCallback(
+    async (name: string, url: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git remote add ${name} ${url}`, type: "cmd" }]);
+          const result = await tauriGitBackend.addRemote(repoPath, name, url);
+          appendCommandResult(result);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun("Remote added", name);
+        } catch (error) {
+          log([{ text: `Add remote failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
+  );
+
+  const deleteRemote = useCallback(
+    async (name: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git remote remove ${name}`, type: "cmd" }]);
+          const result = await tauriGitBackend.deleteRemote(repoPath, name);
+          appendCommandResult(result);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun("Remote removed", name);
+        } catch (error) {
+          log([{ text: `Remove remote failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
+  );
+
+  const getRemotes = useCallback(async () => {
+    try {
+      return await tauriGitBackend.getRemotes(repoPath);
+    } catch {
+      return [];
+    }
+  }, [repoPath]);
+
+  const applyPatchText = useCallback(
+    async (patchContent: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: "$ git apply -", type: "cmd" }]);
+          const result = await tauriGitBackend.applyPatch(repoPath, patchContent);
+          appendCommandResult(result);
+          await refreshRepositorySnapshot(repoPath);
+          toastRun("Applied patch", "Working tree updated");
+        } catch (error) {
+          log([{ text: `Apply patch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
+  );
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
@@ -2237,7 +2337,13 @@ export const GitClientProvider: React.FC<{
         behindCount,
         onFetchProp: props.onFetch,
         onPullProp: props.onPull,
-        onPushProp: props.onPush
+        onPushProp: props.onPush,
+        getCompare,
+        createPatch,
+        applyPatchText,
+        addRemote,
+        deleteRemote,
+        getRemotes
       }}
     >
       {children}

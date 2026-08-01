@@ -146,8 +146,7 @@ export const BranchesView: React.FC = () => {
   const {
     branchQ,
     setBranchQ,
-    act,
-    openMenu,
+        openMenu,
     confirm,
     setView,
     commits,
@@ -160,7 +159,10 @@ export const BranchesView: React.FC = () => {
     mergeBranch,
     rebaseBranch,
     resetToRef,
-    createBranch
+    createBranch,
+    addRemote,
+    deleteRemote,
+    getRemotes
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
@@ -397,6 +399,30 @@ export const BranchesView: React.FC = () => {
     ).size;
   }, [branches]);
 
+  const handleAddRemote = () => {
+    const name = window.prompt("Remote name (e.g. origin, upstream)", "origin");
+    if (!name || !name.trim()) return;
+    const url = window.prompt(`Remote URL for ${name.trim()}`, "");
+    if (url && url.trim()) {
+      void addRemote(name.trim(), url.trim());
+    }
+  };
+
+  const handleManageRemotes = (e: React.MouseEvent) => {
+    void getRemotes().then(list => {
+      const items = list.map(r => ({
+        label: `${r.name} (${r.kind})`,
+        hint: r.url,
+        run: () => {
+          if (window.confirm(`Delete remote ${r.name}?`)) {
+            void deleteRemote(r.name);
+          }
+        }
+      }));
+      openMenu(e, "Configured Remotes (click to remove)", items.length ? items : [{ label: "No remotes configured" }]);
+    });
+  };
+
   const selectedBranchMeta = selectedBranch ? formatBranchMeta(selectedBranch) : '';
 
   return (
@@ -607,14 +633,14 @@ export const BranchesView: React.FC = () => {
           <Button
             variant="secondary"
             style={{ height: '22px', fontSize: '11px' }}
-            onClick={act('Add remote')}
+            onClick={handleAddRemote}
           >
             Add remote…
           </Button>
           <Button
             variant="secondary"
             style={{ height: '22px', fontSize: '11px' }}
-            onClick={act('Manage remotes')}
+            onClick={handleManageRemotes}
           >
             Manage
           </Button>

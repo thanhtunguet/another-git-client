@@ -59,6 +59,12 @@ pub fn run() {
       git_backend::git_submodule_stage_pointer,
       git_backend::git_submodule_checkout_recorded,
       git_backend::git_submodule_pull_tracked,
+      git_backend::git_get_compare,
+      git_backend::git_create_patch,
+      git_backend::git_apply_patch,
+      git_backend::git_add_remote,
+      git_backend::git_delete_remote,
+      git_backend::git_get_remotes,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
