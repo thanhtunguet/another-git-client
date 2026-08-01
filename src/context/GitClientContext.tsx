@@ -353,6 +353,7 @@ interface GitClientContextType {
   knownRepositories: Array<{ name: string; path: string }>;
   selectRepository: (path: string) => void;
   actionBusy: boolean;
+  activeRemoteAction: 'fetch' | 'pull' | 'push' | null;
   aiMessage: () => void;
   updateAll: () => void;
   paletteAll: () => PaletteItem[];
@@ -459,6 +460,7 @@ export const GitClientProvider: React.FC<{
   const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 0);
   const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 0);
   const [actionBusy, setActionBusy] = useState<boolean>(false);
+  const [activeRemoteAction, setActiveRemoteAction] = useState<'fetch' | 'pull' | 'push' | null>(null);
 
   const graphData = useMemo(() => buildGraphData(commits), [commits]);
 
@@ -586,6 +588,12 @@ export const GitClientProvider: React.FC<{
     },
     [actionBusy]
   );
+
+  const waitForNextPaint = useCallback(async () => {
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => resolve());
+    });
+  }, []);
 
   const appendCommandResult = useCallback((result: GitCommandResult) => {
     const lines: LogEntry[] = [];
@@ -947,30 +955,26 @@ export const GitClientProvider: React.FC<{
     if (actionBusy) {
       return;
     }
-    confirm(
-      'Fetch all remotes with prune?',
-      'This updates all remote tracking refs and prunes refs that no longer exist on the remote.',
-      'git fetch --prune',
-      'Fetch',
-      () => {
-        void (async () => {
-          await runWithActionLock(async () => {
-            try {
-              setPaletteOpen(false);
-              log([{ text: '$ git fetch --prune', type: 'cmd' }]);
-              const result = await tauriGitBackend.fetch(repoPath, { prune: true });
-              appendCommandResult(result);
-              await refreshBranchSummary(repoPath);
-              toastRun('Fetch complete', 'Fetched with prune');
-              if (props.onFetch) props.onFetch();
-            } catch (error) {
-              log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-            }
-          });
-        })();
+    setPaletteOpen(false);
+    setActionBusy(true);
+    setActiveRemoteAction('fetch');
+    log([{ text: '$ git fetch --prune', type: 'cmd' }]);
+    void (async () => {
+      try {
+        await waitForNextPaint();
+        const result = await tauriGitBackend.fetch(repoPath, { prune: true });
+        appendCommandResult(result);
+        await refreshBranchSummary(repoPath);
+        toastRun('Fetch complete', 'Fetched with prune');
+        if (props.onFetch) props.onFetch();
+      } catch (error) {
+        log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      } finally {
+        setActiveRemoteAction(null);
+        setActionBusy(false);
       }
-    );
-  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, runWithActionLock]);
+    })();
+  }, [actionBusy, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, waitForNextPaint]);
 
   const doPull = useCallback(() => {
     if (actionBusy) {
@@ -982,23 +986,28 @@ export const GitClientProvider: React.FC<{
       'git pull',
       'Pull',
       () => {
+        setPaletteOpen(false);
+        setActionBusy(true);
+        setActiveRemoteAction('pull');
+        log([{ text: '$ git pull', type: 'cmd' }]);
         void (async () => {
-          await runWithActionLock(async () => {
-            try {
-              log([{ text: '$ git pull', type: 'cmd' }]);
-              const result = await tauriGitBackend.pull(repoPath);
-              appendCommandResult(result);
-              await refreshBranchSummary(repoPath);
-              toastRun('Pull complete', 'Local branch updated from remote');
-              if (props.onPull) props.onPull();
-            } catch (error) {
-              log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-            }
-          });
+          try {
+            await waitForNextPaint();
+            const result = await tauriGitBackend.pull(repoPath);
+            appendCommandResult(result);
+            await refreshBranchSummary(repoPath);
+            toastRun('Pull complete', 'Local branch updated from remote');
+            if (props.onPull) props.onPull();
+          } catch (error) {
+            log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          } finally {
+            setActiveRemoteAction(null);
+            setActionBusy(false);
+          }
         })();
       }
     );
-  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch, runWithActionLock]);
+  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, behindCount, currentBranch, waitForNextPaint]);
 
   const doPush = useCallback(() => {
     if (actionBusy) {
@@ -1010,23 +1019,28 @@ export const GitClientProvider: React.FC<{
       'git push',
       'Push',
       () => {
+        setPaletteOpen(false);
+        setActionBusy(true);
+        setActiveRemoteAction('push');
+        log([{ text: '$ git push', type: 'cmd' }]);
         void (async () => {
-          await runWithActionLock(async () => {
-            try {
-              log([{ text: '$ git push', type: 'cmd' }]);
-              const result = await tauriGitBackend.push(repoPath);
-              appendCommandResult(result);
-              await refreshBranchSummary(repoPath);
-              toastRun('Push complete', `${currentBranch} updated on remote`);
-              if (props.onPush) props.onPush();
-            } catch (error) {
-              log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-            }
-          });
+          try {
+            await waitForNextPaint();
+            const result = await tauriGitBackend.push(repoPath);
+            appendCommandResult(result);
+            await refreshBranchSummary(repoPath);
+            toastRun('Push complete', `${currentBranch} updated on remote`);
+            if (props.onPush) props.onPush();
+          } catch (error) {
+            log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          } finally {
+            setActiveRemoteAction(null);
+            setActionBusy(false);
+          }
         })();
       }
     );
-  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun, runWithActionLock]);
+  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
@@ -1259,6 +1273,7 @@ export const GitClientProvider: React.FC<{
         knownRepositories,
         selectRepository,
         actionBusy,
+        activeRemoteAction,
         aiMessage,
         updateAll,
         paletteAll,

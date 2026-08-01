@@ -120,6 +120,12 @@ fn run_git(repo: &Path, args: &[String]) -> Result<GitCommandResult, String> {
   ))
 }
 
+async fn run_git_spawn_blocking(repo: PathBuf, args: Vec<String>) -> Result<GitCommandResult, String> {
+  tauri::async_runtime::spawn_blocking(move || run_git(&repo, &args))
+    .await
+    .map_err(|e| format!("Failed to join git task: {e}"))?
+}
+
 fn parse_ahead_behind(track: &str) -> (i32, i32) {
   let mut ahead = 0;
   let mut behind = 0;
@@ -590,7 +596,7 @@ pub fn git_clone_repo(url: String, destination: String) -> Result<GitCommandResu
 }
 
 #[tauri::command]
-pub fn git_fetch(
+pub async fn git_fetch(
   repo_path: String,
   remote: Option<String>,
   prune: Option<bool>,
@@ -603,11 +609,11 @@ pub fn git_fetch(
   if let Some(remote_name) = remote {
     args.push(remote_name);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_pull(
+pub async fn git_pull(
   repo_path: String,
   remote: Option<String>,
   branch: Option<String>,
@@ -620,11 +626,11 @@ pub fn git_pull(
   if let Some(branch_name) = branch {
     args.push(branch_name);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_push(
+pub async fn git_push(
   repo_path: String,
   remote: Option<String>,
   branch: Option<String>,
@@ -641,7 +647,7 @@ pub fn git_push(
   if let Some(branch_name) = branch {
     args.push(branch_name);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]

@@ -72,3 +72,16 @@
 - Dropdown header now shows the current repository directly (replacing generic Repository placeholder).
 - Current repository is removed from selectable options list.
 - The separator above actions is rendered only when there are other repositories available to select.
+
+## Follow-up (Remote Toolbar Responsiveness)
+- Improved Fetch/Pull/Push responsiveness in the top toolbar by making command execution fire-and-forget from the UI callback path.
+- Added explicit remote operation state tracking in Git client context:
+  - `activeRemoteAction: 'fetch' | 'pull' | 'push' | null`
+- Added per-action spinner feedback in the toolbar buttons:
+  - active action now renders a rotating spinner icon beside the label
+  - buttons remain lock-protected against concurrent operations
+- Kept completion notification behavior via existing toast system while preserving command output logs in the console.
+- Added shared `spin` keyframes and reusable `.gc-spin` style for loading indicators.
+- Moved Tauri backend `git_fetch`, `git_pull`, and `git_push` execution onto `tauri::async_runtime::spawn_blocking` to prevent blocking the app/UI thread during long-running git network commands.
+- Added a one-frame UI flush (`requestAnimationFrame`) before invoking remote commands so spinner/progress state paints immediately after click/confirm.
+- Removed confirmation step for `Fetch` so the top-bar fetch action starts immediately and shows running state without dialog latency.

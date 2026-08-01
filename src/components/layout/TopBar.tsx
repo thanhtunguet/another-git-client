@@ -19,6 +19,7 @@ export const TopBar: React.FC = () => {
     cloneRepository,
     selectRepository,
     actionBusy,
+    activeRemoteAction,
     toggleTheme,
     theme,
     toggleDock,
@@ -55,6 +56,27 @@ export const TopBar: React.FC = () => {
   };
 
   const themeIcon = theme === 'light' ? 'ph-moon' : 'ph-sun';
+  const renderRemoteButton = (
+    label: 'Fetch' | 'Pull' | 'Push',
+    onClick: () => void,
+    actionKey: 'fetch' | 'pull' | 'push'
+  ) => {
+    const isRunning = activeRemoteAction === actionKey;
+    return (
+      <Button
+        variant="ghost"
+        style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
+        onClick={onClick}
+        disabled={actionBusy}
+        aria-busy={isRunning}
+      >
+        {isRunning ? (
+          <i className="ph ph-spinner-gap gc-spin" style={{ fontSize: '13px' }} />
+        ) : null}
+        {label}
+      </Button>
+    );
+  };
 
   return (
     <div className="gc-topbar">
@@ -122,30 +144,9 @@ export const TopBar: React.FC = () => {
       <div style={{ flex: 1 }} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-        <Button
-          variant="ghost"
-          style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
-          onClick={doFetch}
-          disabled={actionBusy}
-        >
-          Fetch
-        </Button>
-        <Button
-          variant="ghost"
-          style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
-          onClick={doPull}
-          disabled={actionBusy}
-        >
-          Pull
-        </Button>
-        <Button
-          variant="ghost"
-          style={{ height: '24px', padding: '0 8px', color: 'var(--fg2)' }}
-          onClick={doPush}
-          disabled={actionBusy}
-        >
-          Push
-        </Button>
+        {renderRemoteButton('Fetch', doFetch, 'fetch')}
+        {renderRemoteButton('Pull', doPull, 'pull')}
+        {renderRemoteButton('Push', doPush, 'push')}
       </div>
 
       <Button

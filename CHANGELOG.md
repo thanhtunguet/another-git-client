@@ -9,3 +9,7 @@
 - Replaced initial Linux placeholder in header with "Open a repository" neutral state.
 - Added persistent app store for settings and selected/active repository restoration on app reopen.
 - Added repository dropdown select options with persisted repository list and path visibility in open menu.
+- Improved top toolbar Fetch/Pull/Push responsiveness with active-button spinner feedback and async completion flow.
+- Prevented UI freeze during Fetch/Pull/Push by running Tauri git commands on a blocking runtime worker instead of the command thread.
+- Ensured Fetch/Pull/Push loading indicator appears immediately by yielding one render frame before backend invoke.
+- Removed Fetch confirmation to start remote fetch immediately on click with instant spinner feedback.
