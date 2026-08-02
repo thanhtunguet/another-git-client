@@ -1,8 +1,11 @@
 import React from 'react';
 import { Input, Select, Checkbox, Textarea } from '../common/FormControls';
 import { SettingsSection, SettingControlType } from '../../types/git-client';
+import { useGitClient } from '../../context/GitClientContext';
 
 export const SettingsView: React.FC = () => {
+  const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout } = useGitClient();
+
   const settingsNav = [
     { id: 'git', href: '#git', label: 'Git executable' },
     { id: 'graph', href: '#graph', label: 'Graph & history' },
@@ -14,14 +17,34 @@ export const SettingsView: React.FC = () => {
 
   const renderControl = (
     type: SettingControlType,
+    settingKey: string | undefined,
     defVal?: string | boolean,
     opts?: string[],
     width?: number
   ) => {
+    if (!settingKey) return null;
+
+    let value = preferences[settingKey] !== undefined ? preferences[settingKey] : defVal;
+    
+    // Map existing strongly-typed state
+    if (settingKey === 'graphLayout') value = graphLayout === 'grouped' ? 'Grouped by day' : 'Rows';
+    if (settingKey === 'compareLayout') value = compareLayout === 'stack' ? 'Stacked' : (compareLayout === 'graph' ? 'Graph' : 'Side by side');
+
+    const handleChange = (newVal: any) => {
+      if (settingKey === 'graphLayout') {
+        setGraphLayout(newVal === 'Grouped by day' ? 'grouped' : 'rows');
+      } else if (settingKey === 'compareLayout') {
+        setCompareLayout(newVal === 'Stacked' ? 'stack' : 'side');
+      } else {
+        updatePreference(settingKey, newVal);
+      }
+    };
+
     if (type === 'input') {
       return (
         <Input
-          defaultValue={defVal as string}
+          value={value as string}
+          onChange={e => handleChange(e.target.value)}
           style={{
             width: width || 220,
             minHeight: 0,
@@ -35,7 +58,8 @@ export const SettingsView: React.FC = () => {
     if (type === 'select') {
       return (
         <Select
-          defaultValue={defVal as string}
+          value={value as string}
+          onChange={e => handleChange(e.target.value)}
           options={opts || []}
           style={{ width: 'auto', minHeight: 0, height: '26px', fontSize: '12px' }}
         />
@@ -44,7 +68,8 @@ export const SettingsView: React.FC = () => {
     if (type === 'checkbox') {
       return (
         <Checkbox
-          defaultChecked={defVal as boolean}
+          checked={value as boolean}
+          onChange={e => handleChange(e.target.checked)}
           label="Enabled"
           style={{ fontSize: '12px', color: 'var(--fg2)' }}
         />
@@ -53,7 +78,8 @@ export const SettingsView: React.FC = () => {
     if (type === 'textarea') {
       return (
         <Textarea
-          defaultValue={defVal as string}
+          value={value as string}
+          onChange={e => handleChange(e.target.value)}
           rows={4}
           style={{
             maxWidth: '420px',
@@ -76,6 +102,7 @@ export const SettingsView: React.FC = () => {
           label: 'Git executable path',
           hint: 'Blank resolves from PATH',
           control: 'input',
+          settingKey: 'gitPath',
           defaultValue: '/opt/homebrew/bin/git',
           width: 300
         },
@@ -83,6 +110,7 @@ export const SettingsView: React.FC = () => {
           label: 'Command timeout',
           hint: 'Seconds before a git process is killed',
           control: 'input',
+          settingKey: 'gitTimeout',
           defaultValue: '30',
           width: 90
         },
@@ -90,6 +118,7 @@ export const SettingsView: React.FC = () => {
           label: 'Environment',
           hint: 'Extra variables passed to every invocation',
           control: 'input',
+          settingKey: 'gitEnv',
           defaultValue: 'GIT_SSH_COMMAND=ssh -i ~/.ssh/id_ed25519',
           width: 300
         }
@@ -103,6 +132,7 @@ export const SettingsView: React.FC = () => {
           label: 'Graph page size',
           hint: 'Commits loaded per “Load more”',
           control: 'select',
+          settingKey: 'graphPageSize',
           defaultValue: '100',
           options: ['100', '250', '500', '1000']
         },
@@ -110,6 +140,7 @@ export const SettingsView: React.FC = () => {
           label: 'Recent branches count',
           hint: 'Entries kept in the Recent group',
           control: 'input',
+          settingKey: 'recentBranchesCount',
           defaultValue: '8',
           width: 90
         },
@@ -117,12 +148,14 @@ export const SettingsView: React.FC = () => {
           label: 'Virtualize commit list',
           hint: 'Render only visible rows — required above ~5k commits',
           control: 'checkbox',
+          settingKey: 'virtualizeCommitList',
           defaultValue: true
         },
         {
           label: 'Default layout',
           hint: 'Rows or grouped by day',
           control: 'select',
+          settingKey: 'graphLayout',
           defaultValue: 'Rows',
           options: ['Rows', 'Grouped by day']
         }
@@ -136,6 +169,7 @@ export const SettingsView: React.FC = () => {
           label: 'Filter debounce',
           hint: 'Milliseconds before live filters re-run',
           control: 'input',
+          settingKey: 'filterDebounce',
           defaultValue: '180',
           width: 90
         },
@@ -143,6 +177,7 @@ export const SettingsView: React.FC = () => {
           label: 'Status poll interval',
           hint: 'Working-tree refresh cadence',
           control: 'input',
+          settingKey: 'statusPollInterval',
           defaultValue: '2000',
           width: 90
         },
@@ -150,6 +185,7 @@ export const SettingsView: React.FC = () => {
           label: 'Max concurrent git processes',
           hint: '',
           control: 'input',
+          settingKey: 'maxConcurrentProcesses',
           defaultValue: '4',
           width: 90
         }
@@ -163,6 +199,7 @@ export const SettingsView: React.FC = () => {
           label: 'Export format',
           hint: 'Two CSVs or one workbook with two sheets',
           control: 'select',
+          settingKey: 'exportFormat',
           defaultValue: 'Excel workbook (.xlsx)',
           options: ['Excel workbook (.xlsx)', 'Two CSV files']
         },
@@ -170,6 +207,7 @@ export const SettingsView: React.FC = () => {
           label: 'Default compare layout',
           hint: '',
           control: 'select',
+          settingKey: 'compareLayout',
           defaultValue: 'Side by side',
           options: ['Side by side', 'Stacked', 'Graph']
         },
@@ -177,6 +215,7 @@ export const SettingsView: React.FC = () => {
           label: 'Compare-with-revision direction',
           hint: 'Which side the picked revision lands on',
           control: 'select',
+          settingKey: 'compareDirection',
           defaultValue: 'Revision → working tree',
           options: ['Revision → working tree', 'Working tree → revision']
         },
@@ -184,6 +223,7 @@ export const SettingsView: React.FC = () => {
           label: 'Remember recent compare pairs',
           hint: '',
           control: 'checkbox',
+          settingKey: 'rememberRecentPairs',
           defaultValue: true
         }
       ]
@@ -196,6 +236,7 @@ export const SettingsView: React.FC = () => {
           label: 'Message templates',
           hint: 'Placeholders: {branch} {ticket} {scope} {cursor}',
           control: 'textarea',
+          settingKey: 'messageTemplates',
           defaultValue:
             '{scope}: {cursor}\n\nRefs: {ticket}\nSigned-off-by: Jakub Kicinski <kuba@kernel.org>'
         },
@@ -203,6 +244,7 @@ export const SettingsView: React.FC = () => {
           label: 'Ticket pattern',
           hint: 'Regex used to extract {ticket} from branch names',
           control: 'input',
+          settingKey: 'ticketPattern',
           defaultValue: '([A-Z]{2,8}-\\d+)',
           width: 220
         },
@@ -210,10 +252,11 @@ export const SettingsView: React.FC = () => {
           label: 'AI generate timeout',
           hint: 'Seconds before generation is cancelled',
           control: 'input',
+          settingKey: 'aiGenerateTimeout',
           defaultValue: '20',
           width: 90
         },
-        { label: 'Wrap message body', hint: '', control: 'input', defaultValue: '72', width: 90 }
+        { label: 'Wrap message body', hint: '', control: 'input', settingKey: 'wrapMessageBody', defaultValue: '72', width: 90 }
       ]
     },
     {
@@ -224,6 +267,7 @@ export const SettingsView: React.FC = () => {
           label: 'Default diff view',
           hint: '',
           control: 'select',
+          settingKey: 'diffView',
           defaultValue: 'Unified',
           options: ['Unified', 'Split']
         },
@@ -231,6 +275,7 @@ export const SettingsView: React.FC = () => {
           label: 'Whitespace',
           hint: '',
           control: 'select',
+          settingKey: 'whitespace',
           defaultValue: 'Show all',
           options: ['Show all', 'Ignore trailing', 'Ignore all']
         },
@@ -238,12 +283,14 @@ export const SettingsView: React.FC = () => {
           label: 'Gutter markers',
           hint: 'Change markers and their thresholds',
           control: 'checkbox',
+          settingKey: 'gutterMarkers',
           defaultValue: true
         },
         {
           label: 'Merge tool',
           hint: '',
           control: 'select',
+          settingKey: 'mergeTool',
           defaultValue: 'Built-in 3-way',
           options: ['Built-in 3-way', 'External: kdiff3']
         }
@@ -315,7 +362,7 @@ export const SettingsView: React.FC = () => {
                       {r.hint}
                     </div>
                   </div>
-                  <div>{renderControl(r.control, r.defaultValue, r.options, r.width)}</div>
+                  <div>{renderControl(r.control, r.settingKey, r.defaultValue, r.options, r.width)}</div>
                 </div>
               ))}
             </div>

@@ -546,6 +546,14 @@ export const GitClientProvider: React.FC<{
   const [actionBusy, setActionBusy] = useState<boolean>(false);
   const [activeRemoteAction, setActiveRemoteAction] = useState<'fetch' | 'pull' | 'push' | null>(null);
 
+  const [preferences, setPreferences] = useState<Record<string, any>>(
+    persistedStore?.settings.preferences || {}
+  );
+
+  const updatePreference = useCallback((key: string, value: any) => {
+    setPreferences(prev => ({ ...prev, [key]: value }));
+  }, []);
+
   const commits = useMemo<CommitRaw[]>(() => {
     if (!graphRows.length) {
       return RAW_COMMITS;
@@ -605,7 +613,8 @@ export const GitClientProvider: React.FC<{
         compareLayout,
         filterOpen,
         scTab,
-        diffTab
+        diffTab,
+        preferences
       },
       repositories: {
         selectedRepoPath,
@@ -624,6 +633,7 @@ export const GitClientProvider: React.FC<{
     filterOpen,
     scTab,
     diffTab,
+    preferences,
     selectedRepoPath,
     repoPath,
     repoName,
@@ -2416,7 +2426,9 @@ export const GitClientProvider: React.FC<{
         deleteRemote,
         getRemotes,
         openAddRemoteDialog,
-        openEditRemoteDialog
+        openEditRemoteDialog,
+        preferences,
+        updatePreference
       }}
     >
       {children}

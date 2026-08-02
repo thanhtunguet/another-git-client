@@ -12,6 +12,7 @@ export interface PersistedSettings {
   filterOpen: boolean;
   scTab: 'changes' | 'stash';
   diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources';
+  preferences?: Record<string, any>;
 }
 
 export interface PersistedRepositories {
