@@ -64,8 +64,14 @@ export const CommitDetailsView: React.FC = () => {
         setView,
     openMenu,
             repoPath,
-    toastRun
+    toastRun,
+    setDiffTargetSha,
+    setDiffTab,
+    setCompareSeedRef,
+    preferences
   } = useGitClient();
+
+  const showGutterMarkers = preferences.gutterMarkers !== false;
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
   const isMulti = sel.length > 1;
@@ -149,8 +155,21 @@ export const CommitDetailsView: React.FC = () => {
   const handleFileMenu = (e: React.MouseEvent, path: string) => {
     const fullSha = getCommitFullSha(detailIdx);
     openMenu(e, path, [
-      { label: 'Open diff', run: () => setView('diff') },
-      { label: 'Compare with Revision…', run: () => setView('compare') },
+      {
+        label: 'Open diff',
+        run: () => {
+          setDiffTargetSha(fullSha);
+          setDiffTab('refs');
+          setView('diff');
+        }
+      },
+      {
+        label: 'Compare with Revision…',
+        run: () => {
+          setCompareSeedRef(fullSha);
+          setView('compare');
+        }
+      },
       {
         label: 'Create patch for file…',
         run: () => {
@@ -212,31 +231,35 @@ export const CommitDetailsView: React.FC = () => {
 
       return (
         <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '8px',
-              color: 'var(--fg3)',
-              userSelect: 'none'
-            }}
-          >
-            {line.oldLine || ''}
-          </span>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '10px',
-              color: 'var(--fg3)',
-              userSelect: 'none',
-              borderRight: '1px solid var(--line)'
-            }}
-          >
-            {line.newLine || ''}
-          </span>
+          {showGutterMarkers && (
+            <>
+              <span
+                style={{
+                  width: '46px',
+                  flex: '0 0 auto',
+                  textAlign: 'right',
+                  paddingRight: '8px',
+                  color: 'var(--fg3)',
+                  userSelect: 'none'
+                }}
+              >
+                {line.oldLine || ''}
+              </span>
+              <span
+                style={{
+                  width: '46px',
+                  flex: '0 0 auto',
+                  textAlign: 'right',
+                  paddingRight: '10px',
+                  color: 'var(--fg3)',
+                  userSelect: 'none',
+                  borderRight: '1px solid var(--line)'
+                }}
+              >
+                {line.newLine || ''}
+              </span>
+            </>
+          )}
           <span style={{ paddingLeft: '10px', whiteSpace: 'pre-wrap', color: fg, flex: 1 }}>
             {line.text}
           </span>
@@ -352,7 +375,11 @@ export const CommitDetailsView: React.FC = () => {
           <Button
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
-            onClick={() => setView('diff')}
+            onClick={() => {
+              setDiffTargetSha(getCommitFullSha(detailIdx));
+              setDiffTab('refs');
+              setView('diff');
+            }}
           >
             {`Open diffs (${dfiles.length})`}
           </Button>
@@ -360,15 +387,19 @@ export const CommitDetailsView: React.FC = () => {
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
             onClick={() => void revertCommit(getCommitFullSha(detailIdx))}
+            disabled={isMulti}
+            title={isMulti ? 'Select a single commit to revert' : 'Revert this commit'}
           >
-            Revert selected
+            Revert{isMulti ? '' : ' selected'}
           </Button>
           <Button
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
             onClick={() => void cherryPickCommit(getCommitFullSha(detailIdx))}
+            disabled={isMulti}
+            title={isMulti ? 'Select a single commit to cherry-pick' : 'Cherry-pick this commit'}
           >
-            Cherry-pick selected
+            Cherry-pick{isMulti ? '' : ' selected'}
           </Button>
           <Button
             variant="secondary"
@@ -378,6 +409,8 @@ export const CommitDetailsView: React.FC = () => {
                 if (p) void navigator.clipboard.writeText(p);
               });
             }}
+            disabled={isMulti}
+            title={isMulti ? 'Select a single commit to create a patch' : 'Create a patch for this commit'}
           >
             Create patch…
           </Button>
@@ -410,7 +443,15 @@ export const CommitDetailsView: React.FC = () => {
                 return (
                   <div
                     key={k}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedFile(f.path)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedFile(f.path);
+                      }
+                    }}
                     onContextMenu={e => handleFileMenu(e, f.path)}
                     style={{
                       display: 'flex',

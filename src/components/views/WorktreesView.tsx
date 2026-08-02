@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { WorktreeEntry } from '../../services/tauriGitBackend';
@@ -16,6 +17,7 @@ export const WorktreesView: React.FC = () => {
     selectRepository,
     confirm,
     openMenu,
+    actionBusy,
   } = useGitClient();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -59,8 +61,7 @@ export const WorktreesView: React.FC = () => {
   const handleMenu = (e: React.MouseEvent, w: WorktreeEntry) => {
     openMenu(e, w.path, [
       { label: 'Open in this window', run: () => selectRepository(w.path) },
-      { label: 'Open in new window', run: () => selectRepository(w.path) },
-      { label: 'Reveal in Finder', run: () => openPathInFileManager(w.path) },
+      { label: 'Reveal in file manager', run: () => openPathInFileManager(w.path) },
       { label: 'Open terminal here', run: () => openPathInTerminal(w.path) },
       { sep: true },
       {
@@ -159,6 +160,7 @@ export const WorktreesView: React.FC = () => {
         <Button
           variant="secondary"
           style={{ height: '25px' }}
+          disabled={actionBusy}
           onClick={() =>
             confirm(
               'Prune stale worktrees?',
@@ -174,6 +176,7 @@ export const WorktreesView: React.FC = () => {
         <Button
           variant="primary"
           style={{ height: '25px' }}
+          disabled={actionBusy}
           onClick={() => {
             setAddPath('');
             setAddBranch('');
@@ -199,33 +202,51 @@ export const WorktreesView: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label htmlFor="worktree-add-path" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
                   Target Directory Path *
                 </label>
-                <input
-                  type="text"
-                  value={addPath}
-                  onChange={e => setAddPath(e.target.value)}
-                  placeholder="/path/to/new-worktree"
-                  style={{
-                    width: '100%',
-                    padding: '6px 10px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--line)',
-                    background: 'var(--color-bg)',
-                    color: 'var(--fg)',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12px'
-                  }}
-                  autoFocus
-                  required
-                />
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    id="worktree-add-path"
+                    type="text"
+                    value={addPath}
+                    onChange={e => setAddPath(e.target.value)}
+                    placeholder="/path/to/new-worktree"
+                    style={{
+                      flex: 1,
+                      width: '100%',
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--line)',
+                      background: 'var(--color-bg)',
+                      color: 'var(--fg)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px'
+                    }}
+                    autoFocus
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      void openDialog({ directory: true, multiple: false, title: 'Select Worktree Directory' }).then(
+                        selected => {
+                          if (typeof selected === 'string') setAddPath(selected);
+                        }
+                      );
+                    }}
+                  >
+                    Browse…
+                  </Button>
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label htmlFor="worktree-add-branch" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
                   Base Branch / Revision (Optional)
                 </label>
                 <input
+                  id="worktree-add-branch"
                   type="text"
                   value={addBranch}
                   onChange={e => setAddBranch(e.target.value)}
@@ -243,10 +264,11 @@ export const WorktreesView: React.FC = () => {
                 />
               </div>
               <div>
-                <label style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label htmlFor="worktree-add-new-branch" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
                   Create New Branch Name (-b, Optional)
                 </label>
                 <input
+                  id="worktree-add-new-branch"
                   type="text"
                   value={addNewBranch}
                   onChange={e => setAddNewBranch(e.target.value)}
@@ -299,10 +321,11 @@ export const WorktreesView: React.FC = () => {
               Locking prevents git from pruning or deleting this worktree.
             </div>
             <div>
-              <label style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+              <label htmlFor="worktree-lock-reason" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
                 Lock Reason (Optional)
               </label>
               <input
+                id="worktree-lock-reason"
                 type="text"
                 value={lockReason}
                 onChange={e => setLockReason(e.target.value)}
@@ -401,7 +424,15 @@ export const WorktreesView: React.FC = () => {
                 return (
                   <div
                     key={i}
+                    role="button"
+                    tabIndex={0}
                     onClick={e => handleMenu(e, w)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMenu(e as unknown as React.MouseEvent, w);
+                      }
+                    }}
                     onContextMenu={e => handleMenu(e, w)}
                     style={{
                       display: 'flex',

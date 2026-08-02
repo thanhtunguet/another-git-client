@@ -18,7 +18,8 @@ export const SubmodulesView: React.FC = () => {
     openPathInTerminal,
     selectRepository,
     confirm,
-    openMenu
+    openMenu,
+    actionBusy
   } = useGitClient();
 
   const totalCount = submodules.length;
@@ -38,7 +39,7 @@ export const SubmodulesView: React.FC = () => {
       { label: 'Show pointer diff', run: () => getSubmodulePointerDiff(m.path) },
       { label: 'Stage pointer change', run: () => stageSubmodulePointer(m.path) },
       { sep: true },
-      { label: 'Reveal in Finder', run: () => openPathInFileManager(m.path) },
+      { label: 'Reveal in file manager', run: () => openPathInFileManager(m.path) },
       { label: 'Open terminal here', run: () => openPathInTerminal(m.path) },
       { label: 'Open as workspace repository', run: () => selectRepository(m.path) },
       { sep: true },
@@ -105,6 +106,7 @@ export const SubmodulesView: React.FC = () => {
           variant="secondary"
           style={{ height: '25px' }}
           onClick={() => initSubmodule()}
+          disabled={actionBusy}
         >
           Init all
         </Button>
@@ -112,6 +114,7 @@ export const SubmodulesView: React.FC = () => {
           variant="secondary"
           style={{ height: '25px' }}
           onClick={() => syncSubmodule({ recursive: true })}
+          disabled={actionBusy}
         >
           Sync URLs
         </Button>
@@ -119,6 +122,7 @@ export const SubmodulesView: React.FC = () => {
           variant="primary"
           style={{ height: '25px' }}
           onClick={() => updateSubmodule({ init: true, recursive: true })}
+          disabled={actionBusy}
         >
           Update all --recursive
         </Button>
@@ -172,7 +176,15 @@ export const SubmodulesView: React.FC = () => {
                 return (
                   <div
                     key={i}
+                    role="button"
+                    tabIndex={0}
                     onClick={e => handleMenu(e, s)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMenu(e as unknown as React.MouseEvent, s);
+                      }
+                    }}
                     onContextMenu={e => handleMenu(e, s)}
                     style={{
                       display: 'flex',

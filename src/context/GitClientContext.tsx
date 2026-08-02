@@ -41,7 +41,6 @@ export const COLORS = [
   'oklch(.70 .10 255)'
 ];
 
-const GRAPH_PAGE_SIZE = 200;
 
 export const RAW_COMMITS: CommitRaw[] = [
   [
@@ -305,7 +304,15 @@ interface GitClientContextType {
   closeMenu: (e?: React.MouseEvent | MouseEvent) => void;
   dialog: DialogState | null;
   confirm: (title: string, body: string, cmd: string, action: string, run?: () => void) => void;
-  prompt: (title: string, body: string, action: string, defaultValue: string, run?: (value: string) => void) => void;
+  prompt: (
+    title: string,
+    body: string,
+    action: string,
+    defaultValue: string,
+    run?: (value: string) => void,
+    inputLabel?: string,
+    inputRequired?: boolean
+  ) => void;
   closeDialog: () => void;
   confirmDialog: () => void;
   promptDialogValue: string;
@@ -330,6 +337,11 @@ interface GitClientContextType {
   sel: number[];
   setSel: React.Dispatch<React.SetStateAction<number[]>>;
   toggleSelCommit: (i: number, isMulti: boolean) => void;
+  diffTargetSha: string | null;
+  setDiffTargetSha: (sha: string | null) => void;
+  compareSeedRef: string | null;
+  setCompareSeedRef: (ref: string | null) => void;
+  findCommitIndexBySha: (sha: string) => number;
   expanded: Record<number, boolean>;
   toggleExpandCommit: (i: number) => void;
   graphLayout: 'rows' | 'grouped';
@@ -348,8 +360,8 @@ interface GitClientContextType {
   setBranchQ: (q: string) => void;
   scTab: 'changes' | 'stash';
   setScTab: (t: 'changes' | 'stash') => void;
-  diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources';
-  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources') => void;
+  diffTab: 'work' | 'index' | 'parent' | 'refs';
+  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs') => void;
   consoleLines: LogEntry[];
   log: (lines: LogEntry[]) => void;
   clearConsole: () => void;
@@ -411,7 +423,6 @@ interface GitClientContextType {
   fetchCommitFiles: (sha: string) => Promise<DiffFile[]>;
   matchesFilter: (i: number) => boolean;
   matchesCompareFilter: (i: number) => boolean;
-  act: (label: string, extra?: string) => () => void;
   doFetch: () => void;
   doPull: () => void;
   doPush: () => void;
@@ -478,6 +489,8 @@ export const GitClientProvider: React.FC<{
   const [promptDialogValue, setPromptDialogValue] = useState<string>('');
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
+  const [diffTargetSha, setDiffTargetSha] = useState<string | null>(null);
+  const [compareSeedRef, setCompareSeedRef] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
   const [graphLayout, setGraphLayout] = useState<'rows' | 'grouped'>(
     persistedStore?.settings.graphLayout || 'rows'
@@ -505,9 +518,11 @@ export const GitClientProvider: React.FC<{
   const [scTab, setScTab] = useState<'changes' | 'stash'>(
     persistedStore?.settings.scTab || 'changes'
   );
-  const [diffTab, setDiffTab] = useState<
-    'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources'
-  >(persistedStore?.settings.diffTab || 'work');
+  const [diffTab, setDiffTab] = useState<'work' | 'index' | 'parent' | 'refs'>(
+    persistedStore?.settings.diffTab === 'merge' || persistedStore?.settings.diffTab === 'sources'
+      ? 'work'
+      : persistedStore?.settings.diffTab || 'work'
+  );
   const [consoleLines, setConsoleLines] = useState<LogEntry[]>(seedLog());
   const [commitMsg, setCommitMsg] = useState<string>(
     'net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: '
@@ -559,6 +574,11 @@ export const GitClientProvider: React.FC<{
   const updatePreference = useCallback((key: string, value: any) => {
     setPreferences(prev => ({ ...prev, [key]: value }));
   }, []);
+
+  const graphPageSizePref = useMemo(() => {
+    const raw = parseInt(String(preferences.graphPageSize ?? '100'), 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 100;
+  }, [preferences.graphPageSize]);
 
   const commits = useMemo<CommitRaw[]>(() => {
     if (!graphRows.length) {
@@ -783,14 +803,14 @@ export const GitClientProvider: React.FC<{
       setGraphLoading(true);
       try {
         const [rows, changed, stashList, wtList, subList] = await Promise.all([
-          tauriGitBackend.getGraph(pathValue, { maxCount: GRAPH_PAGE_SIZE, skip: 0, allRefs: true }),
+          tauriGitBackend.getGraph(pathValue, { maxCount: graphPageSizePref, skip: 0, allRefs: true }),
           tauriGitBackend.getChangedFiles(pathValue),
           tauriGitBackend.getStashes(pathValue).catch(() => []),
           tauriGitBackend.getWorktrees(pathValue).catch(() => []),
           tauriGitBackend.getSubmodules(pathValue, true).catch(() => [])
         ]);
         setGraphRows(rows);
-        setGraphHasMore(rows.length === GRAPH_PAGE_SIZE);
+        setGraphHasMore(rows.length === graphPageSizePref);
         applyChangedFiles(changed);
         setStashes(stashList);
         setWorktrees(wtList);
@@ -806,8 +826,18 @@ export const GitClientProvider: React.FC<{
         setGraphLoading(false);
       }
     },
-    [applyChangedFiles]
+    [applyChangedFiles, graphPageSizePref]
   );
+
+  useEffect(() => {
+    if (!repoPath) return;
+    const raw = parseInt(String(preferences.statusPollInterval ?? '2000'), 10);
+    const intervalMs = Number.isFinite(raw) && raw >= 500 ? raw : 2000;
+    const id = setInterval(() => {
+      void tauriGitBackend.getChangedFiles(repoPath).then(applyChangedFiles).catch(() => {});
+    }, intervalMs);
+    return () => clearInterval(id);
+  }, [repoPath, preferences.statusPollInterval, applyChangedFiles]);
 
   const loadMoreGraph = useCallback(() => {
     if (!repoPath || graphLoading || graphLoadingMore || !graphHasMore) {
@@ -818,19 +848,19 @@ export const GitClientProvider: React.FC<{
       setGraphLoadingMore(true);
       try {
         const page = await tauriGitBackend.getGraph(repoPath, {
-          maxCount: GRAPH_PAGE_SIZE,
+          maxCount: graphPageSizePref,
           skip: graphRows.length,
           allRefs: true
         });
         setGraphRows(prev => prev.concat(page));
-        setGraphHasMore(page.length === GRAPH_PAGE_SIZE);
+        setGraphHasMore(page.length === graphPageSizePref);
       } catch {
         setGraphHasMore(false);
       } finally {
         setGraphLoadingMore(false);
       }
     })();
-  }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length]);
+  }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length, graphPageSizePref]);
 
   const refreshBranchSummary = useCallback(async (pathValue: string) => {
     let currentBranchName = '';
@@ -942,10 +972,12 @@ export const GitClientProvider: React.FC<{
   );
 
   const cancelToast = useCallback(() => {
+    // The underlying git command has already completed by the time this
+    // confirmation toast is shown (toastRun is invoked after the backend
+    // call resolves), so this only dismisses the notification early.
     if (toastTimer) clearInterval(toastTimer);
     setToast(null);
-    log([{ text: '^C  operation cancelled by user', type: 'warn' }]);
-  }, [toastTimer, log]);
+  }, [toastTimer]);
 
   const confirm = useCallback(
     (title: string, body: string, cmd: string, action: string, run?: () => void) => {
@@ -956,9 +988,17 @@ export const GitClientProvider: React.FC<{
   );
 
   const prompt = useCallback(
-    (title: string, body: string, action: string, defaultValue: string, run?: (value: string) => void) => {
+    (
+      title: string,
+      body: string,
+      action: string,
+      defaultValue: string,
+      run?: (value: string) => void,
+      inputLabel?: string,
+      inputRequired: boolean = true
+    ) => {
       setPromptDialogValue(defaultValue);
-      setDialog({ title, body, cmd: '', action, kind: 'prompt', run: run as any });
+      setDialog({ title, body, cmd: '', action, kind: 'prompt', run: run as any, inputLabel, inputRequired });
       setMenu(null);
     },
     []
@@ -1086,6 +1126,7 @@ export const GitClientProvider: React.FC<{
   }, []);
 
   const toggleSelCommit = useCallback((i: number, isMulti: boolean) => {
+    setDiffTargetSha(null);
     setSel(prev => {
       if (isMulti) {
         return prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i];
@@ -1094,30 +1135,14 @@ export const GitClientProvider: React.FC<{
     });
   }, []);
 
+  const findCommitIndexBySha = useCallback(
+    (sha: string): number => graphRows.findIndex(r => r.sha === sha),
+    [graphRows]
+  );
+
   const toggleExpandCommit = useCallback((i: number) => {
     setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
   }, []);
-
-  const act = useCallback(
-    (label: string, extra?: string) => {
-      return () => {
-        setMenu(null);
-        setPaletteOpen(false);
-        const cmdStr =
-          extra ||
-          label
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, ' ')
-            .trim();
-        log([
-          { text: '$ git ' + cmdStr, type: 'cmd' },
-          { text: 'ok', type: 'ok' }
-        ]);
-        toastRun(label, 'running ' + (extra || 'git command') + '…');
-      };
-    },
-    [log, toastRun]
-  );
 
   const openRepository = useCallback(() => {
     void (async () => {
@@ -1463,21 +1488,24 @@ export const GitClientProvider: React.FC<{
 
   const aiMessage = useCallback(() => {
     setPaletteOpen(false);
-    toastRun(
-      'Generating commit message',
-      'analysing staged diff — 4 files, 212 lines (timeout 20s)'
-    );
-  }, [toastRun]);
-
-  const updateAll = useCallback(() => {
-    setPaletteOpen(false);
-    log([
-      { text: '$ git submodule update --init --recursive', type: 'cmd' },
-      { text: "Cloning into 'tools/lib/bpf'…", type: 'out' },
-      { text: "Submodule path 'tools/lib/bpf': checked out '2f8a1c4'", type: 'out' }
-    ]);
-    toastRun('Updating 7 submodules', 'tools/lib/bpf — receiving objects 42%');
-  }, [log, toastRun]);
+    if (stagedFiles.length === 0) {
+      log([{ text: 'No staged changes to summarize into a commit message', type: 'warn' }]);
+      return;
+    }
+    const verbFor = (status: DiffFile['status']) =>
+      status === 'A' ? 'Add' : status === 'D' ? 'Remove' : status === 'R' ? 'Rename' : 'Update';
+    let generated: string;
+    if (stagedFiles.length === 1) {
+      const f = stagedFiles[0];
+      generated = `${verbFor(f.status)} ${f.path}`;
+    } else {
+      const names = stagedFiles.slice(0, 3).map(f => f.path.split('/').pop());
+      const suffix = stagedFiles.length > 3 ? ` and ${stagedFiles.length - 3} more` : '';
+      generated = `Update ${stagedFiles.length} files: ${names.join(', ')}${suffix}`;
+    }
+    setCommitMsg(generated);
+    toastRun('Commit message generated', `from ${stagedFiles.length} staged file${stagedFiles.length === 1 ? '' : 's'}`);
+  }, [stagedFiles, log, toastRun]);
 
   const opContinue = useCallback(() => {
     if (!op) return;
@@ -1503,7 +1531,7 @@ export const GitClientProvider: React.FC<{
       () => {
         setOp(null);
         setDialog(null);
-        toastRun('Rebase aborted', 'HEAD restored to f3a9c21');
+        toastRun('Rebase aborted', 'HEAD restored to its pre-rebase state');
       }
     );
   }, [confirm, toastRun]);
@@ -1544,51 +1572,14 @@ export const GitClientProvider: React.FC<{
     [commits, cf]
   );
 
-  const paletteAll = useCallback((): PaletteItem[] => {
-    const nav = (v: GitClientView) => () => {
-      setView(v);
-      setPaletteOpen(false);
-    };
-    return [
-      { group: 'Go to', label: 'Git Graph', hint: '⌘2', run: nav('graph') },
-      { group: 'Go to', label: 'Branches', hint: '⌘1', run: nav('branches') },
-      { group: 'Go to', label: 'Compare Branches', hint: '⌘4', run: nav('compare') },
-      { group: 'Go to', label: 'Worktrees', hint: '⌘6', run: nav('worktrees') },
-      { group: 'Go to', label: 'Submodules', hint: '⌘7', run: nav('submodules') },
-      { group: 'Go to', label: 'Settings', hint: '⌘,', run: nav('settings') },
-      { group: 'Branch', label: 'Checkout branch…', hint: '⌘B', run: act('Checkout branch') },
-      { group: 'Branch', label: 'Create branch from HEAD…', run: () => createBranch() },
-      { group: 'Branch', label: 'Rebase current onto…', run: act('Rebase') },
-      { group: 'Branch', label: 'Delete branch…', run: act('Delete branch') },
-      { group: 'Remote', label: 'Fetch all with prune', hint: '⌘⇧F', run: () => doFetch() },
-      { group: 'Remote', label: 'Pull', run: () => doPull() },
-      { group: 'Remote', label: 'Push', run: () => doPush() },
-      { group: 'Remote', label: 'Add remote…', run: act('Add remote') },
-      { group: 'Commit', label: 'Commit staged changes', hint: '⌘↵', run: act('Commit') },
-      { group: 'Commit', label: 'Amend last commit', run: act('Amend') },
-      { group: 'Commit', label: 'Generate commit message with AI', run: () => aiMessage() },
-      { group: 'Stash', label: 'Stash all changes…', run: act('Stash push') },
-      { group: 'Stash', label: 'Pop latest stash', run: act('Stash pop') },
-      { group: 'Worktree', label: 'Add worktree…', run: act('Worktree add') },
-      { group: 'Submodule', label: 'Update all submodules --recursive', run: () => updateAll() },
-      { group: 'Diff', label: 'Compare any two text sources…', run: nav('diff') },
-      { group: 'Diff', label: 'Compare file with revision…', run: act('Compare with revision') },
-      { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: () => openRepository() },
-      { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
-      { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
-      {
-        group: 'View',
-        label: 'Toggle output console',
-        run: () => {
-          setConsoleOpen(prev => !prev);
-          setPaletteOpen(false);
-        }
-      }
-    ];
-  }, [act, doFetch, doPull, doPush, createBranch, aiMessage, updateAll, openRepository, cloneRepository, toggleTheme]);
-
   // Keyboard navigation hotkeys
   useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => {
+      const el = target as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+    };
     const handleKey = (e: KeyboardEvent) => {
       const k = (e.key || '').toLowerCase();
       if ((e.metaKey || e.ctrlKey) && k === 'k') {
@@ -1596,18 +1587,21 @@ export const GitClientProvider: React.FC<{
         setPaletteOpen(true);
         setPaletteQ('');
       } else if (e.key === 'Escape') {
+        const hadOverlayOpen = paletteOpen || menu !== null || dialog !== null;
         setPaletteOpen(false);
         setMenu(null);
         setDialog(null);
-        setSel([0]);
-      } else if ((e.metaKey || e.ctrlKey) && k === 'a' && view === 'compare') {
+        if (!hadOverlayOpen) {
+          setSel([0]);
+        }
+      } else if ((e.metaKey || e.ctrlKey) && k === 'a' && view === 'compare' && !isEditableTarget(e.target)) {
         e.preventDefault();
         setSel(commits.map((_, i) => i));
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [view, commits]);
+  }, [view, commits, paletteOpen, menu, dialog]);
 
   const fetchCommitFiles = useCallback(
     async (sha: string): Promise<DiffFile[]> => {
@@ -2190,6 +2184,11 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
   );
 
+  const updateAll = useCallback(() => {
+    setPaletteOpen(false);
+    void updateSubmodule({ init: true, recursive: true });
+  }, [updateSubmodule]);
+
   const syncSubmodule = useCallback(
     async (options?: { path?: string; recursive?: boolean }) => {
       await runWithActionLock(async () => {
@@ -2295,6 +2294,159 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
   );
 
+  const paletteCheckoutBranch = useCallback(() => {
+    setPaletteOpen(false);
+    prompt(
+      'Checkout Branch',
+      'Enter the name of the local branch to check out.',
+      'Checkout',
+      currentBranch,
+      value => {
+        const name = value.trim();
+        if (name) void checkoutBranch(name);
+      },
+      'Branch name'
+    );
+  }, [prompt, currentBranch, checkoutBranch]);
+
+  const paletteRebase = useCallback(() => {
+    setPaletteOpen(false);
+    prompt(
+      'Rebase Onto',
+      `Enter the branch or reference to rebase "${currentBranch}" onto.`,
+      'Rebase',
+      '',
+      value => {
+        const ref = value.trim();
+        if (ref) void rebaseBranch(ref);
+      },
+      'Branch or reference'
+    );
+  }, [prompt, currentBranch, rebaseBranch]);
+
+  const paletteDeleteBranch = useCallback(() => {
+    setPaletteOpen(false);
+    prompt(
+      'Delete Branch',
+      'Enter the name of the local branch to delete. This cannot be undone.',
+      'Delete',
+      '',
+      value => {
+        const name = value.trim();
+        if (name) void deleteBranch(name);
+      },
+      'Branch name'
+    );
+  }, [prompt, deleteBranch]);
+
+  const paletteStashPush = useCallback(() => {
+    setPaletteOpen(false);
+    prompt(
+      'Stash Changes',
+      'Optional message describing this stash. All tracked changes will be stashed.',
+      'Stash',
+      '',
+      value => {
+        void createStash(value.trim() || undefined);
+      },
+      'Stash message (optional)',
+      false
+    );
+  }, [prompt, createStash]);
+
+  const paletteStashPop = useCallback(() => {
+    setPaletteOpen(false);
+    if (stashes.length === 0) {
+      log([{ text: 'No stashes to pop', type: 'warn' }]);
+      return;
+    }
+    void applyStash(stashes[0].stashRef, true);
+  }, [stashes, applyStash, log]);
+
+  const paletteAddWorktree = useCallback(() => {
+    setPaletteOpen(false);
+    prompt(
+      'Add Worktree',
+      'Enter the absolute path for the new worktree.',
+      'Add',
+      '',
+      value => {
+        const path = value.trim();
+        if (path) void addWorktree(path);
+      },
+      'Worktree path'
+    );
+  }, [prompt, addWorktree]);
+
+  const paletteAll = useCallback((): PaletteItem[] => {
+    const nav = (v: GitClientView) => () => {
+      setView(v);
+      setPaletteOpen(false);
+    };
+    return [
+      { group: 'Go to', label: 'Git Graph', hint: '⌘2', run: nav('graph') },
+      { group: 'Go to', label: 'Branches', hint: '⌘1', run: nav('branches') },
+      { group: 'Go to', label: 'Compare Branches', hint: '⌘4', run: nav('compare') },
+      { group: 'Go to', label: 'Worktrees', hint: '⌘6', run: nav('worktrees') },
+      { group: 'Go to', label: 'Submodules', hint: '⌘7', run: nav('submodules') },
+      { group: 'Go to', label: 'Settings', hint: '⌘,', run: nav('settings') },
+      { group: 'Branch', label: 'Checkout branch…', hint: '⌘B', run: paletteCheckoutBranch },
+      { group: 'Branch', label: 'Create branch from HEAD…', run: () => createBranch() },
+      { group: 'Branch', label: 'Rebase current onto…', run: paletteRebase },
+      { group: 'Branch', label: 'Delete branch…', run: paletteDeleteBranch },
+      { group: 'Remote', label: 'Fetch all with prune', hint: '⌘⇧F', run: () => doFetch() },
+      { group: 'Remote', label: 'Pull', run: () => doPull() },
+      { group: 'Remote', label: 'Push', run: () => doPush() },
+      { group: 'Remote', label: 'Add remote…', run: () => openAddRemoteDialog() },
+      { group: 'Commit', label: 'Commit staged changes', hint: '⌘↵', run: () => { setPaletteOpen(false); void commitChanges(); } },
+      { group: 'Commit', label: 'Amend last commit', run: () => { setPaletteOpen(false); void commitChanges(undefined, true); } },
+      { group: 'Commit', label: 'Generate commit message from staged changes', run: () => aiMessage() },
+      { group: 'Stash', label: 'Stash all changes…', run: paletteStashPush },
+      { group: 'Stash', label: 'Pop latest stash', run: paletteStashPop },
+      { group: 'Worktree', label: 'Add worktree…', run: paletteAddWorktree },
+      { group: 'Submodule', label: 'Update all submodules --recursive', run: () => updateAll() },
+      { group: 'Diff', label: 'Compare any two text sources…', run: nav('diff') },
+      {
+        group: 'Diff',
+        label: "Open selected commit's diff",
+        run: () => {
+          setDiffTab('refs');
+          setView('diff');
+          setPaletteOpen(false);
+        }
+      },
+      { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: () => openRepository() },
+      { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
+      { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
+      {
+        group: 'View',
+        label: 'Toggle output console',
+        run: () => {
+          setConsoleOpen(prev => !prev);
+          setPaletteOpen(false);
+        }
+      }
+    ];
+  }, [
+    paletteCheckoutBranch,
+    paletteRebase,
+    paletteDeleteBranch,
+    paletteStashPush,
+    paletteStashPop,
+    paletteAddWorktree,
+    doFetch,
+    doPull,
+    doPush,
+    createBranch,
+    openAddRemoteDialog,
+    commitChanges,
+    aiMessage,
+    updateAll,
+    openRepository,
+    cloneRepository,
+    toggleTheme
+  ]);
+
   return (
     <GitClientContext.Provider
       value={{
@@ -2345,6 +2497,11 @@ export const GitClientProvider: React.FC<{
         sel,
         setSel,
         toggleSelCommit,
+        diffTargetSha,
+        setDiffTargetSha,
+        compareSeedRef,
+        setCompareSeedRef,
+        findCommitIndexBySha,
         expanded,
         toggleExpandCommit,
         graphLayout,
@@ -2426,7 +2583,6 @@ export const GitClientProvider: React.FC<{
         fetchCommitFiles,
         matchesFilter,
         matchesCompareFilter,
-        act,
         doFetch,
         doPull,
         doPush,

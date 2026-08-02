@@ -13,11 +13,10 @@ export const SourceControlDock: React.FC = () => {
     setScTab,
     setView,
     openMenu,
-    toastRun,
     commitMsg,
     setCommitMsg,
-    act,
     aiMessage,
+    actionBusy,
     stagedFiles,
     unstagedFiles,
     untrackedFiles,
@@ -31,14 +30,26 @@ export const SourceControlDock: React.FC = () => {
     createStash,
     applyStash,
     dropStash,
-    prompt
+    prompt,
+    preferences,
+    currentBranch
   } = useGitClient();
 
   const [amend, setAmend] = useState(false);
 
+  const wrapCol = (() => {
+    const raw = parseInt(String(preferences.wrapMessageBody ?? '72'), 10);
+    return Number.isFinite(raw) && raw >= 20 && raw <= 200 ? raw : 72;
+  })();
+
   if (!dock) return null;
 
-
+  const activateOnEnter = (fn: () => void) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fn();
+    }
+  };
 
   const handleFileMenu = (e: React.MouseEvent, f: DiffFile, isStaged: boolean) => {
     openMenu(e, f.path, [
@@ -65,8 +76,28 @@ export const SourceControlDock: React.FC = () => {
     ]);
   };
 
-  const { currentBranch } = useGitClient();
+  const extractTicket = () => {
+    const pattern = preferences.ticketPattern || '([A-Z]{2,8}-\\d+)';
+    try {
+      const match = currentBranch.match(new RegExp(pattern));
+      return match ? match[1] || match[0] : '';
+    } catch {
+      return '';
+    }
+  };
+
+  const applyTemplate = (tpl: string) =>
+    tpl
+      .replace(/\{branch\}/g, currentBranch)
+      .replace(/\{ticket\}/g, extractTicket())
+      .replace(/\{scope\}/g, '')
+      .replace(/\{cursor\}/g, '');
+
   const handleTemplateMenu = (e: React.MouseEvent) => {
+    const customTemplate =
+      preferences.messageTemplates ||
+      '{scope}: {cursor}\n\nRefs: {ticket}\nSigned-off-by: Jakub Kicinski <kuba@kernel.org>';
+
     openMenu(e, "Message templates", [
       {
         label: "{scope}: {cursor}",
@@ -82,6 +113,11 @@ export const SourceControlDock: React.FC = () => {
         label: "[{branch}] {cursor}",
         hint: "branch-tagged",
         run: () => setCommitMsg(`[${currentBranch}] work in progress`)
+      },
+      {
+        label: "Custom template",
+        hint: "from Settings",
+        run: () => setCommitMsg(applyTemplate(customTemplate))
       },
       { sep: true },
       { label: "Edit templates…", run: () => setView("settings") }
@@ -168,7 +204,10 @@ export const SourceControlDock: React.FC = () => {
             {stagedFiles.map((f, i) => (
               <div
                 key={i}
+                role="button"
+                tabIndex={0}
                 onClick={() => setView('diff')}
+                onKeyDown={activateOnEnter(() => setView('diff'))}
                 onContextMenu={e => handleFileMenu(e, f, true)}
                 style={{
                   display: 'flex',
@@ -246,7 +285,10 @@ export const SourceControlDock: React.FC = () => {
             {unstagedFiles.map((f, i) => (
               <div
                 key={i}
+                role="button"
+                tabIndex={0}
                 onClick={() => setView('diff')}
+                onKeyDown={activateOnEnter(() => setView('diff'))}
                 onContextMenu={e => handleFileMenu(e, f, false)}
                 style={{
                   display: 'flex',
@@ -282,17 +324,6 @@ export const SourceControlDock: React.FC = () => {
                 >
                   {f.path}
                 </span>
-                <Button
-                  variant="ghost"
-                  style={{ height: '17px', fontSize: '10px', padding: '0 4px' }}
-                  onClick={e => {
-                    e.stopPropagation();
-                    toastRun('Shelving file', f.path.split('/').pop() || '');
-                  }}
-                  title="Shelve this file"
-                >
-                  shelve
-                </Button>
                 <span
                   style={{ color: 'var(--fg3)', fontSize: '11px' }}
                 >{`+${f.add} −${f.del}`}</span>
@@ -335,7 +366,10 @@ export const SourceControlDock: React.FC = () => {
             {untrackedFiles.map((f, i) => (
               <div
                 key={`untracked-${i}`}
+                role="button"
+                tabIndex={0}
                 onClick={() => setView('diff')}
+                onKeyDown={activateOnEnter(() => setView('diff'))}
                 onContextMenu={e => handleFileMenu(e, f, false)}
                 style={{
                   display: 'flex',
@@ -376,80 +410,6 @@ export const SourceControlDock: React.FC = () => {
                 >{`+${f.add} −${f.del}`}</span>
               </div>
             ))}
-
-            <div
-              style={{
-                padding: 'var(--space-3)',
-                borderTop: '1px solid var(--line)',
-                marginTop: 'var(--space-2)'
-              }}
-            >
-              <h6 style={{ margin: '0 0 6px', color: 'var(--fg3)' }}>Partial staging</h6>
-              <div
-                style={{
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--radius-md)',
-                  overflow: 'hidden',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px'
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    padding: '4px 8px',
-                    background: 'var(--raised)',
-                    borderBottom: '1px solid var(--line)'
-                  }}
-                >
-                  <span style={{ color: 'var(--fg3)' }}>@@ -412,7 +412,9 @@</span>
-                  <div style={{ flex: 1 }} />
-                  <Button
-                    variant="ghost"
-                    style={{ height: '17px', fontSize: '10px', padding: '0 4px' }}
-                    onClick={act('Stage hunk')}
-                  >
-                    Stage hunk
-                  </Button>
-                </div>
-                <div style={{ padding: '3px 8px', color: 'var(--fg3)', whiteSpace: 'pre' }}>
-                  {' '}
-                  mlx5e_tx_reporter_err_cqe(sq);
-                </div>
-                <div
-                  style={{
-                    padding: '3px 8px',
-                    background: 'var(--delbg)',
-                    color: 'var(--del)',
-                    whiteSpace: 'pre'
-                  }}
-                >
-                  - if (unlikely(!priv-&gt;channels.num))
-                </div>
-                <div
-                  style={{
-                    padding: '3px 8px',
-                    background: 'var(--addbg)',
-                    color: 'var(--add)',
-                    whiteSpace: 'pre'
-                  }}
-                >
-                  + if (unlikely(!priv-&gt;channels.num ||
-                </div>
-                <div
-                  style={{
-                    padding: '3px 8px',
-                    background: 'var(--addbg)',
-                    color: 'var(--add)',
-                    whiteSpace: 'pre'
-                  }}
-                >
-                  + !test_bit(MLX5E_STATE_OPENED)))
-                </div>
-              </div>
-            </div>
           </div>
 
           <div
@@ -471,6 +431,8 @@ export const SourceControlDock: React.FC = () => {
                 variant="secondary"
                 style={{ flex: 1, height: '22px', fontSize: '11px' }}
                 onClick={aiMessage}
+                disabled={stagedFiles.length === 0}
+                title={stagedFiles.length === 0 ? 'Stage changes to generate a message' : 'Generate a commit message from staged changes'}
               >
                 <i
                   className="ph ph-sparkle"
@@ -484,7 +446,14 @@ export const SourceControlDock: React.FC = () => {
               onChange={e => setCommitMsg(e.target.value)}
               rows={4}
               placeholder="Commit message… ⌘↵ to commit"
-              style={{ minHeight: '78px', fontFamily: 'var(--font-mono)', fontSize: '11.5px' }}
+              aria-label="Commit message"
+              title={`Body wraps at ${wrapCol} columns (Settings → Commit → Wrap message body)`}
+              style={{
+                minHeight: '78px',
+                maxWidth: `${wrapCol}ch`,
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11.5px'
+              }}
             />
             <div
               style={{
@@ -505,6 +474,8 @@ export const SourceControlDock: React.FC = () => {
                 variant="primary"
                 style={{ height: "26px" }}
                 onClick={() => void commitChanges(commitMsg, amend)}
+                disabled={actionBusy || !commitMsg.trim() || stagedFiles.length === 0}
+                title={stagedFiles.length === 0 ? 'Stage changes before committing' : !commitMsg.trim() ? 'Enter a commit message' : 'Commit staged changes'}
               >
                 Commit ⌘↵
               </Button>
@@ -550,7 +521,9 @@ export const SourceControlDock: React.FC = () => {
                     if (msg !== undefined && msg !== null) {
                       void createStash(msg.trim() || undefined, true);
                     }
-                  }
+                  },
+                  "Stash message (optional)",
+                  false
                 );
               }}
               title="Create stash"
@@ -562,7 +535,10 @@ export const SourceControlDock: React.FC = () => {
           {stashes.map((st, i) => (
             <Card
               key={i}
+              role="button"
+              tabIndex={0}
               onClick={e => handleStashMenu(e, st)}
+              onKeyDown={activateOnEnter(() => handleStashMenu({} as React.MouseEvent, st))}
               onContextMenu={e => handleStashMenu(e, st)}
               style={{
                 padding: "var(--space-3)",

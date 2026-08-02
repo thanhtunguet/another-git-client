@@ -78,6 +78,7 @@ function renderGutterSvg(row: GraphRowData, width: number): React.ReactNode {
 
 export const GraphView: React.FC = () => {
   const {
+    repoPath,
     filterOpen,
     setFilterOpen,
     graphLayout,
@@ -100,6 +101,8 @@ export const GraphView: React.FC = () => {
     loadMoreGraph,
     sel,
     toggleSelCommit,
+    setDiffTargetSha,
+    setCompareSeedRef,
     expanded,
     toggleExpandCommit,
     getFileList,
@@ -107,6 +110,8 @@ export const GraphView: React.FC = () => {
     openMenu,
     prompt,
     setView,
+    setDiffTab,
+    preferences,
     } = useGitClient();
 
   const [scrollTop, setScrollTop] = useState(0);
@@ -116,7 +121,8 @@ export const GraphView: React.FC = () => {
     () => Object.values(expanded).some(Boolean),
     [expanded]
   );
-  const enableVirtualRows = graphLayout === 'rows' && !hasExpandedRows;
+  const virtualizeEnabled = preferences.virtualizeCommitList !== false;
+  const enableVirtualRows = graphLayout === 'rows' && !hasExpandedRows && virtualizeEnabled;
   const rowHeight = 30;
   const overscan = 16;
 
@@ -172,7 +178,15 @@ export const GraphView: React.FC = () => {
           toggleSelCommit(i, false);
         }
       },
-      { label: "Diff vs parent", run: () => setView("diff") },
+      {
+        label: "Diff vs parent",
+        run: () => {
+          toggleSelCommit(i, false);
+          setDiffTargetSha(fullSha);
+          setDiffTab("parent");
+          setView("diff");
+        }
+      },
       { sep: true },
       { label: "Checkout (detached)", run: () => void checkoutBranch(fullSha) },
       {
@@ -185,7 +199,7 @@ export const GraphView: React.FC = () => {
             "branch-" + hash,
             (name?: string) => {
               if (name && name.trim()) {
-                void tauriGitBackend.createBranch(commits[0] ? "" : "", name.trim(), fullSha).then(() => {
+                void tauriGitBackend.createBranch(repoPath, name.trim(), fullSha).then(() => {
                   void checkoutBranch(name.trim());
                 });
               }
@@ -220,8 +234,16 @@ export const GraphView: React.FC = () => {
         danger: true,
         run: () => void resetToRef(fullSha, "hard")
       },
-      { sep: true },
-      { label: "Compare with current", run: () => setView("compare") },
+      {
+        sep: true
+      },
+      {
+        label: "Compare with current",
+        run: () => {
+          setCompareSeedRef(fullSha);
+          setView("compare");
+        }
+      },
       {
         label: "Copy hash",
         hint: "⌘C",
@@ -277,7 +299,11 @@ export const GraphView: React.FC = () => {
         </span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>·</span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
-          {sel.length > 1 ? `${sel.length} commits selected — range details` : '1 selected'}
+          {sel.length > 1
+            ? `${sel.length} commits selected — range details`
+            : sel.length === 1
+            ? '1 selected'
+            : 'No selection'}
         </span>
       </div>
 
@@ -386,6 +412,7 @@ export const GraphView: React.FC = () => {
           const files = getFileList(i);
           const isExpanded = !!expanded[i];
           const refs = (r[4] || []).map(refBadge);
+          const rowFullSha = getCommitFullSha(i);
 
           return (
             <div key={i}>
@@ -410,9 +437,18 @@ export const GraphView: React.FC = () => {
                 </div>
               )}
               <div
+                role="button"
+                tabIndex={0}
+                aria-selected={isSelected}
                 onClick={e => toggleSelCommit(i, e.shiftKey || e.metaKey || e.ctrlKey)}
                 onDoubleClick={() => toggleExpandCommit(i)}
                 onContextMenu={e => handleCommitMenu(e, i)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleSelCommit(i, e.shiftKey || e.metaKey || e.ctrlKey);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -532,7 +568,23 @@ export const GraphView: React.FC = () => {
                     {files.map((fl, fIdx) => (
                       <div
                         key={fIdx}
-                        onClick={() => setView('diff')}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          toggleSelCommit(i, false);
+                          setDiffTargetSha(rowFullSha);
+                          setDiffTab('parent');
+                          setView('diff');
+                        }}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleSelCommit(i, false);
+                            setDiffTargetSha(rowFullSha);
+                            setDiffTab('parent');
+                            setView('diff');
+                          }
+                        }}
                         style={{
                           display: 'flex',
                           alignItems: 'center',

@@ -1,16 +1,46 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 
 export const CommandPalette: React.FC = () => {
   const { paletteOpen, closePalette, paletteQ, setPaletteQ, paletteAll } = useGitClient();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  if (!paletteOpen) return null;
-
-  const items = paletteAll();
+  const items = paletteOpen ? paletteAll() : [];
   const pq = paletteQ.toLowerCase();
   const filtered = items.filter(
     p => !pq || (p.group + ' ' + p.label).toLowerCase().indexOf(pq) >= 0
   );
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [paletteQ, paletteOpen]);
+
+  useEffect(() => {
+    itemRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
+
+  if (!paletteOpen) return null;
+
+  const runItem = (index: number) => {
+    const item = filtered[index];
+    if (!item) return;
+    closePalette();
+    item.run();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex(prev => (filtered.length ? (prev + 1) % filtered.length : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex(prev => (filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      runItem(activeIndex);
+    }
+  };
 
   return (
     <div className="dialog-backdrop gc-command-palette-backdrop" onClick={closePalette}>
@@ -18,8 +48,14 @@ export const CommandPalette: React.FC = () => {
         <input
           value={paletteQ}
           onChange={e => setPaletteQ(e.target.value)}
+          onKeyDown={handleInputKeyDown}
           autoFocus
           placeholder="Type an action, branch, or commit…"
+          aria-label="Command palette search"
+          role="combobox"
+          aria-expanded={true}
+          aria-controls="gc-command-palette-listbox"
+          aria-activedescendant={filtered[activeIndex] ? `gc-command-palette-option-${activeIndex}` : undefined}
           style={{
             height: '44px',
             background: 'transparent',
@@ -33,14 +69,20 @@ export const CommandPalette: React.FC = () => {
             outline: 'none'
           }}
         />
-        <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}>
+        <div
+          id="gc-command-palette-listbox"
+          role="listbox"
+          style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2)' }}
+        >
           {filtered.map((p, i) => (
             <div
               key={i}
-              onClick={() => {
-                closePalette();
-                p.run();
-              }}
+              id={`gc-command-palette-option-${i}`}
+              role="option"
+              aria-selected={i === activeIndex}
+              ref={el => { itemRefs.current[i] = el; }}
+              onMouseEnter={() => setActiveIndex(i)}
+              onClick={() => runItem(i)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -49,7 +91,7 @@ export const CommandPalette: React.FC = () => {
                 padding: '0 var(--space-3)',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
-                background: i === 0 ? 'var(--sel)' : 'transparent'
+                background: i === activeIndex ? 'var(--sel)' : 'transparent'
               }}
             >
               <span

@@ -256,7 +256,8 @@ export const BranchesView: React.FC = () => {
     doFetch,
     toastRun,
     openAddRemoteDialog,
-    openEditRemoteDialog
+    openEditRemoteDialog,
+    setCompareSeedRef
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
@@ -454,7 +455,13 @@ export const BranchesView: React.FC = () => {
       { sep: true },
       { label: `Merge ${name} into ${currentBranch}`, run: () => mergeBranch(name) },
       { label: `Rebase ${currentBranch} onto ${name}`, run: () => rebaseBranch(name) },
-      { label: "Compare with current", run: () => setView("compare") },
+      {
+        label: "Compare with current",
+        run: () => {
+          setCompareSeedRef(name);
+          setView("compare");
+        }
+      },
       { label: "Open in Git Graph", run: () => setView("graph") },
       { sep: true },
       { label: "Reset current to here — soft", run: () => resetToRef(name, "soft") },
@@ -530,7 +537,19 @@ export const BranchesView: React.FC = () => {
     ]);
   };
 
-  const branchPreviewIndices = [6, 7, 8];
+  const selectedBranchCommitIndices = useMemo(() => {
+    if (!selectedBranch) return [];
+    const tipIdx = commits.findIndex(c => (c[4] || []).includes(selectedBranch.name));
+    if (tipIdx < 0) return [];
+    const indices: number[] = [];
+    let cur: number | undefined = tipIdx;
+    while (indices.length < 3 && cur !== undefined && cur >= 0) {
+      indices.push(cur);
+      const parents = commits[cur]?.[3] as number[] | undefined;
+      cur = parents && parents.length ? parents[0] : undefined;
+    }
+    return indices;
+  }, [commits, selectedBranch]);
 
   const remoteCount = useMemo(() => {
     return new Set(
@@ -672,7 +691,16 @@ export const BranchesView: React.FC = () => {
               return (
                 <div
                   key={row.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
                   onClick={() => toggleFolder(row.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleFolder(row.id);
+                    }
+                  }}
                   onContextMenu={isRemoteFolder ? (e) => handleRemoteFolderMenu(e, row.label) : undefined}
                   style={{
                     display: 'flex',
@@ -712,7 +740,17 @@ export const BranchesView: React.FC = () => {
               return (
                 <div
                   key={row.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => void checkoutBranch(row.tag.name)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      void checkoutBranch(row.tag.name);
+                    }
+                  }}
                   onContextMenu={e => handleTagMenu(e, row.tag)}
+                  title={`Checkout tag ${row.tag.name}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -759,7 +797,16 @@ export const BranchesView: React.FC = () => {
             return (
               <div
                 key={row.id}
+                role="button"
+                tabIndex={0}
+                aria-selected={isSelected}
                 onClick={() => setSelectedBranchName(branch.name)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedBranchName(branch.name);
+                  }
+                }}
                 onContextMenu={e => handleBranchMenu(e, branch)}
                 style={{
                   display: 'flex',
@@ -886,7 +933,11 @@ export const BranchesView: React.FC = () => {
           <Button
             variant="secondary"
             style={{ height: '25px', padding: '0 10px' }}
-            onClick={() => setView('compare')}
+            onClick={() => {
+              if (selectedBranch) setCompareSeedRef(selectedBranch.name);
+              setView('compare');
+            }}
+            disabled={!selectedBranch}
           >
             Compare with current
           </Button>
@@ -915,7 +966,14 @@ export const BranchesView: React.FC = () => {
           <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>
             Recent commits on this branch
           </h6>
-          {branchPreviewIndices.map(idx => {
+          {!selectedBranchCommitIndices.length && (
+            <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+              {selectedBranch
+                ? "This branch's tip isn't in the currently loaded graph — open Git Graph and load more commits to see its history."
+                : 'Select a branch to see its recent commits.'}
+            </div>
+          )}
+          {selectedBranchCommitIndices.map(idx => {
             const c = commits[idx];
             return (
               <div

@@ -15,8 +15,9 @@ export const ProgressToast: React.FC = () => {
           variant="secondary"
           style={{ height: '19px', fontSize: '10.5px' }}
           onClick={cancelToast}
+          title="Dismiss this notification"
         >
-          Cancel
+          Dismiss
         </Button>
       </div>
       <div

@@ -59,9 +59,15 @@ export const DiffView: React.FC = () => {
     untrackedFiles,
     sel,
     getCommitFullSha,
+    diffTargetSha,
+    setDiffTargetSha,
     stageFile,
-        toastRun
+    unstageFile,
+    toastRun,
+    preferences
   } = useGitClient();
+
+  const showGutterMarkers = preferences.gutterMarkers !== false;
 
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [rawDiffText, setRawDiffText] = useState<string>('');
@@ -98,7 +104,7 @@ export const DiffView: React.FC = () => {
             text = await tauriGitBackend.showFileDiff(repoPath, targetPath, true);
           }
         } else if (diffTab === 'parent' || diffTab === 'refs') {
-          const sha = getCommitFullSha(sel[0] ?? 0);
+          const sha = diffTargetSha || getCommitFullSha(sel[0] ?? 0);
           if (sha) {
             text = await tauriGitBackend.getCommitDiff(repoPath, sha, targetPath || undefined);
           }
@@ -116,17 +122,15 @@ export const DiffView: React.FC = () => {
     })();
 
     return () => { active = false; };
-  }, [repoPath, targetPath, diffTab, sel, getCommitFullSha]);
+  }, [repoPath, targetPath, diffTab, sel, getCommitFullSha, diffTargetSha]);
 
   const parsedLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
 
-  const tabs: [id: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources', label: string][] = [
+  const tabs: [id: 'work' | 'index' | 'parent' | 'refs', label: string][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
     ['parent', 'Commit ↔ parent'],
-    ['refs', 'Selected commit diff'],
-    ['merge', '3-way merge / conflict'],
-    ['sources', 'Compare text sources']
+    ['refs', 'Selected commit diff']
   ];
 
   const monoStyle: React.CSSProperties = {
@@ -172,31 +176,35 @@ export const DiffView: React.FC = () => {
 
       return (
         <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '8px',
-              color: 'var(--fg3)',
-              userSelect: 'none'
-            }}
-          >
-            {line.oldLine || ''}
-          </span>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '10px',
-              color: 'var(--fg3)',
-              userSelect: 'none',
-              borderRight: '1px solid var(--line)'
-            }}
-          >
-            {line.newLine || ''}
-          </span>
+          {showGutterMarkers && (
+            <>
+              <span
+                style={{
+                  width: '46px',
+                  flex: '0 0 auto',
+                  textAlign: 'right',
+                  paddingRight: '8px',
+                  color: 'var(--fg3)',
+                  userSelect: 'none'
+                }}
+              >
+                {line.oldLine || ''}
+              </span>
+              <span
+                style={{
+                  width: '46px',
+                  flex: '0 0 auto',
+                  textAlign: 'right',
+                  paddingRight: '10px',
+                  color: 'var(--fg3)',
+                  userSelect: 'none',
+                  borderRight: '1px solid var(--line)'
+                }}
+              >
+                {line.newLine || ''}
+              </span>
+            </>
+          )}
           <span style={{ paddingLeft: '10px', whiteSpace: 'pre-wrap', color: fg, flex: 1 }}>
             {line.text}
           </span>
@@ -222,13 +230,22 @@ export const DiffView: React.FC = () => {
             {targetPath || 'Repository diff'}
           </span>
           <div style={{ flex: 1 }} />
-          {targetPath && (
+          {targetPath && diffTab === 'work' && (
             <Button
               variant="secondary"
               style={{ height: '22px', fontSize: '11.5px' }}
               onClick={() => void stageFile(targetPath)}
             >
               Stage file
+            </Button>
+          )}
+          {targetPath && diffTab === 'index' && (
+            <Button
+              variant="secondary"
+              style={{ height: '22px', fontSize: '11.5px' }}
+              onClick={() => void unstageFile(targetPath)}
+            >
+              Unstage file
             </Button>
           )}
           <Button
@@ -279,7 +296,11 @@ export const DiffView: React.FC = () => {
             <Button
               key={t[0]}
               variant="secondary"
-              onClick={() => setDiffTab(t[0])}
+              aria-pressed={active}
+              onClick={() => {
+                setDiffTargetSha(null);
+                setDiffTab(t[0]);
+              }}
               style={{
                 flex: '0 0 auto',
                 height: '25px',
@@ -314,7 +335,15 @@ export const DiffView: React.FC = () => {
             {availableFiles.map(f => (
               <div
                 key={f.path}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedPath(f.path)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedPath(f.path);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

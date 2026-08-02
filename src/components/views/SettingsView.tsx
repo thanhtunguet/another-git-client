@@ -7,7 +7,6 @@ export const SettingsView: React.FC = () => {
   const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout } = useGitClient();
 
   const settingsNav = [
-    { id: 'git', href: '#git', label: 'Git executable' },
     { id: 'graph', href: '#graph', label: 'Graph & history' },
     { id: 'perf', href: '#perf', label: 'Performance' },
     { id: 'compare', href: '#compare', label: 'Compare & export' },
@@ -20,12 +19,13 @@ export const SettingsView: React.FC = () => {
     settingKey: string | undefined,
     defVal?: string | boolean,
     opts?: string[],
-    width?: number
+    width?: number,
+    label?: string
   ) => {
     if (!settingKey) return null;
 
     let value = preferences[settingKey] !== undefined ? preferences[settingKey] : defVal;
-    
+
     // Map existing strongly-typed state
     if (settingKey === 'graphLayout') value = graphLayout === 'grouped' ? 'Grouped by day' : 'Rows';
     if (settingKey === 'compareLayout') value = compareLayout === 'stack' ? 'Stacked' : 'Side by side';
@@ -43,6 +43,7 @@ export const SettingsView: React.FC = () => {
     if (type === 'input') {
       return (
         <Input
+          id={settingKey}
           value={value as string}
           onChange={e => handleChange(e.target.value)}
           style={{
@@ -58,6 +59,7 @@ export const SettingsView: React.FC = () => {
     if (type === 'select') {
       return (
         <Select
+          id={settingKey}
           value={value as string}
           onChange={e => handleChange(e.target.value)}
           options={opts || []}
@@ -68,9 +70,10 @@ export const SettingsView: React.FC = () => {
     if (type === 'checkbox') {
       return (
         <Checkbox
+          id={settingKey}
           checked={value as boolean}
           onChange={e => handleChange(e.target.checked)}
-          label="Enabled"
+          label={label || 'Enabled'}
           style={{ fontSize: '12px', color: 'var(--fg2)' }}
         />
       );
@@ -78,6 +81,7 @@ export const SettingsView: React.FC = () => {
     if (type === 'textarea') {
       return (
         <Textarea
+          id={settingKey}
           value={value as string}
           onChange={e => handleChange(e.target.value)}
           rows={4}
@@ -95,54 +99,16 @@ export const SettingsView: React.FC = () => {
 
   const sections: SettingsSection[] = [
     {
-      id: 'git',
-      title: 'Git executable',
-      rows: [
-        {
-          label: 'Git executable path',
-          hint: 'Blank resolves from PATH',
-          control: 'input',
-          settingKey: 'gitPath',
-          defaultValue: '/opt/homebrew/bin/git',
-          width: 300
-        },
-        {
-          label: 'Command timeout',
-          hint: 'Seconds before a git process is killed',
-          control: 'input',
-          settingKey: 'gitTimeout',
-          defaultValue: '30',
-          width: 90
-        },
-        {
-          label: 'Environment',
-          hint: 'Extra variables passed to every invocation',
-          control: 'input',
-          settingKey: 'gitEnv',
-          defaultValue: 'GIT_SSH_COMMAND=ssh -i ~/.ssh/id_ed25519',
-          width: 300
-        }
-      ]
-    },
-    {
       id: 'graph',
       title: 'Graph & history',
       rows: [
         {
           label: 'Graph page size',
-          hint: 'Commits loaded per “Load more”',
+          hint: 'Commits loaded initially and per “Load more”',
           control: 'select',
           settingKey: 'graphPageSize',
           defaultValue: '100',
           options: ['100', '250', '500', '1000']
-        },
-        {
-          label: 'Recent branches count',
-          hint: 'Entries kept in the Recent group',
-          control: 'input',
-          settingKey: 'recentBranchesCount',
-          defaultValue: '8',
-          width: 90
         },
         {
           label: 'Virtualize commit list',
@@ -166,27 +132,11 @@ export const SettingsView: React.FC = () => {
       title: 'Performance',
       rows: [
         {
-          label: 'Filter debounce',
-          hint: 'Milliseconds before live filters re-run',
-          control: 'input',
-          settingKey: 'filterDebounce',
-          defaultValue: '180',
-          width: 90
-        },
-        {
           label: 'Status poll interval',
-          hint: 'Working-tree refresh cadence',
+          hint: 'Milliseconds between automatic working-tree status refreshes',
           control: 'input',
           settingKey: 'statusPollInterval',
           defaultValue: '2000',
-          width: 90
-        },
-        {
-          label: 'Max concurrent git processes',
-          hint: '',
-          control: 'input',
-          settingKey: 'maxConcurrentProcesses',
-          defaultValue: '4',
           width: 90
         }
       ]
@@ -196,35 +146,20 @@ export const SettingsView: React.FC = () => {
       title: 'Compare & export',
       rows: [
         {
-          label: 'Export format',
-          hint: 'Two CSVs or one workbook with two sheets',
-          control: 'select',
-          settingKey: 'exportFormat',
-          defaultValue: 'Excel workbook (.xlsx)',
-          options: ['Excel workbook (.xlsx)', 'Two CSV files']
-        },
-        {
           label: 'Default compare layout',
           hint: '',
           control: 'select',
           settingKey: 'compareLayout',
           defaultValue: 'Side by side',
-          options: ['Side by side', 'Stacked', 'Graph']
+          options: ['Side by side', 'Stacked']
         },
         {
           label: 'Compare-with-revision direction',
-          hint: 'Which side the picked revision lands on',
+          hint: 'Which side a picked branch/commit lands on when comparing with current',
           control: 'select',
           settingKey: 'compareDirection',
           defaultValue: 'Revision → working tree',
           options: ['Revision → working tree', 'Working tree → revision']
-        },
-        {
-          label: 'Remember recent compare pairs',
-          hint: '',
-          control: 'checkbox',
-          settingKey: 'rememberRecentPairs',
-          defaultValue: true
         }
       ]
     },
@@ -234,7 +169,7 @@ export const SettingsView: React.FC = () => {
       rows: [
         {
           label: 'Message templates',
-          hint: 'Placeholders: {branch} {ticket} {scope} {cursor}',
+          hint: 'Placeholders: {branch} {ticket} {scope} {cursor} — available from the commit box\'s Template menu as "Custom template"',
           control: 'textarea',
           settingKey: 'messageTemplates',
           defaultValue:
@@ -242,21 +177,13 @@ export const SettingsView: React.FC = () => {
         },
         {
           label: 'Ticket pattern',
-          hint: 'Regex used to extract {ticket} from branch names',
+          hint: 'Regex used to extract {ticket} from the current branch name',
           control: 'input',
           settingKey: 'ticketPattern',
           defaultValue: '([A-Z]{2,8}-\\d+)',
           width: 220
         },
-        {
-          label: 'AI generate timeout',
-          hint: 'Seconds before generation is cancelled',
-          control: 'input',
-          settingKey: 'aiGenerateTimeout',
-          defaultValue: '20',
-          width: 90
-        },
-        { label: 'Wrap message body', hint: '', control: 'input', settingKey: 'wrapMessageBody', defaultValue: '72', width: 90 }
+        { label: 'Wrap message body', hint: 'Max characters per line in the commit message box', control: 'input', settingKey: 'wrapMessageBody', defaultValue: '72', width: 90 }
       ]
     },
     {
@@ -264,35 +191,11 @@ export const SettingsView: React.FC = () => {
       title: 'Diff & merge',
       rows: [
         {
-          label: 'Default diff view',
-          hint: '',
-          control: 'select',
-          settingKey: 'diffView',
-          defaultValue: 'Unified',
-          options: ['Unified', 'Split']
-        },
-        {
-          label: 'Whitespace',
-          hint: '',
-          control: 'select',
-          settingKey: 'whitespace',
-          defaultValue: 'Show all',
-          options: ['Show all', 'Ignore trailing', 'Ignore all']
-        },
-        {
           label: 'Gutter markers',
-          hint: 'Change markers and their thresholds',
+          hint: 'Show old/new line-number columns in diff views',
           control: 'checkbox',
           settingKey: 'gutterMarkers',
           defaultValue: true
-        },
-        {
-          label: 'Merge tool',
-          hint: '',
-          control: 'select',
-          settingKey: 'mergeTool',
-          defaultValue: 'Built-in 3-way',
-          options: ['Built-in 3-way', 'External: kdiff3']
         }
       ]
     }
@@ -330,7 +233,7 @@ export const SettingsView: React.FC = () => {
         <div style={{ maxWidth: '760px', padding: 'var(--space-8) var(--space-8) 60px' }}>
           <h3 style={{ margin: '0 0 var(--space-1)' }}>Preferences</h3>
           <p style={{ fontSize: '12.5px', color: 'var(--fg3)', marginBottom: 'var(--space-8)' }}>
-            Settings apply per repository unless marked Global.
+            Settings are saved for this installation and apply across every repository you open.
           </p>
 
           {sections.map(sec => (
@@ -357,12 +260,18 @@ export const SettingsView: React.FC = () => {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '12.5px' }}>{r.label}</div>
+                    {r.control === 'checkbox' ? (
+                      <div style={{ fontSize: '12.5px' }}>{r.label}</div>
+                    ) : (
+                      <label htmlFor={r.settingKey} style={{ fontSize: '12.5px', display: 'block' }}>
+                        {r.label}
+                      </label>
+                    )}
                     <div style={{ fontSize: '11px', color: 'var(--fg3)', textWrap: 'pretty' }}>
                       {r.hint}
                     </div>
                   </div>
-                  <div>{renderControl(r.control, r.settingKey, r.defaultValue, r.options, r.width)}</div>
+                  <div>{renderControl(r.control, r.settingKey, r.defaultValue, r.options, r.width, r.label)}</div>
                 </div>
               ))}
             </div>

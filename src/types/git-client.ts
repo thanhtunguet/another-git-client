@@ -162,6 +162,8 @@ export interface DialogState {
   action: string;
   kind?: 'confirm' | 'clone' | 'add-remote' | 'edit-remote' | 'prompt';
   run?: (value?: string) => void;
+  inputLabel?: string;
+  inputRequired?: boolean;
 }
 
 export interface ToastState {
@@ -276,8 +278,8 @@ export interface GitClientContextType {
   setBranchQ: (q: string) => void;
   scTab: 'changes' | 'stash';
   setScTab: (t: 'changes' | 'stash') => void;
-  diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources';
-  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources') => void;
+  diffTab: 'work' | 'index' | 'parent' | 'refs';
+  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs') => void;
   consoleLines: LogEntry[];
   log: (lines: LogEntry[]) => void;
   clearConsole: () => void;

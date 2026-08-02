@@ -27,6 +27,14 @@ export const Dialog: React.FC = () => {
   const isPromptDialog = dialog.kind === 'prompt';
   const isEditing = dialog.kind === 'edit-remote';
 
+  const canConfirm = isCloneDialog
+    ? !!cloneDialogUrl.trim()
+    : isRemoteDialog
+    ? !!remoteDialogName.trim() && !!remoteDialogUrl.trim()
+    : isPromptDialog && dialog.inputRequired !== false
+    ? !!promptDialogValue.trim()
+    : true;
+
   return (
     <div className="dialog-backdrop" style={{ zIndex: 80 }}>
       <div className="dialog" style={{ animation: 'popIn .1s ease-out' }}>
@@ -96,6 +104,8 @@ export const Dialog: React.FC = () => {
         {isPromptDialog && (
           <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
             <Input
+              label={dialog.inputLabel || 'Value'}
+              placeholder={dialog.inputLabel || 'Enter a value'}
               value={promptDialogValue}
               onChange={e => setPromptDialogValue(e.target.value)}
               autoFocus
@@ -130,6 +140,8 @@ export const Dialog: React.FC = () => {
                 : { height: '28px', color: 'var(--del)', borderColor: 'var(--del)' }
             }
             onClick={confirmDialog}
+            disabled={!canConfirm}
+            title={canConfirm ? undefined : 'Fill in the required field(s) to continue'}
           >
             {dialog.action}
           </Button>

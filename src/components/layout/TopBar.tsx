@@ -46,7 +46,7 @@ export const TopBar: React.FC = () => {
     ]);
   };
 
-  const handleBranchMenu = () => {
+  const goToBranchesView = () => {
     setView('branches');
   };
 
@@ -88,7 +88,7 @@ export const TopBar: React.FC = () => {
 
       <Button
         variant="secondary"
-        onClick={handleBranchMenu}
+        onClick={goToBranchesView}
         disabled={actionBusy}
         style={{ height: '28px', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
         title="Open branches view"
@@ -104,6 +104,8 @@ export const TopBar: React.FC = () => {
 
       <button
         onClick={openPalette}
+        title="Open the command palette to search branches, commits, and commands"
+        aria-label="Open command palette"
         style={{
           flex: '1 1 auto',
           maxWidth: '520px',
@@ -116,7 +118,7 @@ export const TopBar: React.FC = () => {
           border: '1px solid var(--line)',
           borderRadius: 'var(--radius-md)',
           color: 'var(--fg3)',
-          cursor: 'text',
+          cursor: 'pointer',
           fontFamily: 'inherit',
           fontSize: '12.5px',
           textAlign: 'left'
@@ -149,6 +151,7 @@ export const TopBar: React.FC = () => {
         variant="secondary"
         onClick={toggleTheme}
         title="Toggle theme"
+        aria-label="Toggle theme"
         style={{ width: '28px', height: '28px', padding: 0 }}
       >
         <i className={`ph ${themeIcon}`} style={{ fontSize: '15px' }} />
@@ -157,6 +160,8 @@ export const TopBar: React.FC = () => {
       <Button
         variant="secondary"
         onClick={toggleDock}
+        aria-pressed={dock}
+        title={dock ? 'Hide source control panel' : 'Show source control panel'}
         style={{ height: '28px', background: dock ? 'var(--sel)' : 'transparent' }}
       >
         Source Control

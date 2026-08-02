@@ -21,13 +21,15 @@ export function SegmentedControl<T extends string = string>({
   style
 }: SegmentedControlProps<T>) {
   return (
-    <div className={`seg ${className}`.trim()} style={style}>
+    <div className={`seg ${className}`.trim()} style={style} role="radiogroup">
       {options.map(opt => {
         const active = opt.value === value;
         return (
           <button
             key={opt.value}
             type="button"
+            role="radio"
+            aria-checked={active}
             className={`seg-opt ${active ? 'active' : ''}`}
             onClick={() => onChange(opt.value)}
           >

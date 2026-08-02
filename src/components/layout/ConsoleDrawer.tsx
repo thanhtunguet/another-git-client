@@ -7,6 +7,15 @@ export const ConsoleDrawer: React.FC = () => {
 
   if (!consoleOpen) return null;
 
+  const lastLine = consoleLines[consoleLines.length - 1];
+  const lastStatus = lastLine
+    ? lastLine.type === 'err'
+      ? 'last command failed'
+      : lastLine.type === 'warn'
+      ? 'last command: warning'
+      : 'last command ok'
+    : 'no output yet';
+
   const getColor = (type: string) => {
     switch (type) {
       case 'cmd':
@@ -55,7 +64,7 @@ export const ConsoleDrawer: React.FC = () => {
           Output — git
         </span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
-          exit 0 · 4.2s
+          {lastStatus}
         </span>
         <div style={{ flex: 1 }} />
         <Button

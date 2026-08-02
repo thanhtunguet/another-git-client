@@ -1,15 +1,34 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 
 export const ContextMenu: React.FC = () => {
   const { menu, closeMenu } = useGitClient();
+  const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const actionableIndices = (menu?.items || [])
+    .map((m, i) => (m.sep ? -1 : i))
+    .filter(i => i >= 0);
+
+  useEffect(() => {
+    if (menu && actionableIndices.length) {
+      itemRefs.current[actionableIndices[0]]?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu]);
 
   if (!menu) return null;
+
+  const focusRelative = (fromIndex: number, delta: number) => {
+    const pos = actionableIndices.indexOf(fromIndex);
+    if (pos < 0 || !actionableIndices.length) return;
+    const nextPos = (pos + delta + actionableIndices.length) % actionableIndices.length;
+    itemRefs.current[actionableIndices[nextPos]]?.focus();
+  };
 
   return (
     <div className="gc-context-menu-overlay" onClick={closeMenu} onContextMenu={closeMenu}>
       <div
         className="gc-context-menu"
+        role="menu"
         style={{
           left: `${menu.x}px`,
           top: `${menu.y}px`
@@ -38,6 +57,7 @@ export const ContextMenu: React.FC = () => {
             return (
               <div
                 key={i}
+                role="separator"
                 style={{
                   height: '1px',
                   margin: '4px 6px',
@@ -47,12 +67,29 @@ export const ContextMenu: React.FC = () => {
             );
           }
 
+          const activate = () => {
+            closeMenu();
+            if (m.run) m.run();
+          };
+
           return (
             <div
               key={i}
-              onClick={() => {
-                closeMenu();
-                if (m.run) m.run();
+              ref={el => { itemRefs.current[i] = el; }}
+              role="menuitem"
+              tabIndex={-1}
+              onClick={activate}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  activate();
+                } else if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  focusRelative(i, 1);
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  focusRelative(i, -1);
+                }
               }}
               style={{
                 display: 'flex',

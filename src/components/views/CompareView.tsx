@@ -21,7 +21,14 @@ export const CompareView: React.FC = () => {
     toastRun,
     checkoutBranch,
     cherryPickCommit,
-    prompt
+    prompt,
+    compareSeedRef,
+    setCompareSeedRef,
+    setDiffTargetSha,
+    setDiffTab,
+    toggleSelCommit,
+    findCommitIndexBySha,
+    preferences
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchRef[]>([]);
@@ -41,15 +48,22 @@ export const CompareView: React.FC = () => {
       setBranches(bList);
       if (bList.length) {
         const curName = bList.find(b => b.current)?.name || bList[0].name;
-        const otherName = bList.find(b => b.name !== curName)?.name || curName;
-        setLeftRef(prev => prev || curName);
-        setRightRef(prev => prev || otherName);
+        if (compareSeedRef) {
+          const revisionOnLeft = (preferences.compareDirection || 'Revision → working tree') === 'Revision → working tree';
+          setLeftRef(revisionOnLeft ? compareSeedRef : curName);
+          setRightRef(revisionOnLeft ? curName : compareSeedRef);
+          setCompareSeedRef(null);
+        } else {
+          const otherName = bList.find(b => b.name !== curName)?.name || curName;
+          setLeftRef(prev => prev || curName);
+          setRightRef(prev => prev || otherName);
+        }
       }
     }).catch(() => {
       if (active) setBranches([]);
     });
     return () => { active = false; };
-  }, [repoPath]);
+  }, [repoPath, compareSeedRef, setCompareSeedRef, preferences.compareDirection]);
 
   useEffect(() => {
     if (!repoPath || !leftRef || !rightRef) return;
@@ -65,14 +79,33 @@ export const CompareView: React.FC = () => {
 
   const branchOptions = useMemo(() => {
     if (!branches.length) return [leftRef || 'main', rightRef || 'HEAD'].filter(Boolean);
-    return branches.map(b => b.name);
+    const names = branches.map(b => b.name);
+    const extras = [leftRef, rightRef].filter(ref => ref && !names.includes(ref));
+    return [...names, ...extras];
   }, [branches, leftRef, rightRef]);
+
+  const openCommitDetails = (commit: GraphCommitRow) => {
+    const idx = findCommitIndexBySha(commit.sha);
+    if (idx >= 0) {
+      toggleSelCommit(idx, false);
+      setView('details');
+    } else {
+      toastRun('Commit not loaded in Git Graph', 'Load more commits in Git Graph to open its details');
+    }
+  };
 
   const handleCommitMenu = (e: React.MouseEvent, commit: GraphCommitRow) => {
     const hash = commit.shortSha;
     openMenu(e, `${hash}  ${commit.subject.slice(0, 32)}`, [
-      { label: 'Open in Commit Details', hint: '↵', run: () => setView('details') },
-      { label: 'Diff vs parent', run: () => setView('diff') },
+      { label: 'Open in Commit Details', hint: '↵', run: () => openCommitDetails(commit) },
+      {
+        label: 'Diff vs parent',
+        run: () => {
+          setDiffTargetSha(commit.sha);
+          setDiffTab('parent');
+          setView('diff');
+        }
+      },
       { sep: true },
       { label: 'Checkout (detached)', run: () => void checkoutBranch(commit.sha) },
       {
@@ -412,6 +445,7 @@ export const CompareView: React.FC = () => {
         <Button
           variant="secondary"
           onClick={() => setCf({ ...cf, noMerges: !cf.noMerges })}
+          aria-pressed={cf.noMerges}
           style={{
             height: '25px',
             fontSize: '11.5px',
@@ -484,6 +518,15 @@ export const CompareView: React.FC = () => {
                 return (
                   <div
                     key={c.sha || i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openCommitDetails(c)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openCommitDetails(c);
+                      }
+                    }}
                     onContextMenu={e => handleCommitMenu(e, c)}
                     style={{
                       display: 'flex',
@@ -594,6 +637,15 @@ export const CompareView: React.FC = () => {
                 return (
                   <div
                     key={c.sha || i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openCommitDetails(c)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        openCommitDetails(c);
+                      }
+                    }}
                     onContextMenu={e => handleCommitMenu(e, c)}
                     style={{
                       display: 'flex',
