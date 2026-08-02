@@ -251,10 +251,13 @@ export const BranchesView: React.FC = () => {
     rebaseBranch,
     resetToRef,
     createBranch,
-    addRemote,
     deleteRemote,
     getRemotes,
-    deleteTag
+    deleteTag,
+    doFetch,
+    toastRun,
+    openAddRemoteDialog,
+    openEditRemoteDialog
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
@@ -533,12 +536,7 @@ export const BranchesView: React.FC = () => {
   }, [branches]);
 
   const handleAddRemote = () => {
-    const name = window.prompt("Remote name (e.g. origin, upstream)", "origin");
-    if (!name || !name.trim()) return;
-    const url = window.prompt(`Remote URL for ${name.trim()}`, "");
-    if (url && url.trim()) {
-      void addRemote(name.trim(), url.trim());
-    }
+    openAddRemoteDialog();
   };
 
   const handleManageRemotes = (e: React.MouseEvent) => {
@@ -554,6 +552,40 @@ export const BranchesView: React.FC = () => {
       }));
       openMenu(e, "Configured Remotes (click to remove)", items.length ? items : [{ label: "No remotes configured" }]);
     });
+  };
+
+  const handleRemoteGroupMenu = (e: React.MouseEvent) => {
+    openMenu(e, "Remotes", [
+      { label: "Fetch all", run: () => doFetch() },
+      { label: "Add new remote…", run: handleAddRemote }
+    ]);
+  };
+
+  const handleRemoteFolderMenu = (e: React.MouseEvent, remoteName: string) => {
+    openMenu(e, `Remote: ${remoteName}`, [
+      { 
+        label: `Fetch ${remoteName}`, 
+        run: () => {
+          toastRun('Fetching', `Fetching from remote ${remoteName}…`);
+          void tauriGitBackend.fetch(repoPath, { remote: remoteName, prune: true }).then(() => {
+            toastRun('Fetch complete', `Fetched remote ${remoteName}`);
+          }).catch(err => {
+            console.error(err);
+            window.alert(`Fetch failed: ${err}`);
+          });
+        } 
+      },
+      { 
+        label: "Change remote URL…", 
+        run: () => {
+          void getRemotes().then(remotes => {
+            const remote = remotes.find(r => r.name === remoteName);
+            const currentUrl = remote ? remote.url : "";
+            openEditRemoteDialog(remoteName, currentUrl);
+          });
+        } 
+      }
+    ]);
   };
 
   const selectedBranchMeta = selectedBranch ? formatBranchMeta(selectedBranch) : '';
@@ -608,6 +640,7 @@ export const BranchesView: React.FC = () => {
               return (
                 <div
                   key={row.id}
+                  onContextMenu={row.id === 'group:remote' ? handleRemoteGroupMenu : undefined}
                   style={{
                     height: '26px',
                     padding: '0 10px',
@@ -618,7 +651,8 @@ export const BranchesView: React.FC = () => {
                     letterSpacing: '.08em',
                     textTransform: 'uppercase',
                     color: 'var(--fg3)',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    cursor: row.id === 'group:remote' ? 'pointer' : 'default'
                   }}
                 >
                   <span style={{ flex: 1 }}>{row.label}</span>
@@ -630,11 +664,13 @@ export const BranchesView: React.FC = () => {
             if (row.type === 'folder') {
               const padLeft = 10 + row.depth * 12;
               const isExpanded = expandedFolders[row.id] !== false;
+              const isRemoteFolder = row.id.startsWith('folder:remote:');
 
               return (
                 <div
                   key={row.id}
                   onClick={() => toggleFolder(row.id)}
+                  onContextMenu={isRemoteFolder ? (e) => handleRemoteFolderMenu(e, row.label) : undefined}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

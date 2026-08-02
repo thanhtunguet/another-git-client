@@ -218,7 +218,7 @@ pub fn git_is_repo(repo_path: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
   let repo = canonical_repo_path(&repo_path)?;
-  let format = "%(*refname:short)%x1f%(refname:short)%x1f%(refname)%x1f%(upstream:short)%x1f%(upstream:track)%x1f%(HEAD)%x1f%(committerdate:unix)%x1f%(symref)";
+  let format = "%(*refname:short)\x1f%(refname:short)\x1f%(refname)\x1f%(upstream:short)\x1f%(upstream:track)\x1f%(HEAD)\x1f%(committerdate:unix)\x1f%(symref)";
   let args = vec![
     "for-each-ref".to_string(),
     "refs/heads".to_string(),
@@ -302,7 +302,7 @@ pub fn git_get_current_branch(repo_path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn git_get_tags(repo_path: String) -> Result<Vec<TagRef>, String> {
   let repo = canonical_repo_path(&repo_path)?;
-  let format = "%(refname:short)%x1f%(refname)%x1f%(objectname)%x1f%(*objectname)%x1f%(creatordate:unix)";
+  let format = "%(refname:short)\x1f%(refname)\x1f%(objectname)\x1f%(*objectname)\x1f%(creatordate:unix)";
   let args = vec![
     "for-each-ref".to_string(),
     "refs/tags".to_string(),
@@ -1627,4 +1627,10 @@ pub fn git_get_remotes(
   }
 
   Ok(remotes)
+}
+
+#[tauri::command]
+pub fn git_set_remote_url(repo_path: String, name: String, url: String) -> Result<GitCommandResult, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  run_git(&repo, &["remote".to_string(), "set-url".to_string(), name, url])
 }

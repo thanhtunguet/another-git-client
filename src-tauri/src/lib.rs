@@ -65,6 +65,7 @@ pub fn run() {
       git_backend::git_add_remote,
       git_backend::git_delete_remote,
       git_backend::git_get_remotes,
+      git_backend::git_set_remote_url,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

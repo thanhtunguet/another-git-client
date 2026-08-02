@@ -11,20 +11,35 @@ export const Dialog: React.FC = () => {
     cloneDialogUrl,
     setCloneDialogUrl,
     cloneDialogUseGit,
-    setCloneDialogUseGit
+    setCloneDialogUseGit,
+    remoteDialogName,
+    setRemoteDialogName,
+    remoteDialogUrl,
+    setRemoteDialogUrl
   } = useGitClient();
 
   if (!dialog) return null;
 
   const isCloneDialog = dialog.kind === 'clone';
+  const isRemoteDialog = dialog.kind === 'add-remote' || dialog.kind === 'edit-remote';
+  const isEditing = dialog.kind === 'edit-remote';
 
   return (
     <div className="dialog-backdrop" style={{ zIndex: 80 }}>
       <div className="dialog" style={{ animation: 'popIn .1s ease-out' }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
           <i
-            className={isCloneDialog ? 'ph ph-download-simple' : 'ph ph-warning-circle'}
-            style={{ fontSize: '20px', color: isCloneDialog ? 'var(--color-accent)' : 'var(--del)' }}
+            className={
+              isCloneDialog
+                ? 'ph ph-download-simple'
+                : isRemoteDialog
+                ? 'ph ph-cloud-arrow-up'
+                : 'ph ph-warning-circle'
+            }
+            style={{
+              fontSize: '20px',
+              color: isCloneDialog || isRemoteDialog ? 'var(--color-accent)' : 'var(--del)'
+            }}
           />
           <div>
             <div className="dialog-title" style={{ fontSize: '18px' }}>
@@ -54,6 +69,25 @@ export const Dialog: React.FC = () => {
             />
           </div>
         )}
+        {isRemoteDialog && (
+          <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+            <Input
+              label="Remote Name"
+              value={remoteDialogName}
+              onChange={e => setRemoteDialogName(e.target.value)}
+              placeholder="e.g. origin, upstream"
+              autoFocus={!isEditing}
+              readOnly={isEditing}
+            />
+            <Input
+              label="Remote URL"
+              value={remoteDialogUrl}
+              onChange={e => setRemoteDialogUrl(e.target.value)}
+              placeholder="e.g. https://github.com/owner/repo.git"
+              autoFocus={isEditing}
+            />
+          </div>
+        )}
         {dialog.cmd && (
           <div
             style={{
@@ -77,7 +111,7 @@ export const Dialog: React.FC = () => {
           <Button
             variant="primary"
             style={
-              isCloneDialog
+              isCloneDialog || isRemoteDialog
                 ? { height: '28px' }
                 : { height: '28px', color: 'var(--del)', borderColor: 'var(--del)' }
             }

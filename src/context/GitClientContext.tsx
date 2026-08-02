@@ -311,6 +311,10 @@ interface GitClientContextType {
   setCloneDialogUrl: (value: string) => void;
   cloneDialogUseGit: boolean;
   setCloneDialogUseGit: (value: boolean) => void;
+  remoteDialogName: string;
+  setRemoteDialogName: (value: string) => void;
+  remoteDialogUrl: string;
+  setRemoteDialogUrl: (value: string) => void;
   toast: ToastState | null;
   toastPct: number;
   toastRun: (title: string, detail: string, done?: () => void) => void;
@@ -430,8 +434,11 @@ interface GitClientContextType {
   createPatch: (reference: string, filePath?: string) => Promise<string>;
   applyPatchText: (patchContent: string) => Promise<void>;
   addRemote: (name: string, url: string) => Promise<void>;
+  setRemoteUrl: (name: string, url: string) => Promise<void>;
   deleteRemote: (name: string) => Promise<void>;
   getRemotes: () => Promise<import("../services/tauriGitBackend").RemoteEntry[]>;
+  openAddRemoteDialog: () => void;
+  openEditRemoteDialog: (name: string, currentUrl: string) => void;
 }
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
@@ -461,6 +468,8 @@ export const GitClientProvider: React.FC<{
   const [toastTimer, setToastTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const [cloneDialogUrl, setCloneDialogUrl] = useState<string>('');
   const [cloneDialogUseGit, setCloneDialogUseGit] = useState<boolean>(false);
+  const [remoteDialogName, setRemoteDialogName] = useState<string>('');
+  const [remoteDialogUrl, setRemoteDialogUrl] = useState<string>('');
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
@@ -934,6 +943,8 @@ export const GitClientProvider: React.FC<{
     setDialog(null);
     setCloneDialogUrl('');
     setCloneDialogUseGit(false);
+    setRemoteDialogName('');
+    setRemoteDialogUrl('');
   }, []);
 
   const runCloneFromDialog = useCallback(() => {
@@ -988,17 +999,24 @@ export const GitClientProvider: React.FC<{
     })();
   }, [cloneDialogUrl, cloneDialogUseGit, log, toGitSshUrl, getRepoDirNameFromUrl, joinPath, runWithActionLock, appendCommandResult, setActiveRepository, toastRun]);
 
+
+
   const confirmDialog = useCallback(() => {
+    if (!dialog) return;
     const d = dialog;
-    if (!d) {
-      return;
-    }
+    
     if (d.kind === 'clone') {
       runCloneFromDialog();
       return;
     }
     setDialog(null);
-    if (d.run) d.run();
+    if (d.kind === 'add-remote') {
+      if (d.run) d.run();
+    } else if (d.kind === 'edit-remote') {
+      if (d.run) d.run();
+    } else if (d.run) {
+      d.run();
+    }
   }, [dialog, runCloneFromDialog]);
 
   const openMenu = useCallback(
@@ -1114,20 +1132,18 @@ export const GitClientProvider: React.FC<{
   }, [repoPath, log, setActiveRepository, toastRun, runWithActionLock]);
 
   const cloneRepository = useCallback(() => {
-    if (actionBusy) {
-      return;
-    }
-    setCloneDialogUrl('');
-    setCloneDialogUseGit(false);
+    setPaletteOpen(false);
     setDialog({
-      title: 'Clone repository',
-      body: 'Enter the repository URL, then choose the destination folder after pressing Clone.',
+      title: 'Clone Repository',
+      body: 'Enter the URL of the Git repository you want to clone.',
       cmd: '',
       action: 'Clone',
-      kind: 'clone'
+      kind: 'clone',
+      run: runCloneFromDialog
     });
-    setMenu(null);
-  }, [actionBusy, setMenu]);
+  }, [runCloneFromDialog]);
+
+
 
   const createBranch = useCallback(() => {
     if (actionBusy) {
@@ -1315,6 +1331,56 @@ export const GitClientProvider: React.FC<{
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
+
+  const setRemoteUrl = useCallback(
+    async (name: string, url: string) => {
+      await tauriGitBackend.setRemoteUrl(repoPath, name, url);
+      await refreshRepositorySnapshot(repoPath);
+    },
+    [repoPath, refreshRepositorySnapshot]
+  );
+
+  const runAddRemoteFromDialog = useCallback(() => {
+    const name = remoteDialogName.trim();
+    const url = remoteDialogUrl.trim();
+    if (name && url) {
+      void addRemote(name, url);
+    }
+  }, [remoteDialogName, remoteDialogUrl, addRemote]);
+
+  const runEditRemoteFromDialog = useCallback(() => {
+    const name = remoteDialogName.trim();
+    const url = remoteDialogUrl.trim();
+    if (name && url) {
+      void setRemoteUrl(name, url);
+    }
+  }, [remoteDialogName, remoteDialogUrl, setRemoteUrl]);
+
+  const openAddRemoteDialog = useCallback(() => {
+    setRemoteDialogName('');
+    setRemoteDialogUrl('');
+    setDialog({
+      title: 'Add Remote',
+      body: 'Configure a new remote for this repository.',
+      cmd: '',
+      action: 'Add Remote',
+      kind: 'add-remote',
+      run: runAddRemoteFromDialog
+    });
+  }, [runAddRemoteFromDialog]);
+
+  const openEditRemoteDialog = useCallback((name: string, currentUrl: string) => {
+    setRemoteDialogName(name);
+    setRemoteDialogUrl(currentUrl);
+    setDialog({
+      title: 'Edit Remote URL',
+      body: `Change the URL for remote '${name}'.`,
+      cmd: '',
+      action: 'Save changes',
+      kind: 'edit-remote',
+      run: runEditRemoteFromDialog
+    });
+  }, [runEditRemoteFromDialog]);
 
   const deleteRemote = useCallback(
     async (name: string) => {
@@ -2223,6 +2289,10 @@ export const GitClientProvider: React.FC<{
         setCloneDialogUrl,
         cloneDialogUseGit,
         setCloneDialogUseGit,
+        remoteDialogName,
+        setRemoteDialogName,
+        remoteDialogUrl,
+        setRemoteDialogUrl,
         toast,
         toastPct,
         toastRun,
@@ -2342,8 +2412,11 @@ export const GitClientProvider: React.FC<{
         createPatch,
         applyPatchText,
         addRemote,
+        setRemoteUrl,
         deleteRemote,
-        getRemotes
+        getRemotes,
+        openAddRemoteDialog,
+        openEditRemoteDialog
       }}
     >
       {children}

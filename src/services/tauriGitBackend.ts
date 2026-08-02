@@ -380,6 +380,10 @@ export const tauriGitBackend = {
     return invoke<GitCommandResult>("git_add_remote", { repoPath, name, url });
   },
 
+  setRemoteUrl(repoPath: string, name: string, url: string) {
+    return invoke<GitCommandResult>("git_set_remote_url", { repoPath, name, url });
+  },
+
   deleteRemote(repoPath: string, name: string) {
     return invoke<GitCommandResult>("git_delete_remote", { repoPath, name });
   },
