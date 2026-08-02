@@ -5,7 +5,7 @@ import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { Card } from '../common/Card';
 import { RefBadge } from '../../types/git-client';
-import { tauriGitBackend, type BranchRef } from '../../services/tauriGitBackend';
+import { tauriGitBackend, type BranchRef, type TagRef } from '../../services/tauriGitBackend';
 
 type BranchKind = 'local' | 'remote';
 
@@ -21,12 +21,42 @@ type BranchNode = {
   shortName: string;
 };
 
+type TagNode = {
+  name: string;
+  fullRef: string;
+  sha: string;
+};
+
 type TreeRow =
   | { type: 'group'; id: string; label: string; count: number }
   | { type: 'folder'; id: string; label: string; depth: number }
-  | { type: 'branch'; id: string; depth: number; label: string; branch: BranchNode };
+  | { type: 'branch'; id: string; depth: number; label: string; branch: BranchNode }
+  | { type: 'tag'; id: string; depth: number; label: string; tag: TagNode };
 
 type PathMode = 'name' | 'shortName';
+
+// Subsequence fuzzy match: every character of `query` must appear in `text`,
+// in order, but not necessarily contiguously (e.g. "mstr" matches "main-restore").
+function fuzzyMatch(query: string, text: string): boolean {
+  if (!query) {
+    return true;
+  }
+  let qi = 0;
+  for (let ti = 0; ti < text.length && qi < query.length; ti++) {
+    if (text[ti] === query[qi]) {
+      qi++;
+    }
+  }
+  return qi === query.length;
+}
+
+function normalizeTagRef(tag: TagRef): TagNode {
+  return {
+    name: tag.name,
+    fullRef: tag.fullRef,
+    sha: tag.sha
+  };
+}
 
 function normalizeBranchRef(branch: BranchRef): BranchNode {
   const isRemote = branch.kind === 'remote';
@@ -131,6 +161,67 @@ function buildPathRows(
   return rows;
 }
 
+function buildTagRows(
+  tags: TagNode[],
+  basePath: string,
+  idPrefix: string,
+  depth: number,
+  expandedFolders: Record<string, boolean>
+): TreeRow[] {
+  const groups = new Map<string, TagNode[]>();
+  const leaves: TreeRow[] = [];
+
+  for (const tag of tags) {
+    const relativeName = basePath ? tag.name.slice(basePath.length + 1) : tag.name;
+    const parts = relativeName.split('/');
+
+    if (parts.length === 1) {
+      leaves.push({
+        type: 'tag',
+        id: `tag:${idPrefix}:${tag.name}`,
+        depth,
+        label: relativeName,
+        tag
+      });
+      continue;
+    }
+
+    const segment = parts[0];
+    const childPath = basePath ? `${basePath}/${segment}` : segment;
+    const list = groups.get(childPath) ?? [];
+    list.push(tag);
+    groups.set(childPath, list);
+  }
+
+  const rows: TreeRow[] = [];
+
+  const groupEntries = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  for (const [fullPath, groupTags] of groupEntries) {
+    const folderId = `folder:${idPrefix}:${fullPath}`;
+    rows.push({
+      type: 'folder',
+      id: folderId,
+      depth,
+      label: fullPath.split('/').at(-1) ?? fullPath
+    });
+
+    const isExpanded = expandedFolders[folderId] !== false;
+    if (isExpanded) {
+      rows.push(...buildTagRows(groupTags, fullPath, idPrefix, depth + 1, expandedFolders));
+    }
+  }
+
+  leaves.sort((left, right) => {
+    if (left.type !== 'tag' || right.type !== 'tag') {
+      return 0;
+    }
+    return left.tag.name.localeCompare(right.tag.name);
+  });
+
+  rows.push(...leaves);
+  return rows;
+}
+
 function formatBranchMeta(branch: BranchNode): string {
   const parts: string[] = [];
   if (branch.upstream) {
@@ -162,10 +253,12 @@ export const BranchesView: React.FC = () => {
     createBranch,
     addRemote,
     deleteRemote,
-    getRemotes
+    getRemotes,
+    deleteTag
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
+  const [tags, setTags] = useState<TagNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [selectedBranchName, setSelectedBranchName] = useState<string>('');
@@ -173,6 +266,7 @@ export const BranchesView: React.FC = () => {
   useEffect(() => {
     if (!repoPath) {
       setBranches([]);
+      setTags([]);
       setSelectedBranchName('');
       return;
     }
@@ -182,14 +276,20 @@ export const BranchesView: React.FC = () => {
 
     void (async () => {
       try {
-        const refs = await tauriGitBackend.getBranches(repoPath);
+        const [branchRefs, tagRefs] = await Promise.all([
+          tauriGitBackend.getBranches(repoPath),
+          tauriGitBackend.getTags(repoPath)
+        ]);
         if (disposed) {
           return;
         }
-        setBranches(refs.map(normalizeBranchRef));
-      } catch {
+        setBranches(branchRefs.map(normalizeBranchRef));
+        setTags(tagRefs.map(normalizeTagRef));
+      } catch (error) {
         if (!disposed) {
+          console.error('Failed to load branches/tags', error);
           setBranches([]);
+          setTags([]);
         }
       } finally {
         if (!disposed) {
@@ -226,13 +326,24 @@ export const BranchesView: React.FC = () => {
 
     return branches.filter(branch => {
       return (
-        branch.name.toLowerCase().includes(q) ||
-        branch.shortName.toLowerCase().includes(q) ||
-        branch.fullRef.toLowerCase().includes(q) ||
-        (branch.upstream || '').toLowerCase().includes(q)
+        fuzzyMatch(q, branch.name.toLowerCase()) ||
+        fuzzyMatch(q, branch.shortName.toLowerCase()) ||
+        fuzzyMatch(q, branch.fullRef.toLowerCase()) ||
+        fuzzyMatch(q, (branch.upstream || '').toLowerCase())
       );
     });
   }, [branchQ, branches]);
+
+  const filteredTags = useMemo(() => {
+    const q = branchQ.trim().toLowerCase();
+    if (!q) {
+      return tags;
+    }
+
+    return tags.filter(tag => {
+      return fuzzyMatch(q, tag.name.toLowerCase()) || fuzzyMatch(q, tag.fullRef.toLowerCase());
+    });
+  }, [branchQ, tags]);
 
   const localBranches = useMemo(
     () => filteredBranches.filter(branch => branch.kind === 'local'),
@@ -279,8 +390,11 @@ export const BranchesView: React.FC = () => {
       }
     }
 
+    rows.push({ type: 'group', id: 'group:tags', label: 'Tags', count: filteredTags.length });
+    rows.push(...buildTagRows(filteredTags, '', 'tag', 1, expandedFolders));
+
     return rows;
-  }, [expandedFolders, localBranches, remoteBranches, remoteGroups]);
+  }, [expandedFolders, localBranches, remoteBranches, remoteGroups, filteredTags]);
 
   const selectedBranch = useMemo(
     () => branches.find(branch => branch.name === selectedBranchName),
@@ -369,6 +483,25 @@ export const BranchesView: React.FC = () => {
               : `git branch -D ${name}`,
             "Delete branch",
             () => void deleteBranch(name, branch.kind === "remote", true)
+          )
+      }
+    ]);
+  };
+
+  const handleTagMenu = (e: React.MouseEvent, tag: TagNode) => {
+    openMenu(e, tag.name, [
+      { label: "Checkout", hint: "↵", run: () => checkoutBranch(tag.name) },
+      { sep: true },
+      {
+        label: `Delete ${tag.name}`,
+        danger: true,
+        run: () =>
+          confirm(
+            `Delete tag ${tag.name}?`,
+            "This tag will be deleted from your local repository.",
+            `git tag -d ${tag.name}`,
+            "Delete tag",
+            () => void deleteTag(tag.name)
           )
       }
     ]);
@@ -529,6 +662,50 @@ export const BranchesView: React.FC = () => {
                     }}
                   >
                     {row.label}
+                  </span>
+                </div>
+              );
+            }
+
+            if (row.type === 'tag') {
+              const padLeft = 10 + row.depth * 12;
+
+              return (
+                <div
+                  key={row.id}
+                  onContextMenu={e => handleTagMenu(e, row.tag)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    height: '24px',
+                    paddingLeft: `${padLeft}px`,
+                    paddingRight: 'var(--space-3)',
+                    cursor: 'pointer',
+                    color: 'var(--fg)',
+                    fontSize: '12.5px',
+                    fontFamily: 'var(--font-mono)'
+                  }}
+                >
+                  <i className="ph ph-tag" style={{ fontSize: '13px', color: 'var(--fg3)' }} />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '10.5px',
+                      color: 'var(--fg3)'
+                    }}
+                  >
+                    {row.tag.sha.slice(0, 7)}
                   </span>
                 </div>
               );
