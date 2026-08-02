@@ -28,7 +28,7 @@ export const SettingsView: React.FC = () => {
     
     // Map existing strongly-typed state
     if (settingKey === 'graphLayout') value = graphLayout === 'grouped' ? 'Grouped by day' : 'Rows';
-    if (settingKey === 'compareLayout') value = compareLayout === 'stack' ? 'Stacked' : (compareLayout === 'graph' ? 'Graph' : 'Side by side');
+    if (settingKey === 'compareLayout') value = compareLayout === 'stack' ? 'Stacked' : 'Side by side';
 
     const handleChange = (newVal: any) => {
       if (settingKey === 'graphLayout') {

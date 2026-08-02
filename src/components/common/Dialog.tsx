@@ -15,13 +15,16 @@ export const Dialog: React.FC = () => {
     remoteDialogName,
     setRemoteDialogName,
     remoteDialogUrl,
-    setRemoteDialogUrl
+    setRemoteDialogUrl,
+    promptDialogValue,
+    setPromptDialogValue
   } = useGitClient();
 
   if (!dialog) return null;
 
   const isCloneDialog = dialog.kind === 'clone';
   const isRemoteDialog = dialog.kind === 'add-remote' || dialog.kind === 'edit-remote';
+  const isPromptDialog = dialog.kind === 'prompt';
   const isEditing = dialog.kind === 'edit-remote';
 
   return (
@@ -34,11 +37,13 @@ export const Dialog: React.FC = () => {
                 ? 'ph ph-download-simple'
                 : isRemoteDialog
                 ? 'ph ph-cloud-arrow-up'
+                : isPromptDialog
+                ? 'ph ph-cursor-text'
                 : 'ph ph-warning-circle'
             }
             style={{
               fontSize: '20px',
-              color: isCloneDialog || isRemoteDialog ? 'var(--color-accent)' : 'var(--del)'
+              color: isCloneDialog || isRemoteDialog || isPromptDialog ? 'var(--color-accent)' : 'var(--del)'
             }}
           />
           <div>
@@ -88,6 +93,15 @@ export const Dialog: React.FC = () => {
             />
           </div>
         )}
+        {isPromptDialog && (
+          <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+            <Input
+              value={promptDialogValue}
+              onChange={e => setPromptDialogValue(e.target.value)}
+              autoFocus
+            />
+          </div>
+        )}
         {dialog.cmd && (
           <div
             style={{
@@ -111,7 +125,7 @@ export const Dialog: React.FC = () => {
           <Button
             variant="primary"
             style={
-              isCloneDialog || isRemoteDialog
+              isCloneDialog || isRemoteDialog || isPromptDialog
                 ? { height: '28px' }
                 : { height: '28px', color: 'var(--del)', borderColor: 'var(--del)' }
             }

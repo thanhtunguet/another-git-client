@@ -160,8 +160,8 @@ export interface DialogState {
   body: string;
   cmd: string;
   action: string;
-  kind?: 'confirm' | 'clone' | 'add-remote' | 'edit-remote';
-  run?: () => void;
+  kind?: 'confirm' | 'clone' | 'add-remote' | 'edit-remote' | 'prompt';
+  run?: (value?: string) => void;
 }
 
 export interface ToastState {
@@ -233,8 +233,11 @@ export interface GitClientContextType {
   closeMenu: (e?: React.MouseEvent | MouseEvent) => void;
   dialog: DialogState | null;
   confirm: (title: string, body: string, cmd: string, action: string, run?: () => void) => void;
+  prompt: (title: string, body: string, action: string, defaultValue: string, run?: (value: string) => void) => void;
   closeDialog: () => void;
   confirmDialog: () => void;
+  promptDialogValue: string;
+  setPromptDialogValue: (value: string) => void;
   cloneDialogUrl: string;
   setCloneDialogUrl: (value: string) => void;
   cloneDialogUseGit: boolean;

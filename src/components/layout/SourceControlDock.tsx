@@ -30,7 +30,8 @@ export const SourceControlDock: React.FC = () => {
     commitChanges,
     createStash,
     applyStash,
-    dropStash
+    dropStash,
+    prompt
   } = useGitClient();
 
   const [amend, setAmend] = useState(false);
@@ -540,8 +541,17 @@ export const SourceControlDock: React.FC = () => {
               variant="ghost"
               style={{ height: '18px', width: '20px', padding: 0 }}
               onClick={() => {
-                const msg = window.prompt("Stash message (optional)");
-                if (msg !== null) void createStash(msg.trim() || undefined, true);
+                prompt(
+                  "Create Stash",
+                  "Enter an optional message for your stash.",
+                  "Stash",
+                  "",
+                  (msg?: string) => {
+                    if (msg !== undefined && msg !== null) {
+                      void createStash(msg.trim() || undefined, true);
+                    }
+                  }
+                );
               }}
               title="Create stash"
               aria-label="Create stash"

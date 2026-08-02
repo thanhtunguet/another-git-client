@@ -305,8 +305,11 @@ interface GitClientContextType {
   closeMenu: (e?: React.MouseEvent | MouseEvent) => void;
   dialog: DialogState | null;
   confirm: (title: string, body: string, cmd: string, action: string, run?: () => void) => void;
+  prompt: (title: string, body: string, action: string, defaultValue: string, run?: (value: string) => void) => void;
   closeDialog: () => void;
   confirmDialog: () => void;
+  promptDialogValue: string;
+  setPromptDialogValue: (value: string) => void;
   cloneDialogUrl: string;
   setCloneDialogUrl: (value: string) => void;
   cloneDialogUseGit: boolean;
@@ -439,6 +442,8 @@ interface GitClientContextType {
   getRemotes: () => Promise<import("../services/tauriGitBackend").RemoteEntry[]>;
   openAddRemoteDialog: () => void;
   openEditRemoteDialog: (name: string, currentUrl: string) => void;
+  preferences: Record<string, any>;
+  updatePreference: (key: string, value: any) => void;
 }
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
@@ -470,6 +475,7 @@ export const GitClientProvider: React.FC<{
   const [cloneDialogUseGit, setCloneDialogUseGit] = useState<boolean>(false);
   const [remoteDialogName, setRemoteDialogName] = useState<string>('');
   const [remoteDialogUrl, setRemoteDialogUrl] = useState<string>('');
+  const [promptDialogValue, setPromptDialogValue] = useState<string>('');
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
@@ -949,12 +955,22 @@ export const GitClientProvider: React.FC<{
     []
   );
 
+  const prompt = useCallback(
+    (title: string, body: string, action: string, defaultValue: string, run?: (value: string) => void) => {
+      setPromptDialogValue(defaultValue);
+      setDialog({ title, body, cmd: '', action, kind: 'prompt', run: run as any });
+      setMenu(null);
+    },
+    []
+  );
+
   const closeDialog = useCallback(() => {
     setDialog(null);
     setCloneDialogUrl('');
     setCloneDialogUseGit(false);
     setRemoteDialogName('');
     setRemoteDialogUrl('');
+    setPromptDialogValue('');
   }, []);
 
   const runCloneFromDialog = useCallback(() => {
@@ -1020,14 +1036,16 @@ export const GitClientProvider: React.FC<{
       return;
     }
     setDialog(null);
-    if (d.kind === 'add-remote') {
+    if (d.kind === 'prompt') {
+      if (d.run) d.run(promptDialogValue);
+    } else if (d.kind === 'add-remote') {
       if (d.run) d.run();
     } else if (d.kind === 'edit-remote') {
       if (d.run) d.run();
     } else if (d.run) {
       d.run();
     }
-  }, [dialog, runCloneFromDialog]);
+  }, [dialog, runCloneFromDialog, promptDialogValue]);
 
   const openMenu = useCallback(
     (e: React.MouseEvent | MouseEvent, title: string, items: MenuItem[]) => {
@@ -1159,36 +1177,45 @@ export const GitClientProvider: React.FC<{
     if (actionBusy) {
       return;
     }
-    const branchName = window.prompt('Create new branch', 'feature/new-branch');
-    if (!branchName || !branchName.trim()) {
-      return;
-    }
-    const nextBranch = branchName.trim();
-    confirm(
-      `Create branch ${nextBranch}?`,
-      `This creates ${nextBranch} from ${currentBranch} and checks it out.`,
-      `git branch ${nextBranch} ${currentBranch}\ngit checkout ${nextBranch}`,
-      'Create branch',
-      () => {
-        void (async () => {
-          await runWithActionLock(async () => {
-            try {
-              log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
-              const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
-              appendCommandResult(createResult);
-              log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
-              const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
-              appendCommandResult(checkoutResult);
-              await refreshBranchSummary(repoPath);
-              await refreshRepositorySnapshot(repoPath);
-              toastRun('Branch created', nextBranch);
-            } catch (error) {
-              log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-            }
-          });
-        })();
+    setPromptDialogValue('feature/new-branch');
+    setDialog({
+      title: 'Create new branch',
+      body: 'Enter a name for the new branch.',
+      cmd: '',
+      action: 'Create branch',
+      kind: 'prompt',
+      run: (branchName?: string) => {
+        if (!branchName || !branchName.trim()) {
+          return;
+        }
+        const nextBranch = branchName.trim();
+        confirm(
+          `Create branch ${nextBranch}?`,
+          `This creates ${nextBranch} from ${currentBranch} and checks it out.`,
+          `git branch ${nextBranch} ${currentBranch}\ngit checkout ${nextBranch}`,
+          'Create branch',
+          () => {
+            void (async () => {
+              await runWithActionLock(async () => {
+                try {
+                  log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
+                  const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
+                  appendCommandResult(createResult);
+                  log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
+                  const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
+                  appendCommandResult(checkoutResult);
+                  await refreshBranchSummary(repoPath);
+                  await refreshRepositorySnapshot(repoPath);
+                  toastRun('Branch created', nextBranch);
+                } catch (error) {
+                  log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+                }
+              });
+            })();
+          }
+        );
       }
-    );
+    });
   }, [actionBusy, confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, runWithActionLock]);
 
   useEffect(() => {
@@ -2293,8 +2320,11 @@ export const GitClientProvider: React.FC<{
         closeMenu,
         dialog,
         confirm,
+        prompt,
         closeDialog,
         confirmDialog,
+        promptDialogValue,
+        setPromptDialogValue,
         cloneDialogUrl,
         setCloneDialogUrl,
         cloneDialogUseGit,

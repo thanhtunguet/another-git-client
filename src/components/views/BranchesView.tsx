@@ -235,7 +235,8 @@ export const BranchesView: React.FC = () => {
   const {
     branchQ,
     setBranchQ,
-        openMenu,
+    prompt,
+    openMenu,
     confirm,
     setView,
     commits,
@@ -419,21 +420,35 @@ export const BranchesView: React.FC = () => {
       {
         label: `New branch from '${name}'…`,
         run: () => {
-          const newBranch = window.prompt(`Create new branch from ${name}`, `${name}-copy`);
-          if (newBranch && newBranch.trim()) {
-            void tauriGitBackend.createBranch(repoPath, newBranch.trim(), name).then(() => {
-              void checkoutBranch(newBranch.trim());
-            });
-          }
+          prompt(
+            `Create new branch from ${name}`,
+            `Enter a name for the new branch based on ${name}.`,
+            'Create branch',
+            `${name}-copy`,
+            (newBranch?: string) => {
+              if (newBranch && newBranch.trim()) {
+                void tauriGitBackend.createBranch(repoPath, newBranch.trim(), name).then(() => {
+                  void checkoutBranch(newBranch.trim());
+                });
+              }
+            }
+          );
         }
       },
       {
         label: "Rename…",
         run: () => {
-          const newName = window.prompt(`Rename branch ${name}`, name);
-          if (newName && newName.trim() && newName.trim() !== name) {
-            void renameBranch(name, newName.trim());
-          }
+          prompt(
+            `Rename branch ${name}`,
+            `Enter a new name for branch ${name}.`,
+            'Rename branch',
+            name,
+            (newName?: string) => {
+              if (newName && newName.trim() && newName.trim() !== name) {
+                void renameBranch(name, newName.trim());
+              }
+            }
+          );
         }
       },
       { sep: true },
@@ -463,10 +478,17 @@ export const BranchesView: React.FC = () => {
           if (branch.kind === "remote") {
             void setUpstream(currentBranch, undefined);
           } else {
-            const upstream = window.prompt(`Set upstream for ${name}`, `origin/${name}`);
-            if (upstream !== null) {
-              void setUpstream(name, upstream.trim() || undefined);
-            }
+            prompt(
+              `Set upstream for ${name}`,
+              `Enter the upstream branch name (e.g. origin/${name}).`,
+              'Set upstream',
+              `origin/${name}`,
+              (upstream?: string) => {
+                if (upstream !== undefined && upstream !== null) {
+                  void setUpstream(name, upstream.trim() || undefined);
+                }
+              }
+            );
           }
         }
       },

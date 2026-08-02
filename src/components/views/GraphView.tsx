@@ -105,6 +105,7 @@ export const GraphView: React.FC = () => {
     getFileList,
     matchesFilter,
     openMenu,
+    prompt,
     setView,
     } = useGitClient();
 
@@ -177,21 +178,35 @@ export const GraphView: React.FC = () => {
       {
         label: "Create branch here…",
         run: () => {
-          const name = window.prompt("Create branch at commit " + hash, "branch-" + hash);
-          if (name && name.trim()) {
-            void tauriGitBackend.createBranch(commits[0] ? "" : "", name.trim(), fullSha).then(() => {
-              void checkoutBranch(name.trim());
-            });
-          }
+          prompt(
+            "Create branch",
+            `Create branch at commit ${hash}.`,
+            "Create branch",
+            "branch-" + hash,
+            (name?: string) => {
+              if (name && name.trim()) {
+                void tauriGitBackend.createBranch(commits[0] ? "" : "", name.trim(), fullSha).then(() => {
+                  void checkoutBranch(name.trim());
+                });
+              }
+            }
+          );
         }
       },
       {
         label: "Create tag here…",
         run: () => {
-          const tagName = window.prompt("Tag name for commit " + hash, "v1.0.0");
-          if (tagName && tagName.trim()) {
-            void createTag(tagName.trim(), fullSha);
-          }
+          prompt(
+            "Create tag",
+            `Tag name for commit ${hash}.`,
+            "Create tag",
+            "v1.0.0",
+            (tagName?: string) => {
+              if (tagName && tagName.trim()) {
+                void createTag(tagName.trim(), fullSha);
+              }
+            }
+          );
         }
       },
       { sep: true },

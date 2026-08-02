@@ -20,7 +20,8 @@ export const CompareView: React.FC = () => {
     createPatch,
     toastRun,
     checkoutBranch,
-    cherryPickCommit
+    cherryPickCommit,
+    prompt
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchRef[]>([]);
@@ -77,12 +78,19 @@ export const CompareView: React.FC = () => {
       {
         label: 'Create branch here…',
         run: () => {
-          const name = window.prompt(`Create branch at commit ${hash}`, `branch-${hash}`);
-          if (name && name.trim()) {
-            void tauriGitBackend.createBranch(repoPath, name.trim(), commit.sha).then(() => {
-              void checkoutBranch(name.trim());
-            });
-          }
+          prompt(
+            'Create branch',
+            `Create branch at commit ${hash}.`,
+            'Create branch',
+            `branch-${hash}`,
+            (name?: string) => {
+              if (name && name.trim()) {
+                void tauriGitBackend.createBranch(repoPath, name.trim(), commit.sha).then(() => {
+                  void checkoutBranch(name.trim());
+                });
+              }
+            }
+          );
         }
       },
       { sep: true },
