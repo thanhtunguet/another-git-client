@@ -3,8 +3,6 @@ import { useGitClient, getHash } from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
-import { Card } from '../common/Card';
-import { RefBadge } from '../../types/git-client';
 import { tauriGitBackend, type BranchRef, type TagRef } from '../../services/tauriGitBackend';
 
 type BranchKind = 'local' | 'remote';
@@ -512,23 +510,6 @@ export const BranchesView: React.FC = () => {
 
   const branchPreviewIndices = [6, 7, 8];
 
-  const branchActionChips: { label: string; variant: RefBadge['variant'] }[] = [
-    'Checkout',
-    'Create',
-    'Rename',
-    'Track upstream',
-    'Merge into current',
-    'Rebase onto',
-    'Compare',
-    'Open in Git Graph',
-    'Reset soft/mixed',
-    'Reset hard',
-    'Delete'
-  ].map(l => ({
-    label: l,
-    variant: l === 'Reset hard' || l === 'Delete' ? 'outline' : 'neutral'
-  }));
-
   const remoteCount = useMemo(() => {
     return new Set(
       branches.filter(branch => branch.kind === 'remote').map(branch => branch.remoteName || 'remote')
@@ -954,17 +935,6 @@ export const BranchesView: React.FC = () => {
               </div>
             );
           })}
-
-          <Card elevation="sm" style={{ marginTop: 'var(--space-8)' }}>
-            <h6 style={{ margin: 0, color: 'var(--fg3)' }}>Right-click any row for</h6>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {branchActionChips.map((a, i) => (
-                <Tag key={i} variant={a.variant}>
-                  {a.label}
-                </Tag>
-              ))}
-            </div>
-          </Card>
         </div>
       </div>
     </div>
