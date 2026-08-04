@@ -1,55 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { useGitClient } from '../../context/GitClientContext';
-import { Button } from '../common/Button';
-import { tauriGitBackend } from '../../services/tauriGitBackend';
-import { useResizablePanel } from '../../hooks/useResizablePanel';
-import { ResizeHandle } from '../common/ResizeHandle';
+import { DiffViewer } from '../common/DiffViewer';
 
-export interface DiffLine {
-  text: string;
-  type: 'hunk' | 'add' | 'del' | 'context';
-  oldLine?: number;
-  newLine?: number;
-}
-
-export function parseDiffText(raw: string): DiffLine[] {
-  if (!raw || !raw.trim()) return [];
-  const lines = raw.split('\n');
-  const result: DiffLine[] = [];
-  let oldN = 0;
-  let newN = 0;
-
-  for (const line of lines) {
-    if (
-      line.startsWith('diff --git') ||
-      line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ')
-    ) {
-      continue;
-    }
-    if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-      if (match) {
-        oldN = parseInt(match[1], 10) - 1;
-        newN = parseInt(match[2], 10) - 1;
-      }
-      result.push({ text: line, type: 'hunk' });
-    } else if (line.startsWith('+')) {
-      newN++;
-      result.push({ text: line.slice(1), type: 'add', newLine: newN });
-    } else if (line.startsWith('-')) {
-      oldN++;
-      result.push({ text: line.slice(1), type: 'del', oldLine: oldN });
-    } else {
-      const content = line.startsWith(' ') ? line.slice(1) : line;
-      oldN++;
-      newN++;
-      result.push({ text: content, type: 'context', oldLine: oldN, newLine: newN });
-    }
-  }
-  return result;
-}
+export { parseDiffText } from '../common/DiffViewer';
+export type { DiffLine } from '../common/DiffViewer';
 
 export const DiffView: React.FC = () => {
   const {
@@ -65,11 +17,8 @@ export const DiffView: React.FC = () => {
     setDiffTargetSha,
     stageFile,
     unstageFile,
-    toastRun,
-    preferences
+    toastRun
   } = useGitClient();
-
-  const showGutterMarkers = preferences.gutterMarkers !== false;
 
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [rawDiffText, setRawDiffText] = useState<string>('');
@@ -126,8 +75,6 @@ export const DiffView: React.FC = () => {
     return () => { active = false; };
   }, [repoPath, targetPath, diffTab, sel, getCommitFullSha, diffTargetSha]);
 
-  const parsedLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
-
   const tabs: [id: 'work' | 'index' | 'parent' | 'refs', label: string][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
@@ -135,144 +82,26 @@ export const DiffView: React.FC = () => {
     ['refs', 'Selected commit diff']
   ];
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '11.8px',
-    lineHeight: '18px'
-  };
-
   const renderDiffPane = () => {
-    if (loading) {
-      return (
-        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)' }}>
-          Loading diff…
-        </div>
-      );
-    }
-
-    if (!parsedLines.length) {
-      return (
-        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
-          {targetPath ? `No diff output for ${targetPath}` : 'No changed files found in current workspace.'}
-        </div>
-      );
-    }
-
-    const rows = parsedLines.map((line, i) => {
-      const bg =
-        line.type === 'add'
-          ? 'var(--addbg)'
-          : line.type === 'del'
-            ? 'var(--delbg)'
-            : line.type === 'hunk'
-              ? 'var(--raised)'
-              : 'transparent';
-      const fg =
-        line.type === 'add'
-          ? 'var(--add)'
-          : line.type === 'del'
-            ? 'var(--del)'
-            : line.type === 'hunk'
-              ? 'var(--fg3)'
-              : 'var(--fg)';
-
-      return (
-        <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          {showGutterMarkers && (
-            <>
-              <span
-                style={{
-                  width: '46px',
-                  flex: '0 0 auto',
-                  textAlign: 'right',
-                  paddingRight: '8px',
-                  color: 'var(--fg3)',
-                  userSelect: 'none'
-                }}
-              >
-                {line.oldLine || ''}
-              </span>
-              <span
-                style={{
-                  width: '46px',
-                  flex: '0 0 auto',
-                  textAlign: 'right',
-                  paddingRight: '10px',
-                  color: 'var(--fg3)',
-                  userSelect: 'none',
-                  borderRight: '1px solid var(--line)'
-                }}
-              >
-                {line.newLine || ''}
-              </span>
-            </>
-          )}
-          <span style={{ paddingLeft: '10px', whiteSpace: 'pre-wrap', color: fg, flex: 1 }}>
-            {line.text}
-          </span>
-        </div>
-      );
-    });
-
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div
-          style={{
-            flex: '0 0 auto',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '0 12px',
-            background: 'var(--panel)',
-            borderBottom: '1px solid var(--line)'
-          }}
-        >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-            {targetPath || 'Repository diff'}
-          </span>
-          <div style={{ flex: 1 }} />
-          {targetPath && diffTab === 'work' && (
-            <Button
-              variant="secondary"
-              style={{ height: '22px', fontSize: '11.5px' }}
-              onClick={() => void stageFile(targetPath)}
-            >
-              Stage file
-            </Button>
-          )}
-          {targetPath && diffTab === 'index' && (
-            <Button
-              variant="secondary"
-              style={{ height: '22px', fontSize: '11.5px' }}
-              onClick={() => void unstageFile(targetPath)}
-            >
-              Unstage file
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={() => {
-              void navigator.clipboard.writeText(rawDiffText);
-              toastRun('Copied diff patch', targetPath || 'diff');
-            }}
-          >
-            Copy patch
-          </Button>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            minHeight: 0,
-            padding: '6px 0',
-            background: 'var(--color-bg)'
-          }}
-        >
-          {rows}
-        </div>
-      </div>
+      <DiffViewer
+        filePath={targetPath}
+        rawDiffText={rawDiffText}
+        loading={loading}
+        emptyMessage={
+          targetPath
+            ? `No diff output for ${targetPath}`
+            : 'No changed files found in current workspace.'
+        }
+        onStageFile={() => void stageFile(targetPath)}
+        onUnstageFile={() => void unstageFile(targetPath)}
+        onCopyPatch={() => {
+          void navigator.clipboard.writeText(rawDiffText);
+          toastRun('Copied diff patch', targetPath || 'diff');
+        }}
+        isStaged={targetPath ? diffTab === 'index' : false}
+        isUnstaged={targetPath ? diffTab === 'work' : false}
+      />
     );
   };
 

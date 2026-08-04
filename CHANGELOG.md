@@ -1,6 +1,8 @@
 # Changelog
 
 ## 2026-08-04
+- Implemented 2-sided (two columns / side-by-side) diff viewer component (`<DiffViewer />`) with block-pairing algorithm (`parseSideBySideDiff`), dual line-number gutters, column header indicators, toolbar layout switcher (`2 Sides` / `1 Side`), and settings configuration.
+- Integrated `<DiffViewer />` across `DiffView.tsx` and `CommitDetailsView.tsx`.
 - Renamed desktop application to **Another Git** (`package.json`, `tauri.conf.json`, `index.html`, and bundle metadata).
 - Implemented custom `useResizablePanel` hook and `<ResizeHandle />` component with `localStorage` state persistence, drag indicators, and double-click size reset.
 - Made all layout panels resizable: Navigation Sidebar (`NavSidebar`), Source Control Dock (`SourceControlDock`), Console Drawer (`ConsoleDrawer`), Branch Tree (`BranchesView`), Commit Details (`CommitDetailsView`), Diff View (`DiffView`), and Compare View (`CompareView`).

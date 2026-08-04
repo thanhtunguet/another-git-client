@@ -5,52 +5,10 @@ import { DiffFile } from '../../types/git-client';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
+import { DiffViewer } from '../common/DiffViewer';
 
-export interface DiffLine {
-  text: string;
-  type: 'hunk' | 'add' | 'del' | 'context';
-  oldLine?: number;
-  newLine?: number;
-}
-
-export function parseDiffText(raw: string): DiffLine[] {
-  if (!raw || !raw.trim()) return [];
-  const lines = raw.split('\n');
-  const result: DiffLine[] = [];
-  let oldN = 0;
-  let newN = 0;
-
-  for (const line of lines) {
-    if (
-      line.startsWith('diff --git') ||
-      line.startsWith('index ') ||
-      line.startsWith('--- ') ||
-      line.startsWith('+++ ')
-    ) {
-      continue;
-    }
-    if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-      if (match) {
-        oldN = parseInt(match[1], 10) - 1;
-        newN = parseInt(match[2], 10) - 1;
-      }
-      result.push({ text: line, type: 'hunk' });
-    } else if (line.startsWith('+')) {
-      newN++;
-      result.push({ text: line.slice(1), type: 'add', newLine: newN });
-    } else if (line.startsWith('-')) {
-      oldN++;
-      result.push({ text: line.slice(1), type: 'del', oldLine: oldN });
-    } else {
-      const content = line.startsWith(' ') ? line.slice(1) : line;
-      oldN++;
-      newN++;
-      result.push({ text: content, type: 'context', oldLine: oldN, newLine: newN });
-    }
-  }
-  return result;
-}
+export { parseDiffText } from '../common/DiffViewer';
+export type { DiffLine } from '../common/DiffViewer';
 
 export const CommitDetailsView: React.FC = () => {
   const {
@@ -63,17 +21,15 @@ export const CommitDetailsView: React.FC = () => {
     cherryPickCommit,
     revertCommit,
     createPatch,
-        setView,
+    setView,
     openMenu,
-            repoPath,
+    repoPath,
     toastRun,
     setDiffTargetSha,
     setDiffTab,
     setCompareSeedRef,
     preferences
   } = useGitClient();
-
-  const showGutterMarkers = preferences.gutterMarkers !== false;
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
   const isMulti = sel.length > 1;
@@ -133,8 +89,6 @@ export const CommitDetailsView: React.FC = () => {
     return () => { active = false; };
   }, [detailIdx, currentFilePath, getCommitFullSha, repoPath]);
 
-  const parsedDiffLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
-
   const dirs: Record<string, DiffFile[]> = {};
   dfiles.forEach(f => {
     const d = f.path.split('/').slice(0, -1).join('/') || '.';
@@ -190,127 +144,23 @@ export const CommitDetailsView: React.FC = () => {
     ]);
   };
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '11.8px',
-    lineHeight: '18px'
-  };
-
   const renderDiffPane = () => {
-    if (loadingDiff) {
-      return (
-        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)' }}>
-          Loading file diff…
-        </div>
-      );
-    }
-
-    if (!parsedDiffLines.length) {
-      return (
-        <div style={{ flex: 1, padding: 'var(--space-4)', fontSize: '12px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
-          {currentFilePath ? `No diff details for ${currentFilePath}` : 'Select a file to view diff details.'}
-        </div>
-      );
-    }
-
-    const rows = parsedDiffLines.map((line, i) => {
-      const bg =
-        line.type === 'add'
-          ? 'var(--addbg)'
-          : line.type === 'del'
-            ? 'var(--delbg)'
-            : line.type === 'hunk'
-              ? 'var(--raised)'
-              : 'transparent';
-      const fg =
-        line.type === 'add'
-          ? 'var(--add)'
-          : line.type === 'del'
-            ? 'var(--del)'
-            : line.type === 'hunk'
-              ? 'var(--fg3)'
-              : 'var(--fg)';
-
-      return (
-        <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          {showGutterMarkers && (
-            <>
-              <span
-                style={{
-                  width: '46px',
-                  flex: '0 0 auto',
-                  textAlign: 'right',
-                  paddingRight: '8px',
-                  color: 'var(--fg3)',
-                  userSelect: 'none'
-                }}
-              >
-                {line.oldLine || ''}
-              </span>
-              <span
-                style={{
-                  width: '46px',
-                  flex: '0 0 auto',
-                  textAlign: 'right',
-                  paddingRight: '10px',
-                  color: 'var(--fg3)',
-                  userSelect: 'none',
-                  borderRight: '1px solid var(--line)'
-                }}
-              >
-                {line.newLine || ''}
-              </span>
-            </>
-          )}
-          <span style={{ paddingLeft: '10px', whiteSpace: 'pre-wrap', color: fg, flex: 1 }}>
-            {line.text}
-          </span>
-        </div>
-      );
-    });
-
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div
-          style={{
-            flex: '0 0 auto',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '0 12px',
-            background: 'var(--panel)',
-            borderBottom: '1px solid var(--line)'
-          }}
-        >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-            {currentFilePath}
-          </span>
-          <div style={{ flex: 1 }} />
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={() => {
-              void createPatch(getCommitFullSha(detailIdx), currentFilePath).then(p => {
-                if (p) void navigator.clipboard.writeText(p);
-              });
-            }}
-          >
-            Copy patch
-          </Button>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            minHeight: 0,
-            padding: '6px 0',
-            background: 'var(--color-bg)'
-          }}
-        >
-          {rows}
-        </div>
-      </div>
+      <DiffViewer
+        filePath={currentFilePath}
+        rawDiffText={rawDiffText}
+        loading={loadingDiff}
+        emptyMessage={
+          currentFilePath
+            ? `No diff details for ${currentFilePath}`
+            : 'Select a file to view diff details.'
+        }
+        onCopyPatch={() => {
+          void createPatch(getCommitFullSha(detailIdx), currentFilePath).then(p => {
+            if (p) void navigator.clipboard.writeText(p);
+          });
+        }}
+      />
     );
   };
 

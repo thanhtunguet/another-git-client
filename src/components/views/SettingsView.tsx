@@ -191,6 +191,14 @@ export const SettingsView: React.FC = () => {
       title: 'Diff & merge',
       rows: [
         {
+          label: 'Default diff view',
+          hint: '2 Sides (Split) or 1 Side (Inline/Unified) layout for diff viewer',
+          control: 'select',
+          settingKey: 'diffMode',
+          defaultValue: 'split',
+          options: ['split', 'inline']
+        },
+        {
           label: 'Gutter markers',
           hint: 'Show old/new line-number columns in diff views',
           control: 'checkbox',

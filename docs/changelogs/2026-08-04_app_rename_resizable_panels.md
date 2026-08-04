@@ -12,6 +12,9 @@
   - **Commit Details Panel** (`CommitDetailsView`): Splitter between commit file list and diff viewer with persistence (`ag_panel_commit_details_width`).
   - **Diff View Sidebar** (`DiffView`): Splitter between changed files panel and diff viewer with persistence (`ag_panel_diff_sidebar_width`).
   - **Compare View Split** (`CompareView`): Splitter between Side A and Side B in side-by-side or stacked layout with persistence (`ag_panel_compare_side_a_width` / `ag_panel_compare_side_a_height`).
+- Built `<DiffViewer />` component supporting 2-sided (side-by-side / two columns) diff view as default, with a `[ 2 Sides | 1 Side ]` layout mode toggle, column header indicators (`Original` vs `Modified`), aligned side-by-side row pairing for deleted/added blocks, line number gutters, and action controls (`Stage`, `Unstage`, `Copy patch`).
+- Integrated `<DiffViewer />` across `DiffView.tsx` and `CommitDetailsView.tsx`.
+- Added "Default diff view" configuration (`split` vs `inline`) under "Diff & merge" in `SettingsView.tsx`.
 
 ## Detailed Changes
 
@@ -20,15 +23,18 @@
 - `index.html`: Updated `<title>` to `"Another Git"`.
 - `src/hooks/useResizablePanel.ts`: Created custom hook to manage panel dimensions, drag handlers, bounds clamping, and `localStorage` synchronization.
 - `src/components/common/ResizeHandle.tsx`: Created visual splitter bar component for horizontal/vertical dragging and reset action.
+- `src/components/common/DiffViewer.tsx`: Created reusable 2-sided and 1-sided diff rendering component with block-pairing algorithm (`parseSideBySideDiff`).
+- `src/components/views/DiffView.tsx`: Integrated `DiffViewer` for workspace file diffs.
+- `src/components/views/CommitDetailsView.tsx`: Integrated `DiffViewer` for commit file diffs.
+- `src/components/views/SettingsView.tsx`: Added `diffMode` setting row in `Diff & merge` section.
 - `src/components/layout/NavSidebar.tsx`: Added `style` and `className` props for variable width.
 - `src/components/layout/SourceControlDock.tsx`: Added `style` and `className` props for variable width.
 - `src/components/GitClient.tsx`: Integrated resizable layout handles for `NavSidebar` and `SourceControlDock`.
 - `src/components/layout/ConsoleDrawer.tsx`: Integrated vertical resizable handle for bottom console output.
 - `src/components/views/BranchesView.tsx`: Added horizontal splitter between branch/tag tree and branch inspector.
-- `src/components/views/CommitDetailsView.tsx`: Added horizontal splitter between commit files list and diff pane.
-- `src/components/views/DiffView.tsx`: Added horizontal splitter between changed files list and diff content pane.
 - `src/components/views/CompareView.tsx`: Converted grid layout to flexible resizable split supporting horizontal/vertical modes.
 
 ## Verification
 
-- `npm run typecheck`: Passed clean with zero TypeScript errors.
+- `npm run build:tauri-frontend`: Passed clean with zero TypeScript or build errors.
+
