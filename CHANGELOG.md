@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-04
+- Renamed desktop application to **Another Git** (`package.json`, `tauri.conf.json`, `index.html`, and bundle metadata).
+- Implemented custom `useResizablePanel` hook and `<ResizeHandle />` component with `localStorage` state persistence, drag indicators, and double-click size reset.
+- Made all layout panels resizable: Navigation Sidebar (`NavSidebar`), Source Control Dock (`SourceControlDock`), Console Drawer (`ConsoleDrawer`), Branch Tree (`BranchesView`), Commit Details (`CommitDetailsView`), Diff View (`DiffView`), and Compare View (`CompareView`).
+- Documented session changes in `docs/changelogs/2026-08-04_app_rename_resizable_panels.md`.
+
 ## 2026-08-01
 - Added Rust backend commands `git_get_compare`, `git_create_patch`, and `git_apply_patch`.
 - Wired `CompareView.tsx` to live backend comparison, dynamic branch selection, side-by-side commit comparison, and export summary/patch.

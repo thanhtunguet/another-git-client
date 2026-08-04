@@ -1,9 +1,20 @@
 import React from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { ResizeHandle } from '../common/ResizeHandle';
 
 export const ConsoleDrawer: React.FC = () => {
   const { consoleOpen, consoleLines, clearConsole, toggleConsole } = useGitClient();
+
+  const consolePanel = useResizablePanel({
+    storageKey: 'ag_panel_console_height',
+    defaultSize: 200,
+    minSize: 100,
+    maxSize: 600,
+    direction: 'vertical',
+    reverse: true
+  });
 
   if (!consoleOpen) return null;
 
@@ -32,16 +43,24 @@ export const ConsoleDrawer: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        flex: '0 0 auto',
-        height: '200px',
-        borderTop: '1px solid var(--line)',
-        background: 'var(--panel)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}
-    >
+    <>
+      <ResizeHandle
+        direction="vertical"
+        isDragging={consolePanel.isDragging}
+        onMouseDown={consolePanel.handleMouseDown}
+        onDoubleClick={consolePanel.resetSize}
+        title="Drag to resize console drawer (Double-click to reset)"
+      />
+      <div
+        style={{
+          flex: '0 0 auto',
+          height: `${consolePanel.size}px`,
+          borderTop: '1px solid var(--line)',
+          background: 'var(--panel)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
       <div
         style={{
           flex: '0 0 auto',
@@ -99,5 +118,6 @@ export const ConsoleDrawer: React.FC = () => {
         ))}
       </div>
     </div>
-  );
+  </>
+);
 };

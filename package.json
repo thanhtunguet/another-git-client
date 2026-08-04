@@ -1,7 +1,7 @@
 {
-  "name": "git-client-design",
+  "name": "another-git",
   "version": "1.0.0",
-  "description": "A reusable React + TypeScript 7.0 + SCSS Git Client component library based on Nocturne Design System",
+  "description": "Another Git desktop application",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

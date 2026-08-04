@@ -19,11 +19,14 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'components', label: 'Components', icon: 'ph-stack' }
 ];
 
-export const NavSidebar: React.FC = () => {
+export const NavSidebar: React.FC<{ style?: React.CSSProperties; className?: string }> = ({
+  style,
+  className = ''
+}) => {
   const { view, setView } = useGitClient();
 
   return (
-    <div className="gc-sidebar">
+    <div className={`gc-sidebar ${className}`.trim()} style={style}>
       {NAV_ITEMS.map(item => {
         const active = view === item.id;
         return (

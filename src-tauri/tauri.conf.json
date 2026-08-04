@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Git Client Design",
+  "productName": "Another Git",
   "version": "0.1.0",
-  "identifier": "com.gitclientdesign.app",
+  "identifier": "com.anothergit.app",
   "build": {
     "frontendDist": "../dist-tauri",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Git Client Design",
+        "title": "Another Git",
         "width": 800,
         "height": 600,
         "resizable": true,

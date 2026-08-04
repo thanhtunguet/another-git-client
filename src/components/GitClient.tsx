@@ -22,11 +22,31 @@ import { CommandPalette } from './common/CommandPalette';
 import { Dialog } from './common/Dialog';
 import { ProgressToast } from './common/ProgressToast';
 
+import { useResizablePanel } from '../hooks/useResizablePanel';
+import { ResizeHandle } from './common/ResizeHandle';
+
 const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
   className = '',
   style
 }) => {
-  const { view } = useGitClient();
+  const { view, dock } = useGitClient();
+
+  const navPanel = useResizablePanel({
+    storageKey: 'ag_panel_nav_sidebar_width',
+    defaultSize: 82,
+    minSize: 60,
+    maxSize: 240,
+    direction: 'horizontal'
+  });
+
+  const dockPanel = useResizablePanel({
+    storageKey: 'ag_panel_sc_dock_width',
+    defaultSize: 330,
+    minSize: 220,
+    maxSize: 600,
+    direction: 'horizontal',
+    reverse: true
+  });
 
   const renderActiveView = () => {
     switch (view) {
@@ -57,12 +77,30 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
     <div className={`gc-container ${className}`.trim()} style={style}>
       <TopBar />
       <div className="gc-main-row">
-        <NavSidebar />
+        <NavSidebar style={{ width: `${navPanel.size}px` }} />
+        <ResizeHandle
+          direction="horizontal"
+          isDragging={navPanel.isDragging}
+          onMouseDown={navPanel.handleMouseDown}
+          onDoubleClick={navPanel.resetSize}
+          title="Drag to resize navigation sidebar (Double-click to reset)"
+        />
         <div className="gc-view-container">
           {renderActiveView()}
           <ConsoleDrawer />
         </div>
-        <SourceControlDock />
+        {dock && (
+          <>
+            <ResizeHandle
+              direction="horizontal"
+              isDragging={dockPanel.isDragging}
+              onMouseDown={dockPanel.handleMouseDown}
+              onDoubleClick={dockPanel.resetSize}
+              title="Drag to resize source control dock (Double-click to reset)"
+            />
+            <SourceControlDock style={{ width: `${dockPanel.size}px` }} />
+          </>
+        )}
       </div>
       <StatusBar />
 

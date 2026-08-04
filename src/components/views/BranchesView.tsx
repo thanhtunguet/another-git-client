@@ -4,6 +4,8 @@ import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { tauriGitBackend, type BranchRef, type TagRef } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { ResizeHandle } from '../common/ResizeHandle';
 
 type BranchKind = 'local' | 'remote';
 
@@ -612,11 +614,20 @@ export const BranchesView: React.FC = () => {
 
   const selectedBranchMeta = selectedBranch ? formatBranchMeta(selectedBranch) : '';
 
+  const treePanel = useResizablePanel({
+    storageKey: 'ag_panel_branches_tree_width',
+    defaultSize: 340,
+    minSize: 200,
+    maxSize: 600,
+    direction: 'horizontal'
+  });
+
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
       <div
         style={{
-          flex: '0 0 340px',
+          width: `${treePanel.size}px`,
+          flex: '0 0 auto',
           display: 'flex',
           flexDirection: 'column',
           borderRight: '1px solid var(--line)',
@@ -909,6 +920,14 @@ export const BranchesView: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <ResizeHandle
+        direction="horizontal"
+        isDragging={treePanel.isDragging}
+        onMouseDown={treePanel.handleMouseDown}
+        onDoubleClick={treePanel.resetSize}
+        title="Drag to resize branch tree panel (Double-click to reset)"
+      />
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
         <div

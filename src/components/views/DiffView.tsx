@@ -2,6 +2,8 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { ResizeHandle } from '../common/ResizeHandle';
 
 export interface DiffLine {
   text: string;
@@ -274,6 +276,14 @@ export const DiffView: React.FC = () => {
     );
   };
 
+  const sidebarPanel = useResizablePanel({
+    storageKey: 'ag_panel_diff_sidebar_width',
+    defaultSize: 220,
+    minSize: 140,
+    maxSize: 500,
+    direction: 'horizontal'
+  });
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Top tabs */}
@@ -322,7 +332,8 @@ export const DiffView: React.FC = () => {
         {availableFiles.length > 0 && (
           <div
             style={{
-              flex: '0 0 220px',
+              width: `${sidebarPanel.size}px`,
+              flex: '0 0 auto',
               borderRight: '1px solid var(--line)',
               background: 'var(--panel)',
               overflow: 'auto',
@@ -364,6 +375,16 @@ export const DiffView: React.FC = () => {
               </div>
             ))}
           </div>
+        )}
+
+        {availableFiles.length > 0 && (
+          <ResizeHandle
+            direction="horizontal"
+            isDragging={sidebarPanel.isDragging}
+            onMouseDown={sidebarPanel.handleMouseDown}
+            onDoubleClick={sidebarPanel.resetSize}
+            title="Drag to resize file selector panel (Double-click to reset)"
+          />
         )}
 
         {/* Diff content */}

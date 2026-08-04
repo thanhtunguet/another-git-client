@@ -4,6 +4,8 @@ import { Button } from '../common/Button';
 import { Input, Select } from '../common/FormControls';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { tauriGitBackend, type BranchRef, type GitCompareResult, type GraphCommitRow } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { ResizeHandle } from '../common/ResizeHandle';
 
 export const CompareView: React.FC = () => {
   const {
@@ -329,8 +331,15 @@ export const CompareView: React.FC = () => {
     );
   };
 
-  const cmpCols = compareLayout === 'side' ? '1fr 1fr' : '1fr';
-  const cmpRows = compareLayout === 'side' ? '1fr' : '1fr 1fr';
+  const isSide = compareLayout === 'side';
+
+  const sideAPanel = useResizablePanel({
+    storageKey: isSide ? 'ag_panel_compare_side_a_width' : 'ag_panel_compare_side_a_height',
+    defaultSize: isSide ? 450 : 260,
+    minSize: isSide ? 200 : 100,
+    maxSize: isSide ? 1200 : 600,
+    direction: isSide ? 'horizontal' : 'vertical'
+  });
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -464,16 +473,15 @@ export const CompareView: React.FC = () => {
           style={{
             flex: 1,
             minHeight: 0,
-            display: 'grid',
-            gridTemplateColumns: cmpCols,
-            gridTemplateRows: cmpRows,
-            gap: '1px',
-            background: 'var(--line)'
+            display: 'flex',
+            flexDirection: isSide ? 'row' : 'column'
           }}
         >
           {/* Side A */}
           <div
             style={{
+              ...(isSide ? { width: `${sideAPanel.size}px` } : { height: `${sideAPanel.size}px` }),
+              flex: '0 0 auto',
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
@@ -589,6 +597,14 @@ export const CompareView: React.FC = () => {
               )}
             </div>
           </div>
+
+          <ResizeHandle
+            direction={isSide ? 'horizontal' : 'vertical'}
+            isDragging={sideAPanel.isDragging}
+            onMouseDown={sideAPanel.handleMouseDown}
+            onDoubleClick={sideAPanel.resetSize}
+            title="Drag to resize comparison split (Double-click to reset)"
+          />
 
           {/* Side B */}
           <div

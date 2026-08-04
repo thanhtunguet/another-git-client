@@ -3,6 +3,8 @@ import { useGitClient, statusColor } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { DiffFile } from '../../types/git-client';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { ResizeHandle } from '../common/ResizeHandle';
 
 export interface DiffLine {
   text: string;
@@ -312,12 +314,21 @@ export const CommitDetailsView: React.FC = () => {
     );
   };
 
+  const leftPanel = useResizablePanel({
+    storageKey: 'ag_panel_commit_details_width',
+    defaultSize: 380,
+    minSize: 220,
+    maxSize: 700,
+    direction: 'horizontal'
+  });
+
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
       {/* Left panel */}
       <div
         style={{
-          flex: '0 0 380px',
+          width: `${leftPanel.size}px`,
+          flex: '0 0 auto',
           display: 'flex',
           flexDirection: 'column',
           borderRight: '1px solid var(--line)',
@@ -496,6 +507,14 @@ export const CommitDetailsView: React.FC = () => {
           ))}
         </div>
       </div>
+
+      <ResizeHandle
+        direction="horizontal"
+        isDragging={leftPanel.isDragging}
+        onMouseDown={leftPanel.handleMouseDown}
+        onDoubleClick={leftPanel.resetSize}
+        title="Drag to resize file list panel (Double-click to reset)"
+      />
 
       {/* Right diff pane */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>

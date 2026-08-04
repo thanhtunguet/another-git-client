@@ -6,7 +6,10 @@ import { Card } from '../common/Card';
 import { statusColor } from '../../context/GitClientContext';
 import { DiffFile } from '../../types/git-client';
 
-export const SourceControlDock: React.FC = () => {
+export const SourceControlDock: React.FC<{ style?: React.CSSProperties; className?: string }> = ({
+  style,
+  className = ''
+}) => {
   const {
     dock,
     scTab,
@@ -98,10 +101,10 @@ export const SourceControlDock: React.FC = () => {
       preferences.messageTemplates ||
       '{scope}: {cursor}\n\nRefs: {ticket}\nSigned-off-by: Jakub Kicinski <kuba@kernel.org>';
 
-    openMenu(e, "Message templates", [
+    openMenu(e, 'Message Templates', [
       {
-        label: "{scope}: {cursor}",
-        hint: "kernel",
+        label: "Signed-off-by template",
+        hint: "kernel-style",
         run: () => setCommitMsg("core: update implementation\n\nSigned-off-by: Developer <dev@example.com>")
       },
       {
@@ -125,7 +128,7 @@ export const SourceControlDock: React.FC = () => {
   };
 
   return (
-    <div className="gc-dock">
+    <div className={`gc-dock ${className}`.trim()} style={style}>
       <div
         style={{
           flex: '0 0 auto',
