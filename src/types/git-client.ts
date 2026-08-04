@@ -35,7 +35,7 @@ export interface RefBadge {
   variant: 'accent' | 'accent-2' | 'neutral' | 'outline';
 }
 
-export type DiffFileStatus = 'A' | 'D' | 'M' | 'R' | '?';
+export type DiffFileStatus = 'A' | 'D' | 'M' | 'R' | '?' | 'U';
 
 export interface DiffFile {
   path: string;
@@ -278,8 +278,8 @@ export interface GitClientContextType {
   setBranchQ: (q: string) => void;
   scTab: 'changes' | 'stash';
   setScTab: (t: 'changes' | 'stash') => void;
-  diffTab: 'work' | 'index' | 'parent' | 'refs';
-  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs') => void;
+  diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge';
+  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs' | 'merge') => void;
   consoleLines: LogEntry[];
   log: (lines: LogEntry[]) => void;
   clearConsole: () => void;

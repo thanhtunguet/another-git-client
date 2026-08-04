@@ -1,6 +1,20 @@
 # Changelog
 
 ## 2026-08-05
+- Fixed empty view issues in Diff/Merge tab (DiffView.tsx) when opening clean repositories or inspecting commit diffs.
+- Added live commit file hydration via fetchCommitFiles when viewing commit diffs ("parent" and "refs" modes).
+- Added Merge Conflicts resolution tab ("merge") with conflict badge counters and interactive resolution controls (Keep Ours / Keep Theirs / Mark Resolved).
+- Added structured empty state cards with contextual icons, explanations, and quick action buttons when working tree or staged list is clean.
+- Preserved diff --git file boundary headers in DiffViewer.tsx for multi-file commit diff readability.
+- Extended DiffFileStatus and porcelain status parser in GitClientContext.tsx to handle unmerged conflict status ("U").
+- Documented session changes in docs/changelogs/2026-08-05_diff_merge_empty_page_fix.md.
+- Fixed empty view issues in Diff/Merge tab () when opening clean repositories or inspecting commit diffs.
+- Added live commit file hydration via  when viewing commit diffs ( and  modes).
+- Added Merge Conflicts resolution tab () with conflict badge counters and interactive resolution controls (Keep Ours / Keep Theirs / Mark Resolved).
+- Added structured empty state cards with contextual icons, explanations, and quick action buttons when working tree or staged list is clean.
+- Preserved  file boundary headers in  for multi-file commit diff readability.
+- Extended  and porcelain status parser in  to handle unmerged conflict status ().
+- Documented session changes in .
 - Audited all destructive git operations across the codebase and replaced all unconfirmed actions with the app standard custom modal dialog (`<Dialog />`).
 - Routed commit reverting ("Revert selected" button in `CommitDetailsView` & "Revert commit" in `GraphView` context menu) through custom confirmation modals.
 - Routed hard HEAD resetting ("Reset HEAD to here — hard" in `GraphView` context menu) through custom confirmation modal detailing lost uncommitted changes.

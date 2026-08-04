@@ -186,7 +186,9 @@ export function statusColor(s: string): string {
       ? 'var(--del)'
       : s === 'R'
         ? 'var(--iris)'
-        : 'var(--color-accent)';
+        : s === 'U'
+          ? 'var(--del)'
+          : 'var(--color-accent)';
 }
 
 export function refBadge(label: string): RefBadge {
@@ -360,8 +362,8 @@ interface GitClientContextType {
   setBranchQ: (q: string) => void;
   scTab: 'changes' | 'stash';
   setScTab: (t: 'changes' | 'stash') => void;
-  diffTab: 'work' | 'index' | 'parent' | 'refs';
-  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs') => void;
+  diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge';
+  setDiffTab: (t: 'work' | 'index' | 'parent' | 'refs' | 'merge') => void;
   consoleLines: LogEntry[];
   log: (lines: LogEntry[]) => void;
   clearConsole: () => void;
@@ -518,8 +520,8 @@ export const GitClientProvider: React.FC<{
   const [scTab, setScTab] = useState<'changes' | 'stash'>(
     persistedStore?.settings.scTab || 'changes'
   );
-  const [diffTab, setDiffTab] = useState<'work' | 'index' | 'parent' | 'refs'>(
-    persistedStore?.settings.diffTab === 'merge' || persistedStore?.settings.diffTab === 'sources'
+  const [diffTab, setDiffTab] = useState<'work' | 'index' | 'parent' | 'refs' | 'merge'>(
+    persistedStore?.settings.diffTab === 'sources'
       ? 'work'
       : persistedStore?.settings.diffTab || 'work'
   );
@@ -766,9 +768,12 @@ export const GitClientProvider: React.FC<{
       if (entry.untracked) {
         return '?';
       }
+      if (entry.indexStatus === 'U' || entry.worktreeStatus === 'U' || entry.status.includes('U')) {
+        return 'U';
+      }
       const resolved = (entry.indexStatus || entry.worktreeStatus || 'M').trim() || 'M';
       const primary = resolved[0] || 'M';
-      if (primary === 'A' || primary === 'D' || primary === 'M' || primary === 'R' || primary === '?') {
+      if (primary === 'A' || primary === 'D' || primary === 'M' || primary === 'R' || primary === '?' || primary === 'U') {
         return primary;
       }
       return 'M';

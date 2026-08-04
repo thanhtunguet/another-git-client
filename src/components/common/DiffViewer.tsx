@@ -18,8 +18,11 @@ export function parseDiffText(raw: string): DiffLine[] {
   let newN = 0;
 
   for (const line of lines) {
+    if (line.startsWith('diff --git')) {
+      result.push({ text: line, type: 'hunk' });
+      continue;
+    }
     if (
-      line.startsWith('diff --git') ||
       line.startsWith('index ') ||
       line.startsWith('--- ') ||
       line.startsWith('+++ ')
