@@ -96,15 +96,36 @@ fn canonical_repo_path(repo_path: &str) -> Result<PathBuf, String> {
   if !path.exists() {
     return Err(format!("Repository path does not exist: {repo_path}"));
   }
-  path
-    .canonicalize()
-    .map_err(|e| format!("Failed to resolve repository path {repo_path}: {e}"))
+  Ok(path.canonicalize().unwrap_or(path))
 }
 
 fn run_git_allow_failure(repo: &Path, args: &[String]) -> Result<GitCommandResult, String> {
-  let output = Command::new("git")
-    .args(args)
-    .current_dir(repo)
+  let mut cmd = Command::new("git");
+  cmd.args(args).current_dir(repo);
+
+  #[cfg(unix)]
+  {
+    if let Ok(current_path) = std::env::var("PATH") {
+      let extra_paths = [
+        "/usr/local/bin",
+        "/usr/bin",
+        "/bin",
+        "/home/linuxbrew/.linuxbrew/bin",
+      ];
+      let mut missing = Vec::new();
+      for p in extra_paths {
+        if !current_path.split(':').any(|item| item == p) && Path::new(p).exists() {
+          missing.push(p);
+        }
+      }
+      if !missing.is_empty() {
+        let new_path = format!("{}:{}", missing.join(":"), current_path);
+        cmd.env("PATH", new_path);
+      }
+    }
+  }
+
+  let output = cmd
     .output()
     .map_err(|e| format!("Failed to spawn git: {e}"))?;
 
@@ -218,7 +239,7 @@ pub fn git_is_repo(repo_path: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
   let repo = canonical_repo_path(&repo_path)?;
-  let format = "%(*refname:short)\x1f%(refname:short)\x1f%(refname)\x1f%(upstream:short)\x1f%(upstream:track)\x1f%(HEAD)\x1f%(committerdate:unix)\x1f%(symref)";
+  let format = "%(*refname:short)\x1f%(refname:short)\x1f%(refname)\x1f%(upstream:short)\x1f%(upstream:track)\x1f%(HEAD)\x1f%(committerdate:unix)";
   let args = vec![
     "for-each-ref".to_string(),
     "refs/heads".to_string(),
@@ -235,10 +256,12 @@ pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
       continue;
     }
 
+    let full_ref = parts[2].to_string();
+
     // Skip symbolic refs such as refs/remotes/origin/HEAD — they mirror another
     // ref rather than naming a real branch and would otherwise show up as a
     // phantom leaf (e.g. an "origin" entry inside the "origin" remote folder).
-    let is_symref = parts.get(7).is_some_and(|symref| !symref.is_empty());
+    let is_symref = full_ref.starts_with("refs/remotes/") && full_ref.ends_with("/HEAD");
     if is_symref {
       continue;
     }
@@ -248,7 +271,6 @@ pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
     } else {
       parts[1].to_string()
     };
-    let full_ref = parts[2].to_string();
     let upstream = if parts[3].is_empty() {
       None
     } else {

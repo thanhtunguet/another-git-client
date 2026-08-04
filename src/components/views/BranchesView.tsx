@@ -267,6 +267,7 @@ export const BranchesView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [selectedBranchName, setSelectedBranchName] = useState<string>('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!repoPath) {
@@ -278,6 +279,7 @@ export const BranchesView: React.FC = () => {
 
     let disposed = false;
     setIsLoading(true);
+    setLoadError(null);
 
     void (async () => {
       try {
@@ -290,11 +292,14 @@ export const BranchesView: React.FC = () => {
         }
         setBranches(branchRefs.map(normalizeBranchRef));
         setTags(tagRefs.map(normalizeTagRef));
+        setLoadError(null);
       } catch (error) {
         if (!disposed) {
+          const msg = error instanceof Error ? error.message : String(error);
           console.error('Failed to load branches/tags', error);
           setBranches([]);
           setTags([]);
+          setLoadError(msg);
         }
       } finally {
         if (!disposed) {
@@ -865,7 +870,63 @@ export const BranchesView: React.FC = () => {
               </div>
             );
           })}
-          {!treeRows.length && !isLoading && (
+          {loadError && !isLoading && (
+            <div
+              style={{
+                padding: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '6px',
+                margin: '12px'
+              }}
+            >
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--danger)' }}>
+                Failed to load branches
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  color: 'var(--fg2)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  maxHeight: '120px',
+                  overflowY: 'auto'
+                }}
+              >
+                {loadError}
+              </div>
+              <Button
+                variant="secondary"
+                style={{ alignSelf: 'flex-start', height: '24px', fontSize: '11px' }}
+                onClick={() => {
+                  setIsLoading(true);
+                  setLoadError(null);
+                  void (async () => {
+                    try {
+                      const [branchRefs, tagRefs] = await Promise.all([
+                        tauriGitBackend.getBranches(repoPath),
+                        tauriGitBackend.getTags(repoPath)
+                      ]);
+                      setBranches(branchRefs.map(normalizeBranchRef));
+                      setTags(tagRefs.map(normalizeTagRef));
+                      setLoadError(null);
+                    } catch (err) {
+                      setLoadError(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  })();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          )}
+          {!treeRows.length && !isLoading && !loadError && (
             <div
               style={{
                 padding: '12px',

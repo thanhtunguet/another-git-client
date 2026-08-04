@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-04
+- Fixed Linux branch loading failures caused by Git < 2.38 `%(symref)` format atom incompatibility in `src-tauri/src/git_backend.rs`, added PATH discovery for Linux GUI desktop launchers, made path canonicalization non-breaking across mount boundaries, and added explicit error state UI feedback and retry control in `BranchesView.tsx`.
 - Implemented 2-sided (two columns / side-by-side) diff viewer component (`<DiffViewer />`) with block-pairing algorithm (`parseSideBySideDiff`), dual line-number gutters, column header indicators, toolbar layout switcher (`2 Sides` / `1 Side`), and settings configuration.
 - Integrated `<DiffViewer />` across `DiffView.tsx` and `CommitDetailsView.tsx`.
 - Renamed desktop application to **Another Git** (`package.json`, `tauri.conf.json`, `index.html`, and bundle metadata).
