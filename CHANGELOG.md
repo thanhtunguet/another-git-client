@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-08-05
+- Audited all destructive git operations across the codebase and replaced all unconfirmed actions with the app standard custom modal dialog (`<Dialog />`).
+- Routed commit reverting ("Revert selected" button in `CommitDetailsView` & "Revert commit" in `GraphView` context menu) through custom confirmation modals.
+- Routed hard HEAD resetting ("Reset HEAD to here — hard" in `GraphView` context menu) through custom confirmation modal detailing lost uncommitted changes.
+- Routed file change discarding ("Discard changes" in `SourceControlDock` file context menu) and stash dropping ("Drop" in `SourceControlDock` stash context menu) through custom confirmation modals.
+- Eliminated native browser `window.confirm`, `window.alert`, and `window.prompt` calls in favor of custom modal dialogs (`confirm`, `prompt`) and non-blocking toast notifications.
+- Added backdrop click cancellation to the custom `<Dialog />` overlay.
+- Documented session changes in `docs/changelogs/2026-08-05_destructive_actions_confirmation_dialogs.md`.
+
 ## 2026-08-04
 - Fixed Linux branch loading failures caused by Git < 2.38 `%(symref)` format atom incompatibility in `src-tauri/src/git_backend.rs`, added PATH discovery for Linux GUI desktop launchers, made path canonicalization non-breaking across mount boundaries, and added explicit error state UI feedback and retry control in `BranchesView.tsx`.
 - Implemented 2-sided (two columns / side-by-side) diff viewer component (`<DiffViewer />`) with block-pairing algorithm (`parseSideBySideDiff`), dual line-number gutters, column header indicators, toolbar layout switcher (`2 Sides` / `1 Side`), and settings configuration.

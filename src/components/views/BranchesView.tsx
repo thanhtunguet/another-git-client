@@ -574,9 +574,13 @@ export const BranchesView: React.FC = () => {
         label: `${r.name} (${r.kind})`,
         hint: r.url,
         run: () => {
-          if (window.confirm(`Delete remote ${r.name}?`)) {
-            void deleteRemote(r.name);
-          }
+          confirm(
+            `Delete remote ${r.name}?`,
+            "This will remove the remote server reference from your repository configuration.",
+            `git remote remove ${r.name}`,
+            "Delete Remote",
+            () => void deleteRemote(r.name)
+          );
         }
       }));
       openMenu(e, "Configured Remotes (click to remove)", items.length ? items : [{ label: "No remotes configured" }]);
@@ -600,7 +604,7 @@ export const BranchesView: React.FC = () => {
             toastRun('Fetch complete', `Fetched remote ${remoteName}`);
           }).catch(err => {
             console.error(err);
-            window.alert(`Fetch failed: ${err}`);
+            toastRun('Fetch failed', String(err));
           });
         } 
       },

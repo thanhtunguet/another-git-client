@@ -20,6 +20,7 @@ export const CommitDetailsView: React.FC = () => {
     fetchCommitFiles,
     cherryPickCommit,
     revertCommit,
+    confirm,
     createPatch,
     setView,
     openMenu,
@@ -27,8 +28,7 @@ export const CommitDetailsView: React.FC = () => {
     toastRun,
     setDiffTargetSha,
     setDiffTab,
-    setCompareSeedRef,
-    preferences
+    setCompareSeedRef
   } = useGitClient();
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
@@ -247,7 +247,19 @@ export const CommitDetailsView: React.FC = () => {
           <Button
             variant="secondary"
             style={{ height: '23px', fontSize: '11.5px' }}
-            onClick={() => void revertCommit(getCommitFullSha(detailIdx))}
+            onClick={() => {
+              const fullSha = getCommitFullSha(detailIdx);
+              const shortSha = getCommitHash(detailIdx);
+              const commit = commits[detailIdx];
+              const subject = commit?.[0] ? ` ("${commit[0]}")` : "";
+              confirm(
+                'Revert Commit?',
+                `Revert commit ${shortSha}${subject}? A new commit will be created to invert the changes.`,
+                `git revert --no-edit ${fullSha}`,
+                'Revert',
+                () => void revertCommit(fullSha)
+              );
+            }}
             disabled={isMulti}
             title={isMulti ? 'Select a single commit to revert' : 'Revert this commit'}
           >

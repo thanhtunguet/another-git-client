@@ -36,8 +36,8 @@ export const Dialog: React.FC = () => {
     : true;
 
   return (
-    <div className="dialog-backdrop" style={{ zIndex: 80 }}>
-      <div className="dialog" style={{ animation: 'popIn .1s ease-out' }}>
+    <div className="dialog-backdrop" style={{ zIndex: 80 }} onClick={closeDialog}>
+      <div className="dialog" style={{ animation: 'popIn .1s ease-out' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
           <i
             className={

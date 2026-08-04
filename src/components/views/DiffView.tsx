@@ -1,5 +1,10 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { useGitClient } from '../../context/GitClientContext';
+import { tauriGitBackend } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { Button } from '../common/Button';
+import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
-
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
 

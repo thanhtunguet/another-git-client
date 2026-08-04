@@ -93,6 +93,8 @@ export const GraphView: React.FC = () => {
     cherryPickCommit,
     revertCommit,
     resetToRef,
+    confirm,
+    currentBranch,
     toastRun,
     graphData,
     graphHasMore,
@@ -225,14 +227,35 @@ export const GraphView: React.FC = () => {
       },
       { sep: true },
       { label: "Cherry-pick", run: () => void cherryPickCommit(fullSha) },
-      { label: "Revert commit", run: () => void revertCommit(fullSha) },
+      {
+        label: "Revert commit",
+        run: () => {
+          const commit = commits[i];
+          const subject = commit?.[0] ? ` ("${commit[0]}")` : '';
+          confirm(
+            "Revert Commit?",
+            `Revert commit ${hash}${subject}? A new commit will be created to invert the changes.`,
+            `git revert --no-edit ${fullSha}`,
+            "Revert",
+            () => void revertCommit(fullSha)
+          );
+        }
+      },
       { sep: true },
       { label: "Reset HEAD to here — soft", run: () => void resetToRef(fullSha, "soft") },
       { label: "Reset HEAD to here — mixed", run: () => void resetToRef(fullSha, "mixed") },
       {
         label: "Reset HEAD to here — hard",
         danger: true,
-        run: () => void resetToRef(fullSha, "hard")
+        run: () => {
+          confirm(
+            `Hard reset ${currentBranch || 'HEAD'} to ${hash}?`,
+            "All uncommitted changes in the working tree and index will be permanently discarded.",
+            `git reset --hard ${fullSha}`,
+            "Reset --hard",
+            () => void resetToRef(fullSha, "hard")
+          );
+        }
       },
       {
         sep: true

@@ -1037,11 +1037,36 @@ export const GitClientProvider: React.FC<{
       }
 
       if (!destinationBase) {
-        const fallbackPath = window.prompt('Clone destination parent folder', '');
-        if (!fallbackPath || !fallbackPath.trim()) {
-          return;
-        }
-        destinationBase = fallbackPath.trim();
+        prompt(
+          'Clone Destination',
+          'Enter the absolute parent folder path where the repository should be cloned.',
+          'Clone',
+          '',
+          (val?: string) => {
+            const fallbackPath = (val || '').trim();
+            if (!fallbackPath) return;
+            const repoDirName = getRepoDirNameFromUrl(cloneUrl);
+            const destinationPath = joinPath(fallbackPath, repoDirName);
+            void (async () => {
+              try {
+                toastRun('Cloning', `Cloning ${cloneUrl}...`);
+                log([{ text: `$ git clone ${cloneUrl} ${destinationPath}`, type: 'cmd' }]);
+                const result = await tauriGitBackend.cloneRepo(cloneUrl, destinationPath);
+                appendCommandResult(result);
+                if (result.exitCode === 0) {
+                  await setActiveRepository(destinationPath);
+                  toastRun('Cloned repository', repoDirName);
+                } else {
+                  log([{ text: `Clone failed: ${result.stderr || 'Unknown error'}`, type: 'err' }]);
+                }
+              } catch (error) {
+                log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+              }
+            })();
+          },
+          'Destination parent folder'
+        );
+        return;
       }
 
       const repoDirName = getRepoDirNameFromUrl(cloneUrl);
@@ -1162,11 +1187,18 @@ export const GitClientProvider: React.FC<{
         }
 
         if (!nextPath) {
-          const fallbackPath = window.prompt('Open repository path', repoPath);
-          if (!fallbackPath || !fallbackPath.trim()) {
-            return;
-          }
-          nextPath = fallbackPath.trim();
+          prompt(
+            'Open Repository',
+            'Enter the path of the repository to open.',
+            'Open',
+            repoPath,
+            (val?: string) => {
+              const fallbackPath = (val || '').trim();
+              if (fallbackPath) void selectRepository(fallbackPath);
+            },
+            'Repository path'
+          );
+          return;
         }
 
         try {

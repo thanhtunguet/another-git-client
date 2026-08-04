@@ -33,6 +33,7 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     createStash,
     applyStash,
     dropStash,
+    confirm,
     prompt,
     preferences,
     currentBranch
@@ -65,7 +66,14 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
       {
         label: "Discard changes",
         danger: true,
-        run: () => void discardChanges(f.path, f.status === "?")
+        run: () =>
+          confirm(
+            `Discard changes in ${f.path}?`,
+            "All uncommitted modifications in this file will be permanently lost.",
+            f.status === "?" ? `rm ${f.path}` : `git checkout -- ${f.path}`,
+            "Discard",
+            () => void discardChanges(f.path, f.status === "?")
+          )
       }
     ]);
   };
@@ -75,7 +83,18 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
       { label: "Apply", run: () => void applyStash(st.stashRef, false) },
       { label: "Pop", run: () => void applyStash(st.stashRef, true) },
       { sep: true },
-      { label: "Drop", danger: true, run: () => void dropStash(st.stashRef) }
+      {
+        label: "Drop",
+        danger: true,
+        run: () =>
+          confirm(
+            `Drop stash ${st.stashRef}?`,
+            "The stashed changes will be permanently deleted.",
+            `git stash drop ${st.stashRef}`,
+            "Drop Stash",
+            () => void dropStash(st.stashRef)
+          )
+      }
     ]);
   };
 
