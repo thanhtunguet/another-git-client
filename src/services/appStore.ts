@@ -2,6 +2,13 @@ import { GitClientView, Theme } from '../types/git-client';
 
 const APP_STORE_KEY = 'git-client-design.app-store.v1';
 
+export interface AIConfig {
+  enabled: boolean;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
 export interface PersistedSettings {
   theme: Theme;
   dock: boolean;
@@ -13,6 +20,7 @@ export interface PersistedSettings {
   scTab: 'changes' | 'stash';
   diffTab: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources';
   preferences?: Record<string, any>;
+  ai?: AIConfig;
 }
 
 export interface PersistedRepositories {
@@ -31,6 +39,13 @@ export interface PersistedAppStore {
 function canUseStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
+
+const DEFAULT_AI_CONFIG: AIConfig = {
+  enabled: false,
+  baseUrl: '',
+  apiKey: '',
+  model: 'gpt-4o-mini'
+};
 
 export function loadAppStore(): PersistedAppStore | null {
   if (!canUseStorage()) {
@@ -52,6 +67,44 @@ export function loadAppStore(): PersistedAppStore | null {
   } catch {
     return null;
   }
+}
+
+export function loadAIConfig(): AIConfig {
+  const store = loadAppStore();
+  const ai = store?.settings.ai;
+  if (!ai) return { ...DEFAULT_AI_CONFIG };
+  return {
+    enabled: ai.enabled ?? false,
+    baseUrl: ai.baseUrl ?? '',
+    apiKey: ai.apiKey ?? '',
+    model: ai.model || 'gpt-4o-mini'
+  };
+}
+
+export function saveAIConfig(config: AIConfig): void {
+  const store = loadAppStore() ?? {
+    version: 1 as const,
+    settings: {
+      theme: 'dark' as Theme,
+      dock: true,
+      view: 'graph' as GitClientView,
+      graphLayout: 'rows' as const,
+      compareMode: 'list' as const,
+      compareLayout: 'side' as const,
+      filterOpen: false,
+      scTab: 'changes' as const,
+      diffTab: 'work' as const,
+      preferences: {}
+    },
+    repositories: {
+      selectedRepoPath: '',
+      activeRepoPath: '',
+      repoName: '',
+      repositoryList: []
+    }
+  };
+  store.settings.ai = { ...config };
+  saveAppStore(store);
 }
 
 export function saveAppStore(value: PersistedAppStore): void {

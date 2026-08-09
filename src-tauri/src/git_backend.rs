@@ -1631,6 +1631,24 @@ pub fn git_delete_remote(
 }
 
 #[tauri::command]
+pub fn git_get_staged_diff(repo_path: String, max_bytes: Option<usize>) -> Result<String, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let args = vec![
+    "diff".to_string(),
+    "--staged".to_string(),
+    "--no-color".to_string(),
+    "--no-ext-diff".to_string(),
+  ];
+  let output = run_git(&repo, &args)?.stdout;
+  let limit = max_bytes.unwrap_or(64 * 1024);
+  if output.len() > limit {
+    Ok(output[..limit].to_string())
+  } else {
+    Ok(output)
+  }
+}
+
+#[tauri::command]
 pub fn git_get_remotes(
   repo_path: String,
 ) -> Result<Vec<RemoteEntry>, String> {

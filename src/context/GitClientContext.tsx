@@ -20,7 +20,7 @@ import {
   MenuItem
 } from '../types/git-client';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
-import { loadAppStore, saveAppStore } from '../services/appStore';
+import { loadAppStore, saveAppStore, loadAIConfig, saveAIConfig, AIConfig } from '../services/appStore';
 import {
   tauriGitBackend,
   type ChangedFile as BackendChangedFile,
@@ -30,6 +30,7 @@ import {
   type WorktreeEntry,
   type SubmoduleEntry
 } from '../services/tauriGitBackend';
+import { generateAICommitMessage } from '../services/aiCommitMessage';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -436,6 +437,9 @@ interface GitClientContextType {
   actionBusy: boolean;
   activeRemoteAction: 'fetch' | 'pull' | 'push' | null;
   aiMessage: () => void;
+  aiBusy: boolean;
+  aiConfig: AIConfig;
+  updateAIConfig: (config: AIConfig) => void;
   updateAll: () => void;
   paletteAll: () => PaletteItem[];
   repoName: string;
@@ -573,8 +577,16 @@ export const GitClientProvider: React.FC<{
     persistedStore?.settings.preferences || {}
   );
 
+  const [aiConfig, setAIConfig] = useState<AIConfig>(() => loadAIConfig());
+  const [aiBusy, setAIBusy] = useState(false);
+
   const updatePreference = useCallback((key: string, value: any) => {
     setPreferences(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const updateAIConfig = useCallback((config: AIConfig) => {
+    setAIConfig(config);
+    saveAIConfig(config);
   }, []);
 
   const graphPageSizePref = useMemo(() => {
@@ -1523,26 +1535,57 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
 
-  const aiMessage = useCallback(() => {
+  const aiMessage = useCallback(async () => {
     setPaletteOpen(false);
     if (stagedFiles.length === 0) {
       log([{ text: 'No staged changes to summarize into a commit message', type: 'warn' }]);
       return;
     }
-    const verbFor = (status: DiffFile['status']) =>
-      status === 'A' ? 'Add' : status === 'D' ? 'Remove' : status === 'R' ? 'Rename' : 'Update';
-    let generated: string;
-    if (stagedFiles.length === 1) {
-      const f = stagedFiles[0];
-      generated = `${verbFor(f.status)} ${f.path}`;
-    } else {
-      const names = stagedFiles.slice(0, 3).map(f => f.path.split('/').pop());
-      const suffix = stagedFiles.length > 3 ? ` and ${stagedFiles.length - 3} more` : '';
-      generated = `Update ${stagedFiles.length} files: ${names.join(', ')}${suffix}`;
+
+    if (!aiConfig.enabled) {
+      log([{ text: 'AI commit message generation is disabled. Enable it in Settings → AI', type: 'warn' }]);
+      return;
     }
-    setCommitMsg(generated);
-    toastRun('Commit message generated', `from ${stagedFiles.length} staged file${stagedFiles.length === 1 ? '' : 's'}`);
-  }, [stagedFiles, log, toastRun]);
+
+    setAIBusy(true);
+    log([{ text: 'Generating commit message with AI...', type: 'cmd' }]);
+
+    try {
+      const response = await generateAICommitMessage({
+        repoPath,
+        stagedFiles: stagedFiles.map(f => ({
+          path: f.path,
+          status: f.status,
+          additions: f.add,
+          deletions: f.del
+        }))
+      });
+
+      setCommitMsg(response.message);
+      toastRun('Commit message generated', 'by AI');
+      log([{ text: '✓ Commit message generated successfully', type: 'ok' }]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log([{ text: `✗ AI commit message generation failed: ${errorMessage}`, type: 'err' }]);
+
+      // Fallback to simple generation
+      const verbFor = (status: DiffFile['status']) =>
+        status === 'A' ? 'Add' : status === 'D' ? 'Remove' : status === 'R' ? 'Rename' : 'Update';
+      let generated: string;
+      if (stagedFiles.length === 1) {
+        const f = stagedFiles[0];
+        generated = `${verbFor(f.status)} ${f.path}`;
+      } else {
+        const names = stagedFiles.slice(0, 3).map(f => f.path.split('/').pop());
+        const suffix = stagedFiles.length > 3 ? ` and ${stagedFiles.length - 3} more` : '';
+        generated = `Update ${stagedFiles.length} files: ${names.join(', ')}${suffix}`;
+      }
+      setCommitMsg(generated);
+      toastRun('Commit message generated', `from ${stagedFiles.length} staged file${stagedFiles.length === 1 ? '' : 's'} (fallback)`);
+    } finally {
+      setAIBusy(false);
+    }
+  }, [repoPath, stagedFiles, log, toastRun, aiConfig]);
 
   const opContinue = useCallback(() => {
     if (!op) return;
@@ -2631,6 +2674,9 @@ export const GitClientProvider: React.FC<{
         actionBusy,
         activeRemoteAction,
         aiMessage,
+        aiBusy,
+        aiConfig,
+        updateAIConfig,
         updateAll,
         paletteAll,
         repoName,

@@ -391,4 +391,8 @@ export const tauriGitBackend = {
   getRemotes(repoPath: string) {
     return invoke<RemoteEntry[]>("git_get_remotes", { repoPath });
   },
+
+  getStagedDiff(repoPath: string, maxBytes?: number) {
+    return invoke<string>("git_get_staged_diff", { repoPath, maxBytes });
+  },
 };

@@ -4,14 +4,15 @@ import { SettingsSection, SettingControlType } from '../../types/git-client';
 import { useGitClient } from '../../context/GitClientContext';
 
 export const SettingsView: React.FC = () => {
-  const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout } = useGitClient();
+  const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout, aiConfig, updateAIConfig } = useGitClient();
 
   const settingsNav = [
     { id: 'graph', href: '#graph', label: 'Graph & history' },
     { id: 'perf', href: '#perf', label: 'Performance' },
     { id: 'compare', href: '#compare', label: 'Compare & export' },
     { id: 'commit', href: '#commit', label: 'Commit' },
-    { id: 'diff', href: '#diff', label: 'Diff & merge' }
+    { id: 'diff', href: '#diff', label: 'Diff & merge' },
+    { id: 'ai', href: '#ai', label: 'AI Commit' }
   ];
 
   const renderControl = (
@@ -23,6 +24,34 @@ export const SettingsView: React.FC = () => {
     label?: string
   ) => {
     if (!settingKey) return null;
+
+    // Handle AI settings separately
+    if (settingKey.startsWith('ai.')) {
+      const aiKey = settingKey.replace('ai.', '');
+      const value = (aiConfig as any)[aiKey] || defVal;
+      const inputType = aiKey === 'apiKey' ? 'password' : 'text';
+      
+      return (
+        <Input
+          id={settingKey}
+          type={inputType}
+          value={value as string}
+          onChange={e => {
+            updateAIConfig({
+              ...aiConfig,
+              [aiKey]: e.target.value
+            });
+          }}
+          style={{
+            width: width || 320,
+            minHeight: 0,
+            height: '26px',
+            fontSize: '12px',
+            fontFamily: 'var(--font-mono)'
+          }}
+        />
+      );
+    }
 
     let value = preferences[settingKey] !== undefined ? preferences[settingKey] : defVal;
 
@@ -206,8 +235,53 @@ export const SettingsView: React.FC = () => {
           defaultValue: true
         }
       ]
+    },
+    {
+      id: 'ai',
+      title: 'AI Commit Message',
+      rows: [
+        {
+          label: 'OpenAI API Key',
+          hint: 'Your OpenAI API key for generating commit messages',
+          control: 'input',
+          settingKey: 'ai.apiKey',
+          defaultValue: ''
+        },
+        {
+          label: 'Model',
+          hint: 'OpenAI model to use (e.g., gpt-4o, gpt-4o-mini, gpt-3.5-turbo)',
+          control: 'input',
+          settingKey: 'ai.model',
+          defaultValue: 'gpt-4o-mini'
+        }
+      ]
     }
   ];
+
+  const renderAIControl = (settingKey: string, defaultValue: string) => {
+    const value = (aiConfig as any)[settingKey] || defaultValue;
+    
+    return (
+      <Input
+        id={settingKey}
+        type={settingKey === 'ai.apiKey' ? 'password' : 'text'}
+        value={value}
+        onChange={e => {
+          updateAIConfig({
+            ...aiConfig,
+            [settingKey.replace('ai.', '')]: e.target.value
+          });
+        }}
+        style={{
+          width: 320,
+          minHeight: 0,
+          height: '26px',
+          fontSize: '12px',
+          fontFamily: 'var(--font-mono)'
+        }}
+      />
+    );
+  };
 
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
