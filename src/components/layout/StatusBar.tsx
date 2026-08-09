@@ -12,7 +12,7 @@ export const StatusBar: React.FC = () => {
     currentBranch,
     behindCount,
     aheadCount,
-    commits,
+    totalCommitCount,
     stagedFiles,
     unstagedFiles,
     untrackedFiles,
@@ -110,7 +110,7 @@ export const StatusBar: React.FC = () => {
 
       <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>git 2.51.0</span>
       <span style={{ color: 'var(--fg3)' }}>·</span>
-      <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{`${commits.length} commits`}</span>
+      <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{`${totalCommitCount} commits`}</span>
     </div>
   );
 };

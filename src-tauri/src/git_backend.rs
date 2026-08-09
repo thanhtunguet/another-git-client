@@ -360,6 +360,25 @@ pub fn git_get_tags(repo_path: String) -> Result<Vec<TagRef>, String> {
 }
 
 #[tauri::command]
+pub fn git_get_commit_count(repo_path: String, all_refs: Option<bool>) -> Result<u64, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let mut args = vec![
+    "rev-list".to_string(),
+    "--count".to_string(),
+  ];
+  if all_refs.unwrap_or(true) {
+    args.push("--all".to_string());
+  } else {
+    args.push("HEAD".to_string());
+  }
+  let output = run_git(&repo, &args)?.stdout;
+  let trimmed = output.trim();
+  trimmed
+    .parse::<u64>()
+    .map_err(|e| format!("Failed to parse commit count '{trimmed}': {e}"))
+}
+
+#[tauri::command]
 pub fn git_get_graph(
   repo_path: String,
   max_count: Option<usize>,

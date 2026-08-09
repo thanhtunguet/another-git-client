@@ -549,6 +549,7 @@ export const GitClientProvider: React.FC<{
   const [repoPath, setRepoPath] = useState<string>(
     props.repoPath || persistedStore?.repositories.activeRepoPath || ''
   );
+  const [totalCommitCount, setTotalCommitCount] = useState<number>(0);
   const [repoName, setRepoName] = useState<string>(
     props.repoName || persistedStore?.repositories.repoName || 'Open a repository'
   );
@@ -814,17 +815,19 @@ export const GitClientProvider: React.FC<{
         setGraphHasMore(false);
         applyChangedFiles([]);
         setStashes([]);
+        setTotalCommitCount(0);
         return;
       }
 
       setGraphLoading(true);
       try {
-        const [rows, changed, stashList, wtList, subList] = await Promise.all([
+        const [rows, changed, stashList, wtList, subList, commitCount] = await Promise.all([
           tauriGitBackend.getGraph(pathValue, { maxCount: graphPageSizePref, skip: 0, allRefs: true }),
           tauriGitBackend.getChangedFiles(pathValue),
           tauriGitBackend.getStashes(pathValue).catch(() => []),
           tauriGitBackend.getWorktrees(pathValue).catch(() => []),
-          tauriGitBackend.getSubmodules(pathValue, true).catch(() => [])
+          tauriGitBackend.getSubmodules(pathValue, true).catch(() => []),
+          tauriGitBackend.getCommitCount(pathValue, { allRefs: true }).catch(() => 0)
         ]);
         setGraphRows(rows);
         setGraphHasMore(rows.length === graphPageSizePref);
@@ -832,6 +835,7 @@ export const GitClientProvider: React.FC<{
         setStashes(stashList);
         setWorktrees(wtList);
         setSubmodules(subList);
+        setTotalCommitCount(commitCount);
       } catch {
         setGraphRows([]);
         setGraphHasMore(false);
@@ -839,6 +843,7 @@ export const GitClientProvider: React.FC<{
         setStashes([]);
         setWorktrees([]);
         setSubmodules([]);
+        setTotalCommitCount(0);
       } finally {
         setGraphLoading(false);
       }
@@ -2608,6 +2613,7 @@ export const GitClientProvider: React.FC<{
         commitMsg,
         setCommitMsg,
         commits,
+        totalCommitCount,
         getCommitHash,
         getCommitFullSha,
         graphData,

@@ -286,6 +286,7 @@ export interface GitClientContextType {
   commitMsg: string;
   setCommitMsg: (msg: string) => void;
   commits: CommitRaw[];
+  totalCommitCount: number;
   getCommitHash: (i: number) => string;
   getCommitFullSha: (i: number) => string;
   graphData: GraphData;

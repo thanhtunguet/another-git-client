@@ -124,6 +124,13 @@ export const tauriGitBackend = {
     return invoke<TagRef[]>("git_get_tags", { repoPath });
   },
 
+  getCommitCount(repoPath: string, options?: { allRefs?: boolean }) {
+    return invoke<number>("git_get_commit_count", {
+      repoPath,
+      allRefs: options?.allRefs
+    });
+  },
+
   getGraph(repoPath: string, options?: { maxCount?: number; skip?: number; allRefs?: boolean }) {
     return invoke<GraphCommitRow[]>("git_get_graph", {
       repoPath,
