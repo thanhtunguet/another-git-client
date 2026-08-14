@@ -8,6 +8,7 @@
 - Added Tauri PTY commands for terminal start, input, resize, and stop; terminal output is streamed to the frontend through Tauri events.
 - Updated the status-bar control label from `Output` to `Panel` because it now opens both bottom-panel tabs.
 - Reset letter spacing on the bottom terminal panel tab buttons (`Output` / `Terminal`) to default.
+- Added drag-and-drop reordering for the bottom-panel tabs and persisted both the order and active tab in `localStorage`.
 
 ## Verification
 
