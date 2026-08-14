@@ -15,8 +15,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'compare', label: 'Compare', icon: 'ph-git-diff' },
   { id: 'diff', label: 'Diff / Merge', icon: 'ph-git-merge' },
   { id: 'worktrees', label: 'Worktrees', icon: 'ph-tree-structure' },
-  { id: 'submodules', label: 'Submodules', icon: 'ph-package' },
-  { id: 'components', label: 'Components', icon: 'ph-stack' }
+  { id: 'submodules', label: 'Submodules', icon: 'ph-package' }
 ];
 
 export const NavSidebar: React.FC<{ style?: React.CSSProperties; className?: string }> = ({

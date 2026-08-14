@@ -15,7 +15,6 @@ import { DiffView } from './views/DiffView';
 import { WorktreesView } from './views/WorktreesView';
 import { SubmodulesView } from './views/SubmodulesView';
 import { SettingsView } from './views/SettingsView';
-import { ComponentsView } from './views/ComponentsView';
 
 import { ContextMenu } from './common/ContextMenu';
 import { CommandPalette } from './common/CommandPalette';
@@ -30,14 +29,6 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
   style
 }) => {
   const { view, dock } = useGitClient();
-
-  const navPanel = useResizablePanel({
-    storageKey: 'ag_panel_nav_sidebar_width',
-    defaultSize: 82,
-    minSize: 60,
-    maxSize: 240,
-    direction: 'horizontal'
-  });
 
   const dockPanel = useResizablePanel({
     storageKey: 'ag_panel_sc_dock_width',
@@ -66,8 +57,6 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
         return <SubmodulesView />;
       case 'settings':
         return <SettingsView />;
-      case 'components':
-        return <ComponentsView />;
       default:
         return <GraphView />;
     }
@@ -77,14 +66,7 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
     <div className={`gc-container ${className}`.trim()} style={style}>
       <TopBar />
       <div className="gc-main-row">
-        <NavSidebar style={{ width: `${navPanel.size}px` }} />
-        <ResizeHandle
-          direction="horizontal"
-          isDragging={navPanel.isDragging}
-          onMouseDown={navPanel.handleMouseDown}
-          onDoubleClick={navPanel.resetSize}
-          title="Drag to resize navigation sidebar (Double-click to reset)"
-        />
+        <NavSidebar />
         <div className="gc-view-container">
           {renderActiveView()}
           <ConsoleDrawer />

@@ -8,8 +8,7 @@ export type GitClientView =
   | 'diff'
   | 'worktrees'
   | 'submodules'
-  | 'settings'
-  | 'components';
+  | 'settings';
 
 export type CommitRaw = [
   subject: string,
