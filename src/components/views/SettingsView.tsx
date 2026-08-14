@@ -258,31 +258,6 @@ export const SettingsView: React.FC = () => {
     }
   ];
 
-  const renderAIControl = (settingKey: string, defaultValue: string) => {
-    const value = (aiConfig as any)[settingKey] || defaultValue;
-    
-    return (
-      <Input
-        id={settingKey}
-        type={settingKey === 'ai.apiKey' ? 'password' : 'text'}
-        value={value}
-        onChange={e => {
-          updateAIConfig({
-            ...aiConfig,
-            [settingKey.replace('ai.', '')]: e.target.value
-          });
-        }}
-        style={{
-          width: 320,
-          minHeight: 0,
-          height: '26px',
-          fontSize: '12px',
-          fontFamily: 'var(--font-mono)'
-        }}
-      />
-    );
-  };
-
   return (
     <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
       <div

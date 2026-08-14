@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-14
+- Fixed TypeScript errors: added `totalCommitCount` to `GitClientContextType` interface in `src/context/GitClientContext.tsx` and removed unused `renderAIControl` function in `src/components/views/SettingsView.tsx`. See `docs/changelogs/2026-08-14_typecheck_fixes.md`.
 - Fixed branch names displaying with `^{}` suffix in the branches view. The `git_get_branches` Rust command used `%(*refname:short)` which dereferences tags and appends `^{}`. Stripped the suffix during parsing in `src-tauri/src/git_backend.rs`. See `docs/changelogs/2026-08-14_branch_name_suffix_fix.md`.
 
 ## 2026-08-05
