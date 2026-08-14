@@ -35,7 +35,9 @@ export const CommandPalette: React.FC = () => {
       setActiveIndex(prev => (filtered.length ? (prev + 1) % filtered.length : 0));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIndex(prev => (filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0));
+      setActiveIndex(prev =>
+        filtered.length ? (prev - 1 + filtered.length) % filtered.length : 0
+      );
     } else if (e.key === 'Enter') {
       e.preventDefault();
       runItem(activeIndex);
@@ -55,7 +57,9 @@ export const CommandPalette: React.FC = () => {
           role="combobox"
           aria-expanded={true}
           aria-controls="gc-command-palette-listbox"
-          aria-activedescendant={filtered[activeIndex] ? `gc-command-palette-option-${activeIndex}` : undefined}
+          aria-activedescendant={
+            filtered[activeIndex] ? `gc-command-palette-option-${activeIndex}` : undefined
+          }
           style={{
             height: '44px',
             background: 'transparent',
@@ -80,7 +84,9 @@ export const CommandPalette: React.FC = () => {
               id={`gc-command-palette-option-${i}`}
               role="option"
               aria-selected={i === activeIndex}
-              ref={el => { itemRefs.current[i] = el; }}
+              ref={el => {
+                itemRefs.current[i] = el;
+              }}
               onMouseEnter={() => setActiveIndex(i)}
               onClick={() => runItem(i)}
               style={{
@@ -98,7 +104,6 @@ export const CommandPalette: React.FC = () => {
                 style={{
                   fontSize: '10px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.07em',
                   color: 'var(--fg3)',
                   width: '74px',
                   flex: '0 0 auto'

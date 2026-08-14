@@ -17,7 +17,7 @@ export const WorktreesView: React.FC = () => {
     selectRepository,
     confirm,
     openMenu,
-    actionBusy,
+    actionBusy
   } = useGitClient();
 
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -202,7 +202,15 @@ export const WorktreesView: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
               <div>
-                <label htmlFor="worktree-add-path" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label
+                  htmlFor="worktree-add-path"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
                   Target Directory Path *
                 </label>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -230,11 +238,13 @@ export const WorktreesView: React.FC = () => {
                     type="button"
                     variant="secondary"
                     onClick={() => {
-                      void openDialog({ directory: true, multiple: false, title: 'Select Worktree Directory' }).then(
-                        selected => {
-                          if (typeof selected === 'string') setAddPath(selected);
-                        }
-                      );
+                      void openDialog({
+                        directory: true,
+                        multiple: false,
+                        title: 'Select Worktree Directory'
+                      }).then(selected => {
+                        if (typeof selected === 'string') setAddPath(selected);
+                      });
                     }}
                   >
                     Browse…
@@ -242,7 +252,15 @@ export const WorktreesView: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label htmlFor="worktree-add-branch" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label
+                  htmlFor="worktree-add-branch"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
                   Base Branch / Revision (Optional)
                 </label>
                 <input
@@ -264,7 +282,15 @@ export const WorktreesView: React.FC = () => {
                 />
               </div>
               <div>
-                <label htmlFor="worktree-add-new-branch" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+                <label
+                  htmlFor="worktree-add-new-branch"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
                   Create New Branch Name (-b, Optional)
                 </label>
                 <input
@@ -285,7 +311,15 @@ export const WorktreesView: React.FC = () => {
                   }}
                 />
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '12px',
+                  cursor: 'pointer'
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={addDetach}
@@ -321,7 +355,15 @@ export const WorktreesView: React.FC = () => {
               Locking prevents git from pruning or deleting this worktree.
             </div>
             <div>
-              <label htmlFor="worktree-lock-reason" style={{ fontSize: '12px', color: 'var(--fg2)', display: 'block', marginBottom: '4px' }}>
+              <label
+                htmlFor="worktree-lock-reason"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--fg2)',
+                  display: 'block',
+                  marginBottom: '4px'
+                }}
+              >
                 Lock Reason (Optional)
               </label>
               <input
@@ -357,7 +399,14 @@ export const WorktreesView: React.FC = () => {
       {/* Worktree List View */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: 'var(--space-1) 0' }}>
         {worktrees.length === 0 ? (
-          <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--fg3)', fontSize: '13px' }}>
+          <div
+            style={{
+              padding: 'var(--space-6)',
+              textAlign: 'center',
+              color: 'var(--fg3)',
+              fontSize: '13px'
+            }}
+          >
             No worktrees found in this repository.
           </div>
         ) : (
@@ -373,7 +422,6 @@ export const WorktreesView: React.FC = () => {
                   marginTop: 'var(--space-2)',
                   fontSize: '10.5px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.07em',
                   color: 'var(--fg3)'
                 }}
               >
@@ -384,42 +432,42 @@ export const WorktreesView: React.FC = () => {
                 const icon = w.isCurrent
                   ? 'ph-house'
                   : w.locked
-                  ? 'ph-lock'
-                  : w.prunableReason
-                  ? 'ph-warning'
-                  : 'ph-folder-open';
+                    ? 'ph-lock'
+                    : w.prunableReason
+                      ? 'ph-warning'
+                      : 'ph-folder-open';
 
                 const dot = w.prunableReason
                   ? 'var(--del)'
                   : w.isCurrent
-                  ? 'var(--add)'
-                  : w.isDirty
-                  ? 'var(--warn)'
-                  : w.locked
-                  ? 'var(--color-accent)'
-                  : 'var(--add)';
+                    ? 'var(--add)'
+                    : w.isDirty
+                      ? 'var(--warn)'
+                      : w.locked
+                        ? 'var(--color-accent)'
+                        : 'var(--add)';
 
                 const mark = w.isCurrent ? 'var(--color-accent)' : 'transparent';
 
                 const stateText = w.prunableReason
                   ? w.prunableReason
                   : w.locked
-                  ? `locked${w.lockReason ? ` — “${w.lockReason}”` : ''}`
-                  : w.isDirty
-                  ? 'uncommitted changes'
-                  : 'clean';
+                    ? `locked${w.lockReason ? ` — “${w.lockReason}”` : ''}`
+                    : w.isDirty
+                      ? 'uncommitted changes'
+                      : 'clean';
 
                 const stateColor = w.prunableReason
                   ? 'var(--del)'
                   : w.isDirty
-                  ? 'var(--warn)'
-                  : 'var(--fg3)';
+                    ? 'var(--warn)'
+                    : 'var(--fg3)';
 
                 const branchLabel = w.branch
                   ? w.branch
                   : w.detached
-                  ? `(detached at ${w.head ? w.head.slice(0, 7) : 'HEAD'})`
-                  : '—';
+                    ? `(detached at ${w.head ? w.head.slice(0, 7) : 'HEAD'})`
+                    : '—';
 
                 return (
                   <div
@@ -475,11 +523,18 @@ export const WorktreesView: React.FC = () => {
                     </span>
                     <span style={{ fontSize: '11px', color: stateColor }}>{stateText}</span>
                     <span
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--iris)' }}
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--iris)'
+                      }}
                     >
                       {w.head ? w.head.slice(0, 7) : '—'}
                     </span>
-                    <i className="ph ph-dots-three" style={{ fontSize: '15px', color: 'var(--fg3)' }} />
+                    <i
+                      className="ph ph-dots-three"
+                      style={{ fontSize: '15px', color: 'var(--fg3)' }}
+                    />
                   </div>
                 );
               })}

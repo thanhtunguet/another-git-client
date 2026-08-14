@@ -38,7 +38,6 @@ export const StatusBar: React.FC = () => {
             style={{
               fontSize: '10px',
               padding: '0 6px',
-              letterSpacing: '.06em',
               color: 'var(--warn)',
               borderColor: 'var(--warn)'
             }}

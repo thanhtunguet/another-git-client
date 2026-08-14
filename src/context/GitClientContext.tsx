@@ -433,8 +433,10 @@ interface GitClientContextType {
   createBranch: () => void;
   openRepository: () => void;
   cloneRepository: () => void;
+  closeRepository: () => void;
   knownRepositories: Array<{ name: string; path: string }>;
   selectRepository: (path: string) => void;
+  forgetRepository: (path: string) => void;
   actionBusy: boolean;
   activeRemoteAction: 'fetch' | 'pull' | 'push' | null;
   aiMessage: () => void;
@@ -933,6 +935,9 @@ export const GitClientProvider: React.FC<{
   }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length, graphPageSizePref]);
 
   const refreshBranchSummary = useCallback(async (pathValue: string) => {
+    if (!pathValue) {
+      return;
+    }
     let currentBranchName = '';
     try {
       const branches = await tauriGitBackend.getBranches(pathValue);
@@ -979,6 +984,10 @@ export const GitClientProvider: React.FC<{
       const remaining = prev.filter(item => item.path !== trimmedPath);
       return [{ name: trimmedName, path: trimmedPath }, ...remaining].slice(0, 20);
     });
+  }, []);
+
+  const forgetRepository = useCallback((pathValue: string) => {
+    setKnownRepositories(prev => prev.filter(item => item.path !== pathValue));
   }, []);
 
   const setActiveRepository = useCallback(async (pathValue: string) => {
@@ -1301,6 +1310,19 @@ export const GitClientProvider: React.FC<{
       run: runCloneFromDialog
     });
   }, [runCloneFromDialog]);
+
+  const closeRepository = useCallback(() => {
+    if (actionBusy || !repoPath) {
+      return;
+    }
+    setRepoPath('');
+    setSelectedRepoPath('');
+    setRepoName('Open a repository');
+    setCurrentBranch('No branch');
+    setAheadCount(0);
+    setBehindCount(0);
+    log([{ text: 'Repository closed', type: 'ok' }]);
+  }, [actionBusy, repoPath, log]);
 
 
 
@@ -2554,6 +2576,9 @@ export const GitClientProvider: React.FC<{
       },
       { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: () => openRepository() },
       { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
+      ...(repoPath
+        ? [{ group: 'Repo', label: 'Close repository', run: () => { setPaletteOpen(false); closeRepository(); } }]
+        : []),
       { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
       {
         group: 'View',
@@ -2581,6 +2606,8 @@ export const GitClientProvider: React.FC<{
     updateAll,
     openRepository,
     cloneRepository,
+    closeRepository,
+    repoPath,
     toggleTheme
   ]);
 
@@ -2727,8 +2754,10 @@ export const GitClientProvider: React.FC<{
         createBranch,
         openRepository,
         cloneRepository,
+        closeRepository,
         knownRepositories,
         selectRepository,
+        forgetRepository,
         actionBusy,
         activeRemoteAction,
         aiMessage,

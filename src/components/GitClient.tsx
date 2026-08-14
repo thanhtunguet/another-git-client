@@ -15,6 +15,7 @@ import { DiffView } from './views/DiffView';
 import { WorktreesView } from './views/WorktreesView';
 import { SubmodulesView } from './views/SubmodulesView';
 import { SettingsView } from './views/SettingsView';
+import { WelcomeView } from './views/WelcomeView';
 
 import { ContextMenu } from './common/ContextMenu';
 import { CommandPalette } from './common/CommandPalette';
@@ -28,7 +29,7 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
   className = '',
   style
 }) => {
-  const { view, dock } = useGitClient();
+  const { view, dock, repoPath } = useGitClient();
 
   const dockPanel = useResizablePanel({
     storageKey: 'ag_panel_sc_dock_width',
@@ -61,6 +62,17 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
         return <GraphView />;
     }
   };
+
+  if (!repoPath) {
+    return (
+      <div className={`gc-container ${className}`.trim()} style={style}>
+        <WelcomeView />
+        <ContextMenu />
+        <Dialog />
+        <ProgressToast />
+      </div>
+    );
+  }
 
   return (
     <div className={`gc-container ${className}`.trim()} style={style}>

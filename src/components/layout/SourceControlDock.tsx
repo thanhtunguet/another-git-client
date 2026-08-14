@@ -58,21 +58,21 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
   const handleFileMenu = (e: React.MouseEvent, f: DiffFile, isStaged: boolean) => {
     openMenu(e, f.path, [
       {
-        label: isStaged ? "Unstage file" : "Stage file",
+        label: isStaged ? 'Unstage file' : 'Stage file',
         run: () => void (isStaged ? unstageFile(f.path) : stageFile(f.path))
       },
-      { label: "Open diff", run: () => setView("diff") },
+      { label: 'Open diff', run: () => setView('diff') },
       { sep: true },
       {
-        label: "Discard changes",
+        label: 'Discard changes',
         danger: true,
         run: () =>
           confirm(
             `Discard changes in ${f.path}?`,
-            "All uncommitted modifications in this file will be permanently lost.",
-            f.status === "?" ? `rm ${f.path}` : `git checkout -- ${f.path}`,
-            "Discard",
-            () => void discardChanges(f.path, f.status === "?")
+            'All uncommitted modifications in this file will be permanently lost.',
+            f.status === '?' ? `rm ${f.path}` : `git checkout -- ${f.path}`,
+            'Discard',
+            () => void discardChanges(f.path, f.status === '?')
           )
       }
     ]);
@@ -80,18 +80,18 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
 
   const handleStashMenu = (e: React.MouseEvent, st: { stashRef: string }) => {
     openMenu(e, st.stashRef, [
-      { label: "Apply", run: () => void applyStash(st.stashRef, false) },
-      { label: "Pop", run: () => void applyStash(st.stashRef, true) },
+      { label: 'Apply', run: () => void applyStash(st.stashRef, false) },
+      { label: 'Pop', run: () => void applyStash(st.stashRef, true) },
       { sep: true },
       {
-        label: "Drop",
+        label: 'Drop',
         danger: true,
         run: () =>
           confirm(
             `Drop stash ${st.stashRef}?`,
-            "The stashed changes will be permanently deleted.",
+            'The stashed changes will be permanently deleted.',
             `git stash drop ${st.stashRef}`,
-            "Drop Stash",
+            'Drop Stash',
             () => void dropStash(st.stashRef)
           )
       }
@@ -122,27 +122,28 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
 
     openMenu(e, 'Message Templates', [
       {
-        label: "Signed-off-by template",
-        hint: "kernel-style",
-        run: () => setCommitMsg("core: update implementation\n\nSigned-off-by: Developer <dev@example.com>")
+        label: 'Signed-off-by template',
+        hint: 'kernel-style',
+        run: () =>
+          setCommitMsg('core: update implementation\n\nSigned-off-by: Developer <dev@example.com>')
       },
       {
-        label: "fix({scope}): {cursor} — Refs {ticket}",
-        hint: "conventional",
-        run: () => setCommitMsg("fix(ui): resolve layout issue\n\nRefs: TASK-101")
+        label: 'fix({scope}): {cursor} — Refs {ticket}',
+        hint: 'conventional',
+        run: () => setCommitMsg('fix(ui): resolve layout issue\n\nRefs: TASK-101')
       },
       {
-        label: "[{branch}] {cursor}",
-        hint: "branch-tagged",
+        label: '[{branch}] {cursor}',
+        hint: 'branch-tagged',
         run: () => setCommitMsg(`[${currentBranch}] work in progress`)
       },
       {
-        label: "Custom template",
-        hint: "from Settings",
+        label: 'Custom template',
+        hint: 'from Settings',
         run: () => setCommitMsg(applyTemplate(customTemplate))
       },
       { sep: true },
-      { label: "Edit templates…", run: () => setView("settings") }
+      { label: 'Edit templates…', run: () => setView('settings') }
     ]);
   };
 
@@ -206,7 +207,6 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 style={{
                   fontSize: '10.5px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.08em',
                   color: 'var(--fg2)'
                 }}
               >
@@ -287,7 +287,6 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 style={{
                   fontSize: '10.5px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.08em',
                   color: 'var(--fg2)'
                 }}
               >
@@ -368,7 +367,6 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 style={{
                   fontSize: '10.5px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.08em',
                   color: 'var(--fg2)'
                 }}
               >
@@ -454,7 +452,11 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 style={{ flex: 1, height: '22px', fontSize: '11px' }}
                 onClick={aiMessage}
                 disabled={stagedFiles.length === 0}
-                title={stagedFiles.length === 0 ? 'Stage changes to generate a message' : 'Generate a commit message from staged changes'}
+                title={
+                  stagedFiles.length === 0
+                    ? 'Stage changes to generate a message'
+                    : 'Generate a commit message from staged changes'
+                }
               >
                 <i
                   className="ph ph-sparkle"
@@ -489,15 +491,21 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 label="Amend"
                 checked={amend}
                 onChange={e => setAmend(e.target.checked)}
-                style={{ fontSize: "11px", color: "var(--fg2)" }}
+                style={{ fontSize: '11px', color: 'var(--fg2)' }}
               />
               <div style={{ flex: 1 }} />
               <Button
                 variant="primary"
-                style={{ height: "26px" }}
+                style={{ height: '26px' }}
                 onClick={() => void commitChanges(commitMsg, amend)}
                 disabled={actionBusy || !commitMsg.trim() || stagedFiles.length === 0}
-                title={stagedFiles.length === 0 ? 'Stage changes before committing' : !commitMsg.trim() ? 'Enter a commit message' : 'Commit staged changes'}
+                title={
+                  stagedFiles.length === 0
+                    ? 'Stage changes before committing'
+                    : !commitMsg.trim()
+                      ? 'Enter a commit message'
+                      : 'Commit staged changes'
+                }
               >
                 Commit ⌘↵
               </Button>
@@ -523,7 +531,6 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
               style={{
                 fontSize: '10.5px',
                 textTransform: 'uppercase',
-                letterSpacing: '.08em',
                 color: 'var(--fg2)'
               }}
             >
@@ -535,16 +542,16 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
               style={{ height: '18px', width: '20px', padding: 0 }}
               onClick={() => {
                 prompt(
-                  "Create Stash",
-                  "Enter an optional message for your stash.",
-                  "Stash",
-                  "",
+                  'Create Stash',
+                  'Enter an optional message for your stash.',
+                  'Stash',
+                  '',
                   (msg?: string) => {
                     if (msg !== undefined && msg !== null) {
                       void createStash(msg.trim() || undefined, true);
                     }
                   },
-                  "Stash message (optional)",
+                  'Stash message (optional)',
                   false
                 );
               }}
@@ -563,18 +570,18 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
               onKeyDown={activateOnEnter(() => handleStashMenu({} as React.MouseEvent, st))}
               onContextMenu={e => handleStashMenu(e, st)}
               style={{
-                padding: "var(--space-3)",
-                marginBottom: "6px",
-                cursor: "pointer",
-                gap: "5px"
+                padding: 'var(--space-3)',
+                marginBottom: '6px',
+                cursor: 'pointer',
+                gap: '5px'
               }}
             >
-              <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)" }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
                 <span
                   style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: "11px",
-                    color: "var(--color-accent)"
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                    color: 'var(--color-accent)'
                   }}
                 >
                   {st.stashRef}
@@ -582,10 +589,10 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 <span
                   style={{
                     flex: 1,
-                    fontSize: "12px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
+                    fontSize: '12px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   {st.message}
@@ -593,11 +600,11 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
               </div>
               <div
                 style={{
-                  display: "flex",
-                  gap: "var(--space-2)",
-                  fontSize: "10.5px",
-                  color: "var(--fg3)",
-                  fontFamily: "var(--font-mono)"
+                  display: 'flex',
+                  gap: 'var(--space-2)',
+                  fontSize: '10.5px',
+                  color: 'var(--fg3)',
+                  fontFamily: 'var(--font-mono)'
                 }}
               >
                 <span>{st.branch}</span>
@@ -607,7 +614,14 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
             </Card>
           ))}
           {!stashes.length && (
-            <div style={{ padding: "12px", color: "var(--fg3)", fontFamily: "var(--font-mono)", fontSize: "11.5px" }}>
+            <div
+              style={{
+                padding: '12px',
+                color: 'var(--fg3)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11.5px'
+              }}
+            >
               No stashes in working tree.
             </div>
           )}

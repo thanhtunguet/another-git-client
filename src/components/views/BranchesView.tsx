@@ -420,11 +420,11 @@ export const BranchesView: React.FC = () => {
 
   const handleBranchMenu = (e: React.MouseEvent, branch: BranchNode) => {
     const name = branch.name;
-    const remoteName = branch.remoteName || "origin";
+    const remoteName = branch.remoteName || 'origin';
     const remoteShort = branch.shortName;
 
     openMenu(e, name, [
-      { label: "Checkout", hint: "↵", run: () => checkoutBranch(name) },
+      { label: 'Checkout', hint: '↵', run: () => checkoutBranch(name) },
       {
         label: `New branch from '${name}'…`,
         run: () => {
@@ -444,7 +444,7 @@ export const BranchesView: React.FC = () => {
         }
       },
       {
-        label: "Rename…",
+        label: 'Rename…',
         run: () => {
           prompt(
             `Rename branch ${name}`,
@@ -463,33 +463,33 @@ export const BranchesView: React.FC = () => {
       { label: `Merge ${name} into ${currentBranch}`, run: () => mergeBranch(name) },
       { label: `Rebase ${currentBranch} onto ${name}`, run: () => rebaseBranch(name) },
       {
-        label: "Compare with current",
+        label: 'Compare with current',
         run: () => {
           setCompareSeedRef(name);
-          setView("compare");
+          setView('compare');
         }
       },
-      { label: "Open in Git Graph", run: () => setView("graph") },
+      { label: 'Open in Git Graph', run: () => setView('graph') },
       { sep: true },
-      { label: "Reset current to here — soft", run: () => resetToRef(name, "soft") },
-      { label: "Reset current to here — mixed", run: () => resetToRef(name, "mixed") },
+      { label: 'Reset current to here — soft', run: () => resetToRef(name, 'soft') },
+      { label: 'Reset current to here — mixed', run: () => resetToRef(name, 'mixed') },
       {
-        label: "Reset current to here — hard",
+        label: 'Reset current to here — hard',
         danger: true,
         run: () =>
           confirm(
             `Hard reset ${currentBranch} to ${name}?`,
-            "All uncommitted changes in the working tree and index will be permanently discarded.",
+            'All uncommitted changes in the working tree and index will be permanently discarded.',
             `git reset --hard ${name}`,
-            "Reset --hard",
-            () => void resetToRef(name, "hard")
+            'Reset --hard',
+            () => void resetToRef(name, 'hard')
           )
       },
       { sep: true },
       {
-        label: branch.kind === "remote" ? "Untrack upstream" : "Set upstream…",
+        label: branch.kind === 'remote' ? 'Untrack upstream' : 'Set upstream…',
         run: () => {
-          if (branch.kind === "remote") {
+          if (branch.kind === 'remote') {
             void setUpstream(currentBranch, undefined);
           } else {
             prompt(
@@ -512,14 +512,14 @@ export const BranchesView: React.FC = () => {
         run: () =>
           confirm(
             `Delete branch ${name}?`,
-            branch.kind === "remote"
-              ? "This deletes the branch on the remote server."
-              : "This branch will be deleted from your local repository.",
-            branch.kind === "remote"
+            branch.kind === 'remote'
+              ? 'This deletes the branch on the remote server.'
+              : 'This branch will be deleted from your local repository.',
+            branch.kind === 'remote'
               ? `git push ${remoteName} --delete ${remoteShort}`
               : `git branch -D ${name}`,
-            "Delete branch",
-            () => void deleteBranch(name, branch.kind === "remote", true)
+            'Delete branch',
+            () => void deleteBranch(name, branch.kind === 'remote', true)
           )
       }
     ]);
@@ -527,7 +527,7 @@ export const BranchesView: React.FC = () => {
 
   const handleTagMenu = (e: React.MouseEvent, tag: TagNode) => {
     openMenu(e, tag.name, [
-      { label: "Checkout", hint: "↵", run: () => checkoutBranch(tag.name) },
+      { label: 'Checkout', hint: '↵', run: () => checkoutBranch(tag.name) },
       { sep: true },
       {
         label: `Delete ${tag.name}`,
@@ -535,9 +535,9 @@ export const BranchesView: React.FC = () => {
         run: () =>
           confirm(
             `Delete tag ${tag.name}?`,
-            "This tag will be deleted from your local repository.",
+            'This tag will be deleted from your local repository.',
             `git tag -d ${tag.name}`,
-            "Delete tag",
+            'Delete tag',
             () => void deleteTag(tag.name)
           )
       }
@@ -560,7 +560,9 @@ export const BranchesView: React.FC = () => {
 
   const remoteCount = useMemo(() => {
     return new Set(
-      branches.filter(branch => branch.kind === 'remote').map(branch => branch.remoteName || 'remote')
+      branches
+        .filter(branch => branch.kind === 'remote')
+        .map(branch => branch.remoteName || 'remote')
     ).size;
   }, [branches]);
 
@@ -576,47 +578,54 @@ export const BranchesView: React.FC = () => {
         run: () => {
           confirm(
             `Delete remote ${r.name}?`,
-            "This will remove the remote server reference from your repository configuration.",
+            'This will remove the remote server reference from your repository configuration.',
             `git remote remove ${r.name}`,
-            "Delete Remote",
+            'Delete Remote',
             () => void deleteRemote(r.name)
           );
         }
       }));
-      openMenu(e, "Configured Remotes (click to remove)", items.length ? items : [{ label: "No remotes configured" }]);
+      openMenu(
+        e,
+        'Configured Remotes (click to remove)',
+        items.length ? items : [{ label: 'No remotes configured' }]
+      );
     });
   };
 
   const handleRemoteGroupMenu = (e: React.MouseEvent) => {
-    openMenu(e, "Remotes", [
-      { label: "Fetch all", run: () => doFetch() },
-      { label: "Add new remote…", run: handleAddRemote }
+    openMenu(e, 'Remotes', [
+      { label: 'Fetch all', run: () => doFetch() },
+      { label: 'Add new remote…', run: handleAddRemote }
     ]);
   };
 
   const handleRemoteFolderMenu = (e: React.MouseEvent, remoteName: string) => {
     openMenu(e, `Remote: ${remoteName}`, [
-      { 
-        label: `Fetch ${remoteName}`, 
+      {
+        label: `Fetch ${remoteName}`,
         run: () => {
           toastRun('Fetching', `Fetching from remote ${remoteName}…`);
-          void tauriGitBackend.fetch(repoPath, { remote: remoteName, prune: true }).then(() => {
-            toastRun('Fetch complete', `Fetched remote ${remoteName}`);
-          }).catch(err => {
-            console.error(err);
-            toastRun('Fetch failed', String(err));
-          });
-        } 
+          void tauriGitBackend
+            .fetch(repoPath, { remote: remoteName, prune: true })
+            .then(() => {
+              toastRun('Fetch complete', `Fetched remote ${remoteName}`);
+            })
+            .catch(err => {
+              console.error(err);
+              toastRun('Fetch failed', String(err));
+            });
+        }
       },
-      { 
-        label: "Change remote URL…", 
+      {
+        label: 'Change remote URL…',
         run: () => {
           void getRemotes().then(remotes => {
             const remote = remotes.find(r => r.name === remoteName);
-            const currentUrl = remote ? remote.url : "";
+            const currentUrl = remote ? remote.url : '';
             openEditRemoteDialog(remoteName, currentUrl);
           });
-        } 
+        }
       }
     ]);
   };
@@ -690,7 +699,6 @@ export const BranchesView: React.FC = () => {
                     alignItems: 'center',
                     fontSize: '10.5px',
                     fontWeight: 600,
-                    letterSpacing: '.08em',
                     textTransform: 'uppercase',
                     color: 'var(--fg3)',
                     userSelect: 'none',
@@ -721,7 +729,9 @@ export const BranchesView: React.FC = () => {
                       toggleFolder(row.id);
                     }
                   }}
-                  onContextMenu={isRemoteFolder ? (e) => handleRemoteFolderMenu(e, row.label) : undefined}
+                  onContextMenu={
+                    isRemoteFolder ? e => handleRemoteFolderMenu(e, row.label) : undefined
+                  }
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1027,15 +1037,12 @@ export const BranchesView: React.FC = () => {
           </Button>
           <Button
             variant="primary"
-            style={{ height: "25px", padding: "0 10px" }}
-            onClick={
-              selectedBranch
-                ? () => void mergeBranch(selectedBranch.name)
-                : undefined
-            }
+            style={{ height: '25px', padding: '0 10px' }}
+            onClick={selectedBranch ? () => void mergeBranch(selectedBranch.name) : undefined}
             disabled={!selectedBranch}
           >
-            <i className="ph ph-git-merge" style={{ fontSize: "14px" }} /> Merge into {currentBranch}
+            <i className="ph ph-git-merge" style={{ fontSize: '14px' }} /> Merge into{' '}
+            {currentBranch}
           </Button>
         </div>
 

@@ -1,11 +1,6 @@
-import { tauriGitBackend } from "../../services/tauriGitBackend";
+import { tauriGitBackend } from '../../services/tauriGitBackend';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  useGitClient,
-  refBadge,
-  statusColor,
-  COLORS
-} from '../../context/GitClientContext';
+import { useGitClient, refBadge, statusColor, COLORS } from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
@@ -113,16 +108,13 @@ export const GraphView: React.FC = () => {
     prompt,
     setView,
     setDiffTab,
-    preferences,
-    } = useGitClient();
+    preferences
+  } = useGitClient();
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
 
-  const hasExpandedRows = useMemo(
-    () => Object.values(expanded).some(Boolean),
-    [expanded]
-  );
+  const hasExpandedRows = useMemo(() => Object.values(expanded).some(Boolean), [expanded]);
   const virtualizeEnabled = preferences.virtualizeCommitList !== false;
   const enableVirtualRows = graphLayout === 'rows' && !hasExpandedRows && virtualizeEnabled;
   const rowHeight = 30;
@@ -143,7 +135,9 @@ export const GraphView: React.FC = () => {
   }, [endIndex, startIndex]);
 
   const topSpacerHeight = enableVirtualRows ? startIndex * rowHeight : 0;
-  const bottomSpacerHeight = enableVirtualRows ? Math.max(0, (commits.length - endIndex) * rowHeight) : 0;
+  const bottomSpacerHeight = enableVirtualRows
+    ? Math.max(0, (commits.length - endIndex) * rowHeight)
+    : 0;
 
   const handleGraphScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
@@ -173,32 +167,32 @@ export const GraphView: React.FC = () => {
     const title = `${hash}  ${commits[i][0].slice(0, 32)}`;
     openMenu(e, title, [
       {
-        label: "Open in Commit Details",
-        hint: "↵",
+        label: 'Open in Commit Details',
+        hint: '↵',
         run: () => {
-          setView("details");
+          setView('details');
           toggleSelCommit(i, false);
         }
       },
       {
-        label: "Diff vs parent",
+        label: 'Diff vs parent',
         run: () => {
           toggleSelCommit(i, false);
           setDiffTargetSha(fullSha);
-          setDiffTab("parent");
-          setView("diff");
+          setDiffTab('parent');
+          setView('diff');
         }
       },
       { sep: true },
-      { label: "Checkout (detached)", run: () => void checkoutBranch(fullSha) },
+      { label: 'Checkout (detached)', run: () => void checkoutBranch(fullSha) },
       {
-        label: "Create branch here…",
+        label: 'Create branch here…',
         run: () => {
           prompt(
-            "Create branch",
+            'Create branch',
             `Create branch at commit ${hash}.`,
-            "Create branch",
-            "branch-" + hash,
+            'Create branch',
+            'branch-' + hash,
             (name?: string) => {
               if (name && name.trim()) {
                 void tauriGitBackend.createBranch(repoPath, name.trim(), fullSha).then(() => {
@@ -210,13 +204,13 @@ export const GraphView: React.FC = () => {
         }
       },
       {
-        label: "Create tag here…",
+        label: 'Create tag here…',
         run: () => {
           prompt(
-            "Create tag",
+            'Create tag',
             `Tag name for commit ${hash}.`,
-            "Create tag",
-            "v1.0.0",
+            'Create tag',
+            'v1.0.0',
             (tagName?: string) => {
               if (tagName && tagName.trim()) {
                 void createTag(tagName.trim(), fullSha);
@@ -226,34 +220,34 @@ export const GraphView: React.FC = () => {
         }
       },
       { sep: true },
-      { label: "Cherry-pick", run: () => void cherryPickCommit(fullSha) },
+      { label: 'Cherry-pick', run: () => void cherryPickCommit(fullSha) },
       {
-        label: "Revert commit",
+        label: 'Revert commit',
         run: () => {
           const commit = commits[i];
           const subject = commit?.[0] ? ` ("${commit[0]}")` : '';
           confirm(
-            "Revert Commit?",
+            'Revert Commit?',
             `Revert commit ${hash}${subject}? A new commit will be created to invert the changes.`,
             `git revert --no-edit ${fullSha}`,
-            "Revert",
+            'Revert',
             () => void revertCommit(fullSha)
           );
         }
       },
       { sep: true },
-      { label: "Reset HEAD to here — soft", run: () => void resetToRef(fullSha, "soft") },
-      { label: "Reset HEAD to here — mixed", run: () => void resetToRef(fullSha, "mixed") },
+      { label: 'Reset HEAD to here — soft', run: () => void resetToRef(fullSha, 'soft') },
+      { label: 'Reset HEAD to here — mixed', run: () => void resetToRef(fullSha, 'mixed') },
       {
-        label: "Reset HEAD to here — hard",
+        label: 'Reset HEAD to here — hard',
         danger: true,
         run: () => {
           confirm(
             `Hard reset ${currentBranch || 'HEAD'} to ${hash}?`,
-            "All uncommitted changes in the working tree and index will be permanently discarded.",
+            'All uncommitted changes in the working tree and index will be permanently discarded.',
             `git reset --hard ${fullSha}`,
-            "Reset --hard",
-            () => void resetToRef(fullSha, "hard")
+            'Reset --hard',
+            () => void resetToRef(fullSha, 'hard')
           );
         }
       },
@@ -261,18 +255,18 @@ export const GraphView: React.FC = () => {
         sep: true
       },
       {
-        label: "Compare with current",
+        label: 'Compare with current',
         run: () => {
           setCompareSeedRef(fullSha);
-          setView("compare");
+          setView('compare');
         }
       },
       {
-        label: "Copy hash",
-        hint: "⌘C",
+        label: 'Copy hash',
+        hint: '⌘C',
         run: () => {
           void navigator.clipboard.writeText(fullSha);
-          toastRun("Copied hash", hash);
+          toastRun('Copied hash', hash);
         }
       }
     ]);
@@ -325,8 +319,8 @@ export const GraphView: React.FC = () => {
           {sel.length > 1
             ? `${sel.length} commits selected — range details`
             : sel.length === 1
-            ? '1 selected'
-            : 'No selection'}
+              ? '1 selected'
+              : 'No selection'}
         </span>
       </div>
 
@@ -395,7 +389,11 @@ export const GraphView: React.FC = () => {
         </div>
       )}
 
-      <div id="gc-graph-scroll" style={{ flex: 1, overflow: 'auto', minHeight: 0 }} onScroll={handleGraphScroll}>
+      <div
+        id="gc-graph-scroll"
+        style={{ flex: 1, overflow: 'auto', minHeight: 0 }}
+        onScroll={handleGraphScroll}
+      >
         <div
           style={{
             display: 'flex',
@@ -408,7 +406,6 @@ export const GraphView: React.FC = () => {
             borderBottom: '1px solid var(--line)',
             fontSize: '11px',
             textTransform: 'uppercase',
-            letterSpacing: '.08em',
             color: 'var(--fg3)',
             paddingRight: 'var(--space-4)'
           }}
@@ -450,7 +447,6 @@ export const GraphView: React.FC = () => {
                     borderTop: '1px solid var(--line)',
                     borderBottom: '1px solid var(--line)',
                     fontSize: '10.5px',
-                    letterSpacing: '.07em',
                     textTransform: 'uppercase',
                     color: 'var(--fg2)',
                     fontFamily: 'var(--font-mono)'

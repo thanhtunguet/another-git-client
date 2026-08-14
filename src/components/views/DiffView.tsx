@@ -122,7 +122,11 @@ export const DiffView: React.FC = () => {
           }
         } else if (diffTab === 'parent' || diffTab === 'refs') {
           if (activeSha) {
-            text = await tauriGitBackend.getCommitDiff(repoPath, activeSha, targetPath || undefined);
+            text = await tauriGitBackend.getCommitDiff(
+              repoPath,
+              activeSha,
+              targetPath || undefined
+            );
           }
         }
         if (active) {
@@ -156,7 +160,11 @@ export const DiffView: React.FC = () => {
     }
   };
 
-  const tabs: [id: 'work' | 'index' | 'parent' | 'refs' | 'merge', label: string, badge?: number][] = [
+  const tabs: [
+    id: 'work' | 'index' | 'parent' | 'refs' | 'merge',
+    label: string,
+    badge?: number
+  ][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
     ['parent', 'Commit ↔ parent'],
@@ -218,21 +226,40 @@ export const DiffView: React.FC = () => {
           background: 'var(--color-bg)'
         }}
       >
-        <i className={`ph ${icon}`} style={{ fontSize: '42px', color: 'var(--fg3)', marginBottom: '12px' }} />
+        <i
+          className={`ph ${icon}`}
+          style={{ fontSize: '42px', color: 'var(--fg3)', marginBottom: '12px' }}
+        />
         <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 600, color: 'var(--fg)' }}>
           {title}
         </h3>
-        <p style={{ margin: '0 0 16px', fontSize: '12.5px', color: 'var(--fg3)', maxWidth: '420px', lineHeight: '1.5' }}>
+        <p
+          style={{
+            margin: '0 0 16px',
+            fontSize: '12.5px',
+            color: 'var(--fg3)',
+            maxWidth: '420px',
+            lineHeight: '1.5'
+          }}
+        >
           {description}
         </p>
         <div style={{ display: 'flex', gap: '8px' }}>
           {primaryAction && (
-            <Button variant="primary" style={{ height: '28px', fontSize: '12px' }} onClick={primaryAction.run}>
+            <Button
+              variant="primary"
+              style={{ height: '28px', fontSize: '12px' }}
+              onClick={primaryAction.run}
+            >
               {primaryAction.label}
             </Button>
           )}
           {secondaryAction && (
-            <Button variant="secondary" style={{ height: '28px', fontSize: '12px' }} onClick={secondaryAction.run}>
+            <Button
+              variant="secondary"
+              style={{ height: '28px', fontSize: '12px' }}
+              onClick={secondaryAction.run}
+            >
               {secondaryAction.label}
             </Button>
           )}
@@ -265,7 +292,9 @@ export const DiffView: React.FC = () => {
             }}
           >
             <span style={{ color: 'var(--del)', fontWeight: 600 }}>Merge Conflict:</span>
-            <span style={{ flex: 1, color: 'var(--fg2)', fontFamily: 'var(--font-mono)' }}>{targetPath}</span>
+            <span style={{ flex: 1, color: 'var(--fg2)', fontFamily: 'var(--font-mono)' }}>
+              {targetPath}
+            </span>
             <Button
               variant="secondary"
               style={{ height: '22px', fontSize: '11px' }}
@@ -294,11 +323,7 @@ export const DiffView: React.FC = () => {
           filePath={targetPath}
           rawDiffText={rawDiffText}
           loading={loading || commitLoading}
-          emptyMessage={
-            targetPath
-              ? `No diff output found for ${targetPath}`
-              : 'No file selected.'
-          }
+          emptyMessage={targetPath ? `No diff output found for ${targetPath}` : 'No file selected.'}
           onStageFile={() => void stageFile(targetPath)}
           onUnstageFile={() => void unstageFile(targetPath)}
           onCopyPatch={() => {
@@ -399,7 +424,6 @@ export const DiffView: React.FC = () => {
               padding: 'var(--space-2) var(--space-3)',
               fontSize: '10.5px',
               textTransform: 'uppercase',
-              letterSpacing: '.07em',
               color: 'var(--fg3)',
               display: 'flex',
               alignItems: 'center',
@@ -408,7 +432,8 @@ export const DiffView: React.FC = () => {
             }}
           >
             <span>
-              {diffTab === 'parent' || diffTab === 'refs' ? 'Commit Files' : 'Changed Files'} ({availableFiles.length})
+              {diffTab === 'parent' || diffTab === 'refs' ? 'Commit Files' : 'Changed Files'} (
+              {availableFiles.length})
             </span>
           </div>
 
@@ -435,7 +460,14 @@ export const DiffView: React.FC = () => {
 
           <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-1) 0' }}>
             {filteredFiles.length === 0 ? (
-              <div style={{ padding: 'var(--space-3)', fontSize: '11.5px', color: 'var(--fg3)', fontStyle: 'italic' }}>
+              <div
+                style={{
+                  padding: 'var(--space-3)',
+                  fontSize: '11.5px',
+                  color: 'var(--fg3)',
+                  fontStyle: 'italic'
+                }}
+              >
                 {availableFiles.length === 0 ? 'No files' : 'No matching files'}
               </div>
             ) : (
@@ -473,7 +505,14 @@ export const DiffView: React.FC = () => {
                   >
                     {f.status}
                   </span>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
                     {f.path.split('/').pop()}
                   </span>
                 </div>

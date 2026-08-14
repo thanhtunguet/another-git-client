@@ -17,6 +17,7 @@ export const TopBar: React.FC = () => {
     doPush,
     openRepository,
     cloneRepository,
+    closeRepository,
     selectRepository,
     actionBusy,
     activeRemoteAction,
@@ -42,7 +43,10 @@ export const TopBar: React.FC = () => {
       ...selectableRepoItems,
       ...(selectableRepoItems.length ? [{ sep: true } as const] : []),
       { label: 'Open Repository…', hint: '⌘O', run: openRepository },
-      { label: 'Clone…', run: cloneRepository }
+      { label: 'Clone…', run: cloneRepository },
+      ...(repoPath
+        ? [{ sep: true } as const, { label: 'Close Repository', run: closeRepository }]
+        : [])
     ]);
   };
 

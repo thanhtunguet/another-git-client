@@ -24,14 +24,22 @@ export const SubmodulesView: React.FC = () => {
 
   const totalCount = submodules.length;
   const needsAttentionCount = submodules.filter(
-    s => s.status === 'out-of-sync' || s.status === 'pointer-mismatch' || s.status === 'modified-content' || s.status === 'merge-conflict' || s.isDirty
+    s =>
+      s.status === 'out-of-sync' ||
+      s.status === 'pointer-mismatch' ||
+      s.status === 'modified-content' ||
+      s.status === 'merge-conflict' ||
+      s.isDirty
   ).length;
 
   const handleMenu = (e: React.MouseEvent, m: SubmoduleEntry) => {
     openMenu(e, m.path, [
       { label: 'Init', run: () => initSubmodule(m.path) },
       { label: 'Update', run: () => updateSubmodule({ path: m.path, init: true }) },
-      { label: 'Update --recursive', run: () => updateSubmodule({ path: m.path, init: true, recursive: true }) },
+      {
+        label: 'Update --recursive',
+        run: () => updateSubmodule({ path: m.path, init: true, recursive: true })
+      },
       { label: 'Sync URL', run: () => syncSubmodule({ path: m.path }) },
       { sep: true },
       { label: 'Checkout recorded commit', run: () => checkoutRecordedSubmoduleCommit(m.path) },
@@ -62,22 +70,23 @@ export const SubmodulesView: React.FC = () => {
   const groups: Array<{ name: string; color: string; items: SubmoduleEntry[] }> = [];
 
   const attentionItems = submodules.filter(
-    s => s.status === 'out-of-sync' || s.status === 'pointer-mismatch' || s.status === 'modified-content' || s.status === 'merge-conflict' || s.isDirty
+    s =>
+      s.status === 'out-of-sync' ||
+      s.status === 'pointer-mismatch' ||
+      s.status === 'modified-content' ||
+      s.status === 'merge-conflict' ||
+      s.isDirty
   );
   if (attentionItems.length > 0) {
     groups.push({ name: 'Needs attention', color: 'var(--warn)', items: attentionItems });
   }
 
-  const cleanItems = submodules.filter(
-    s => s.status === 'clean' && !s.isDirty
-  );
+  const cleanItems = submodules.filter(s => s.status === 'clean' && !s.isDirty);
   if (cleanItems.length > 0) {
     groups.push({ name: 'Clean', color: 'var(--fg3)', items: cleanItems });
   }
 
-  const uninitializedItems = submodules.filter(
-    s => s.status === 'uninitialized' || !s.initialized
-  );
+  const uninitializedItems = submodules.filter(s => s.status === 'uninitialized' || !s.initialized);
   if (uninitializedItems.length > 0) {
     groups.push({ name: 'Uninitialized', color: 'var(--fg3)', items: uninitializedItems });
   }
@@ -131,7 +140,14 @@ export const SubmodulesView: React.FC = () => {
       {/* Submodule List View */}
       <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: 'var(--space-1) 0' }}>
         {submodules.length === 0 ? (
-          <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--fg3)', fontSize: '13px' }}>
+          <div
+            style={{
+              padding: 'var(--space-6)',
+              textAlign: 'center',
+              color: 'var(--fg3)',
+              fontSize: '13px'
+            }}
+          >
             No submodules registered in .gitmodules.
           </div>
         ) : (
@@ -147,7 +163,6 @@ export const SubmodulesView: React.FC = () => {
                   marginTop: 'var(--space-2)',
                   fontSize: '10.5px',
                   textTransform: 'uppercase',
-                  letterSpacing: '.07em',
                   color: g.color
                 }}
               >
@@ -155,20 +170,30 @@ export const SubmodulesView: React.FC = () => {
                 <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
               </div>
               {g.items.map((s, i) => {
-                const isAttention = s.status === 'out-of-sync' || s.status === 'pointer-mismatch' || s.status === 'modified-content' || s.status === 'merge-conflict' || s.isDirty;
+                const isAttention =
+                  s.status === 'out-of-sync' ||
+                  s.status === 'pointer-mismatch' ||
+                  s.status === 'modified-content' ||
+                  s.status === 'merge-conflict' ||
+                  s.isDirty;
                 const icon = isAttention ? 'ph-warning-circle' : 'ph-package';
-                const dot = isAttention ? 'var(--warn)' : !s.initialized ? 'var(--fg3)' : 'var(--add)';
+                const dot = isAttention
+                  ? 'var(--warn)'
+                  : !s.initialized
+                    ? 'var(--fg3)'
+                    : 'var(--add)';
                 const mark = isAttention ? 'var(--warn)' : 'transparent';
 
-                const stateText = !s.initialized || s.status === 'uninitialized'
-                  ? 'not initialized'
-                  : s.status === 'out-of-sync' || s.status === 'pointer-mismatch'
-                  ? `out of sync — recorded ${s.recordedSha ? s.recordedSha.slice(0, 7) : '—'}`
-                  : s.isDirty || s.status === 'modified-content'
-                  ? 'modified content'
-                  : s.status === 'merge-conflict'
-                  ? 'merge conflict'
-                  : 'up to date';
+                const stateText =
+                  !s.initialized || s.status === 'uninitialized'
+                    ? 'not initialized'
+                    : s.status === 'out-of-sync' || s.status === 'pointer-mismatch'
+                      ? `out of sync — recorded ${s.recordedSha ? s.recordedSha.slice(0, 7) : '—'}`
+                      : s.isDirty || s.status === 'modified-content'
+                        ? 'modified content'
+                        : s.status === 'merge-conflict'
+                          ? 'merge conflict'
+                          : 'up to date';
 
                 const stateColor = isAttention ? 'var(--warn)' : 'var(--fg3)';
                 const shaDisplay = s.sha ? s.sha.slice(0, 7) : '—';
@@ -227,11 +252,18 @@ export const SubmodulesView: React.FC = () => {
                     </span>
                     <span style={{ fontSize: '11px', color: stateColor }}>{stateText}</span>
                     <span
-                      style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--iris)' }}
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--iris)'
+                      }}
                     >
                       {shaDisplay}
                     </span>
-                    <i className="ph ph-dots-three" style={{ fontSize: '15px', color: 'var(--fg3)' }} />
+                    <i
+                      className="ph ph-dots-three"
+                      style={{ fontSize: '15px', color: 'var(--fg3)' }}
+                    />
                   </div>
                 );
               })}
