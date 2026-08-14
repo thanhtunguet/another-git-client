@@ -138,15 +138,22 @@ export const ConsoleDrawer: React.FC = () => {
                   event.dataTransfer.setData('text/plain', tab.id);
                   setDraggedTab(tab.id);
                 }}
-                onDragOver={event => event.preventDefault()}
+                onDragOver={event => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = 'move';
+                }}
                 onDrop={event => {
                   event.preventDefault();
                   const source = draggedTab || (event.dataTransfer.getData('text/plain') as BottomPanelTab);
                   if (!tabOrder.includes(source) || source === tab.id) return;
 
+                  const bounds = event.currentTarget.getBoundingClientRect();
+                  const insertAfterTarget = event.clientX > bounds.left + bounds.width / 2;
+
                   setPanelState(previous => {
                     const nextOrder = previous.tabOrder.filter(candidate => candidate !== source);
-                    nextOrder.splice(nextOrder.indexOf(tab.id), 0, source);
+                    const targetIndex = nextOrder.indexOf(tab.id);
+                    nextOrder.splice(targetIndex + (insertAfterTarget ? 1 : 0), 0, source);
                     return { ...previous, tabOrder: nextOrder };
                   });
                   setDraggedTab(null);

@@ -9,6 +9,7 @@
 - Updated the status-bar control label from `Output` to `Panel` because it now opens both bottom-panel tabs.
 - Reset letter spacing on the bottom terminal panel tab buttons (`Output` / `Terminal`) to default.
 - Added drag-and-drop reordering for the bottom-panel tabs and persisted both the order and active tab in `localStorage`.
+- Fixed tab reordering to use the left/right half of the drop target, so dropping after a tab moves the source to the expected position.
 
 ## Verification
 
