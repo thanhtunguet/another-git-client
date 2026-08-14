@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Sorted tags in the Branches view by time descending, including tag path folders ordered by their newest contained tag. See `docs/changelogs/2026-08-15_branches_tag_sorting.md`.
 - Fixed the Branches view recent-commits pane by loading the selected branch's history directly from the Tauri Git backend. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
 
 ## 2026-08-14

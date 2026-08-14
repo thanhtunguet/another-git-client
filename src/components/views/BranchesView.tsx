@@ -16,6 +16,7 @@ type TagNode = {
   name: string;
   fullRef: string;
   sha: string;
+  lastCommitEpoch?: number;
 };
 
 type TreeRow =
@@ -45,7 +46,8 @@ function normalizeTagRef(tag: TagRef): TagNode {
   return {
     name: tag.name,
     fullRef: tag.fullRef,
-    sha: tag.sha
+    sha: tag.sha,
+    lastCommitEpoch: tag.lastCommitEpoch
   };
 }
 
@@ -167,7 +169,14 @@ function buildTagRows(
 
   const rows: TreeRow[] = [];
 
-  const groupEntries = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const groupEntries = Array.from(groups.entries()).sort(([a, leftTags], [b, rightTags]) => {
+    const leftLatest = Math.max(0, ...leftTags.map(tag => tag.lastCommitEpoch ?? 0));
+    const rightLatest = Math.max(0, ...rightTags.map(tag => tag.lastCommitEpoch ?? 0));
+    if (leftLatest !== rightLatest) {
+      return rightLatest - leftLatest;
+    }
+    return a.localeCompare(b);
+  });
   for (const [fullPath, groupTags] of groupEntries) {
     const folderId = `folder:${idPrefix}:${fullPath}`;
     rows.push({
@@ -186,6 +195,11 @@ function buildTagRows(
   leaves.sort((left, right) => {
     if (left.type !== 'tag' || right.type !== 'tag') {
       return 0;
+    }
+    const leftEpoch = left.tag.lastCommitEpoch ?? 0;
+    const rightEpoch = right.tag.lastCommitEpoch ?? 0;
+    if (leftEpoch !== rightEpoch) {
+      return rightEpoch - leftEpoch;
     }
     return left.tag.name.localeCompare(right.tag.name);
   });
