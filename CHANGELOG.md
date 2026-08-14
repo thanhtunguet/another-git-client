@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-14
+- Added a VS Code-style bottom panel with `Output` and an interactive integrated `Terminal` tab (with default letter spacing). The terminal uses a Tauri PTY and starts in the active repository. See `docs/changelogs/2026-08-14_integrated_terminal_tabs.md`.
 - Improved Git action responsiveness: progress now renders before shared Git actions start, and submodule commands run on Tauri blocking workers instead of the command thread. See `docs/changelogs/2026-08-14_git_command_responsiveness.md`.
 - Fixed left navigation menubar to a fixed non-resizable width (82px) and removed "Components" item from navigation sidebar and view router. See `docs/changelogs/2026-08-14_nav_sidebar_fixed_width_remove_components.md`.
 - Fixed TypeScript errors: added `totalCommitCount` to `GitClientContextType` interface in `src/context/GitClientContext.tsx` and removed unused `renderAIControl` function in `src/components/views/SettingsView.tsx`. See `docs/changelogs/2026-08-14_typecheck_fixes.md`.

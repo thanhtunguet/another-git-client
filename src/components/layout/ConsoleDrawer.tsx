@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
+import { IntegratedTerminal } from './IntegratedTerminal';
 
 export const ConsoleDrawer: React.FC = () => {
-  const { consoleOpen, consoleLines, clearConsole, toggleConsole } = useGitClient();
+  const { consoleOpen, consoleLines, clearConsole, toggleConsole, repoPath } = useGitClient();
+  const [activeTab, setActiveTab] = useState<'output' | 'terminal'>('output');
+  const [terminalActivated, setTerminalActivated] = useState(false);
 
   const consolePanel = useResizablePanel({
     storageKey: 'ag_panel_console_height',
@@ -23,8 +26,8 @@ export const ConsoleDrawer: React.FC = () => {
     ? lastLine.type === 'err'
       ? 'last command failed'
       : lastLine.type === 'warn'
-      ? 'last command: warning'
-      : 'last command ok'
+        ? 'last command: warning'
+        : 'last command ok'
     : 'no output yet';
 
   const getColor = (type: string) => {
@@ -61,47 +64,78 @@ export const ConsoleDrawer: React.FC = () => {
           flexDirection: 'column'
         }}
       >
-      <div
-        style={{
-          flex: '0 0 auto',
-          height: '28px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '0 var(--space-3)',
-          borderBottom: '1px solid var(--line)'
-        }}
-      >
-        <span
+        <div
           style={{
-            fontSize: '10.5px',
-            textTransform: 'uppercase',
-            letterSpacing: '.08em',
-            color: 'var(--fg2)'
+            flex: '0 0 auto',
+            height: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 var(--space-3)',
+            borderBottom: '1px solid var(--line)'
           }}
         >
-          Output — git
-        </span>
-        <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
-          {lastStatus}
-        </span>
-        <div style={{ flex: 1 }} />
-        <Button
-          variant="secondary"
-          style={{ height: '20px', fontSize: '11px' }}
-          onClick={clearConsole}
-        >
-          Clear
-        </Button>
-        <Button
-          variant="secondary"
-          style={{ height: '20px', fontSize: '11px' }}
-          onClick={toggleConsole}
-        >
-          Hide
-        </Button>
-      </div>
+          {[
+            { id: 'output' as const, label: 'Output' },
+            { id: 'terminal' as const, label: 'Terminal' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+            onClick={() => {
+              setActiveTab(tab.id);
+              if (tab.id === 'terminal') setTerminalActivated(true);
+            }}
+              style={{
+                alignSelf: 'stretch',
+                padding: '0 var(--space-3)',
+                border: 0,
+                borderBottom:
+                  activeTab === tab.id ? '1px solid var(--color-accent)' : '1px solid transparent',
+                background: 'transparent',
+                color: activeTab === tab.id ? 'var(--fg)' : 'var(--fg3)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                fontSize: '10.5px',
+                fontWeight: 600,
+                textTransform: 'uppercase'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <span
+            style={{
+              marginLeft: 'var(--space-2)',
+              fontSize: '11px',
+              color: 'var(--fg3)',
+              fontFamily: 'var(--font-mono)'
+            }}
+          >
+            {activeTab === 'output' ? lastStatus : repoPath || 'no repository open'}
+          </span>
+          <div style={{ flex: 1 }} />
+          {activeTab === 'output' && (
+            <Button
+              variant="secondary"
+              style={{ height: '20px', fontSize: '11px' }}
+              onClick={clearConsole}
+            >
+              Clear
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            style={{ height: '20px', fontSize: '11px' }}
+            onClick={toggleConsole}
+          >
+            Hide
+          </Button>
+        </div>
       <div
+        role="tabpanel"
+        hidden={activeTab !== 'output'}
         style={{
           flex: 1,
           overflow: 'auto',
@@ -117,7 +151,16 @@ export const ConsoleDrawer: React.FC = () => {
           </div>
         ))}
       </div>
-    </div>
-  </>
-);
+      {terminalActivated && (
+        <div
+          role="tabpanel"
+          hidden={activeTab !== 'terminal'}
+          style={{ flex: 1, minHeight: 0, display: 'flex' }}
+        >
+          <IntegratedTerminal repoPath={repoPath} />
+        </div>
+      )}
+      </div>
+    </>
+  );
 };

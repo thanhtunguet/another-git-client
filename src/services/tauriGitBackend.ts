@@ -6,6 +6,11 @@ export interface GitCommandResult {
   exitCode: number;
 }
 
+export interface TerminalDimensions {
+  cols: number;
+  rows: number;
+}
+
 export interface BranchRef {
   name: string;
   fullRef: string;
@@ -353,6 +358,27 @@ export const tauriGitBackend = {
 
   openPathInTerminal(path: string) {
     return invoke<GitCommandResult>("git_open_path_in_terminal", { path });
+  },
+
+  startTerminal(sessionId: string, cwd: string, dimensions?: TerminalDimensions) {
+    return invoke<void>("terminal_start", {
+      sessionId,
+      cwd,
+      cols: dimensions?.cols,
+      rows: dimensions?.rows
+    });
+  },
+
+  writeTerminal(sessionId: string, data: string) {
+    return invoke<void>("terminal_write", { sessionId, data });
+  },
+
+  resizeTerminal(sessionId: string, dimensions: TerminalDimensions) {
+    return invoke<void>("terminal_resize", { sessionId, ...dimensions });
+  },
+
+  stopTerminal(sessionId: string) {
+    return invoke<void>("terminal_stop", { sessionId });
   },
 
   initSubmodule(repoPath: string, path?: string) {

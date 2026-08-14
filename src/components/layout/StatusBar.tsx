@@ -104,13 +104,15 @@ export const StatusBar: React.FC = () => {
         style={{ height: '18px', fontSize: '10.5px', color: 'var(--fg3)' }}
         onClick={toggleConsole}
       >
-        Output
+        Panel
         <i className={`ph ${consoleChevron}`} style={{ fontSize: '10px' }} />
       </Button>
 
       <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>git 2.51.0</span>
       <span style={{ color: 'var(--fg3)' }}>·</span>
-      <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{`${totalCommitCount} commits`}</span>
+      <span
+        style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}
+      >{`${totalCommitCount} commits`}</span>
     </div>
   );
 };

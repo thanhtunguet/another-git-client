@@ -1,7 +1,11 @@
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1391,6 +1395,150 @@ pub fn git_open_path_in_terminal(path: String) -> Result<GitCommandResult, Strin
     stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     exit_code: output.status.code().unwrap_or(-1),
   })
+}
+
+struct TerminalSession {
+  master: Box<dyn MasterPty + Send>,
+  writer: Box<dyn Write + Send>,
+  child: Box<dyn portable_pty::Child + Send + Sync>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TerminalOutput {
+  session_id: String,
+  data: String,
+}
+
+fn terminal_sessions() -> &'static Mutex<HashMap<String, TerminalSession>> {
+  static SESSIONS: OnceLock<Mutex<HashMap<String, TerminalSession>>> = OnceLock::new();
+  SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[tauri::command]
+pub fn terminal_start(
+  app: AppHandle,
+  session_id: String,
+  cwd: String,
+  cols: Option<u16>,
+  rows: Option<u16>,
+) -> Result<(), String> {
+  let working_dir = canonical_repo_path(&cwd)?;
+  let terminal_size = PtySize {
+    rows: rows.unwrap_or(24).max(1),
+    cols: cols.unwrap_or(80).max(1),
+    pixel_width: 0,
+    pixel_height: 0,
+  };
+  let pair = native_pty_system()
+    .openpty(terminal_size)
+    .map_err(|error| format!("Failed to create terminal: {error}"))?;
+
+  #[cfg(target_os = "windows")]
+  let shell = std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string());
+  #[cfg(not(target_os = "windows"))]
+  let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+
+  let mut command = CommandBuilder::new(shell);
+  command.cwd(working_dir);
+  command.env("TERM", "xterm-256color");
+  let child = pair
+    .slave
+    .spawn_command(command)
+    .map_err(|error| format!("Failed to start terminal shell: {error}"))?;
+  let mut reader = pair
+    .master
+    .try_clone_reader()
+    .map_err(|error| format!("Failed to read terminal output: {error}"))?;
+  let writer = pair
+    .master
+    .take_writer()
+    .map_err(|error| format!("Failed to open terminal input: {error}"))?;
+
+  {
+    let mut sessions = terminal_sessions()
+      .lock()
+      .map_err(|_| "Terminal session storage is unavailable".to_string())?;
+    if let Some(mut existing) = sessions.remove(&session_id) {
+      let _ = existing.child.kill();
+    }
+    sessions.insert(
+      session_id.clone(),
+      TerminalSession {
+        master: pair.master,
+        writer,
+        child,
+      },
+    );
+  }
+
+  std::thread::spawn(move || {
+    let mut buffer = [0_u8; 4096];
+    loop {
+      match reader.read(&mut buffer) {
+        Ok(0) | Err(_) => break,
+        Ok(count) => {
+          let _ = app.emit(
+            "terminal-output",
+            TerminalOutput {
+              session_id: session_id.clone(),
+              data: String::from_utf8_lossy(&buffer[..count]).to_string(),
+            },
+          );
+        }
+      }
+    }
+  });
+
+  Ok(())
+}
+
+#[tauri::command]
+pub fn terminal_write(session_id: String, data: String) -> Result<(), String> {
+  let mut sessions = terminal_sessions()
+    .lock()
+    .map_err(|_| "Terminal session storage is unavailable".to_string())?;
+  let session = sessions
+    .get_mut(&session_id)
+    .ok_or_else(|| "Terminal session is not running".to_string())?;
+  session
+    .writer
+    .write_all(data.as_bytes())
+    .and_then(|_| session.writer.flush())
+    .map_err(|error| format!("Failed to write to terminal: {error}"))
+}
+
+#[tauri::command]
+pub fn terminal_resize(session_id: String, cols: u16, rows: u16) -> Result<(), String> {
+  let mut sessions = terminal_sessions()
+    .lock()
+    .map_err(|_| "Terminal session storage is unavailable".to_string())?;
+  let session = sessions
+    .get_mut(&session_id)
+    .ok_or_else(|| "Terminal session is not running".to_string())?;
+  session
+    .master
+    .resize(PtySize {
+      rows: rows.max(1),
+      cols: cols.max(1),
+      pixel_width: 0,
+      pixel_height: 0,
+    })
+    .map_err(|error| format!("Failed to resize terminal: {error}"))
+}
+
+#[tauri::command]
+pub fn terminal_stop(session_id: String) -> Result<(), String> {
+  let mut sessions = terminal_sessions()
+    .lock()
+    .map_err(|_| "Terminal session storage is unavailable".to_string())?;
+  if let Some(mut session) = sessions.remove(&session_id) {
+    session
+      .child
+      .kill()
+      .map_err(|error| format!("Failed to stop terminal: {error}"))?;
+  }
+  Ok(())
 }
 
 #[tauri::command]
