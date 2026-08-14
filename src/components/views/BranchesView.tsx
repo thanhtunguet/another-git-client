@@ -3,23 +3,10 @@ import { useGitClient, getHash } from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
-import { tauriGitBackend, type BranchRef, type TagRef } from '../../services/tauriGitBackend';
+import { tauriGitBackend, type TagRef } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
-
-type BranchKind = 'local' | 'remote';
-
-type BranchNode = {
-  name: string;
-  fullRef: string;
-  upstream?: string;
-  ahead: number;
-  behind: number;
-  current: boolean;
-  kind: BranchKind;
-  remoteName?: string;
-  shortName: string;
-};
+import { type BranchNode, normalizeBranchRef, buildBranchMenuItems } from '../../utils/branchMenu';
 
 type TagNode = {
   name: string;
@@ -55,25 +42,6 @@ function normalizeTagRef(tag: TagRef): TagNode {
     name: tag.name,
     fullRef: tag.fullRef,
     sha: tag.sha
-  };
-}
-
-function normalizeBranchRef(branch: BranchRef): BranchNode {
-  const isRemote = branch.kind === 'remote';
-  const remoteName = isRemote ? branch.name.split('/')[0] || 'remote' : undefined;
-  const shortName =
-    isRemote && branch.name.includes('/') ? branch.name.split('/').slice(1).join('/') : branch.name;
-
-  return {
-    name: branch.name,
-    fullRef: branch.fullRef,
-    upstream: branch.upstream,
-    ahead: branch.ahead,
-    behind: branch.behind,
-    current: branch.current,
-    kind: isRemote ? 'remote' : 'local',
-    remoteName,
-    shortName
   };
 }
 
@@ -419,110 +387,25 @@ export const BranchesView: React.FC = () => {
   };
 
   const handleBranchMenu = (e: React.MouseEvent, branch: BranchNode) => {
-    const name = branch.name;
-    const remoteName = branch.remoteName || 'origin';
-    const remoteShort = branch.shortName;
-
-    openMenu(e, name, [
-      { label: 'Checkout', hint: '↵', run: () => checkoutBranch(name) },
-      {
-        label: `New branch from '${name}'…`,
-        run: () => {
-          prompt(
-            `Create new branch from ${name}`,
-            `Enter a name for the new branch based on ${name}.`,
-            'Create branch',
-            `${name}-copy`,
-            (newBranch?: string) => {
-              if (newBranch && newBranch.trim()) {
-                void tauriGitBackend.createBranch(repoPath, newBranch.trim(), name).then(() => {
-                  void checkoutBranch(newBranch.trim());
-                });
-              }
-            }
-          );
-        }
-      },
-      {
-        label: 'Rename…',
-        run: () => {
-          prompt(
-            `Rename branch ${name}`,
-            `Enter a new name for branch ${name}.`,
-            'Rename branch',
-            name,
-            (newName?: string) => {
-              if (newName && newName.trim() && newName.trim() !== name) {
-                void renameBranch(name, newName.trim());
-              }
-            }
-          );
-        }
-      },
-      { sep: true },
-      { label: `Merge ${name} into ${currentBranch}`, run: () => mergeBranch(name) },
-      { label: `Rebase ${currentBranch} onto ${name}`, run: () => rebaseBranch(name) },
-      {
-        label: 'Compare with current',
-        run: () => {
-          setCompareSeedRef(name);
-          setView('compare');
-        }
-      },
-      { label: 'Open in Git Graph', run: () => setView('graph') },
-      { sep: true },
-      { label: 'Reset current to here — soft', run: () => resetToRef(name, 'soft') },
-      { label: 'Reset current to here — mixed', run: () => resetToRef(name, 'mixed') },
-      {
-        label: 'Reset current to here — hard',
-        danger: true,
-        run: () =>
-          confirm(
-            `Hard reset ${currentBranch} to ${name}?`,
-            'All uncommitted changes in the working tree and index will be permanently discarded.',
-            `git reset --hard ${name}`,
-            'Reset --hard',
-            () => void resetToRef(name, 'hard')
-          )
-      },
-      { sep: true },
-      {
-        label: branch.kind === 'remote' ? 'Untrack upstream' : 'Set upstream…',
-        run: () => {
-          if (branch.kind === 'remote') {
-            void setUpstream(currentBranch, undefined);
-          } else {
-            prompt(
-              `Set upstream for ${name}`,
-              `Enter the upstream branch name (e.g. origin/${name}).`,
-              'Set upstream',
-              `origin/${name}`,
-              (upstream?: string) => {
-                if (upstream !== undefined && upstream !== null) {
-                  void setUpstream(name, upstream.trim() || undefined);
-                }
-              }
-            );
-          }
-        }
-      },
-      {
-        label: `Delete ${name}`,
-        danger: true,
-        run: () =>
-          confirm(
-            `Delete branch ${name}?`,
-            branch.kind === 'remote'
-              ? 'This deletes the branch on the remote server.'
-              : 'This branch will be deleted from your local repository.',
-            branch.kind === 'remote'
-              ? `git push ${remoteName} --delete ${remoteShort}`
-              : `git branch -D ${name}`,
-            'Delete branch',
-            () => void deleteBranch(name, branch.kind === 'remote', true)
-          )
-      }
-    ]);
+    openMenu(
+      e,
+      branch.name,
+      buildBranchMenuItems(branch, {
+        repoPath,
+        currentBranch,
+        checkoutBranch,
+        renameBranch,
+        mergeBranch,
+        rebaseBranch,
+        resetToRef,
+        setUpstream,
+        deleteBranch,
+        setCompareSeedRef,
+        setView,
+        prompt,
+        confirm
+      })
+    );
   };
 
   const handleTagMenu = (e: React.MouseEvent, tag: TagNode) => {

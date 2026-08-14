@@ -131,6 +131,59 @@
   animation: popIn 0.09s ease-out;
 }
 
+.gc-branch-picker {
+  min-width: 280px;
+  max-width: 340px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.gc-branch-picker-title {
+  padding: 5px 9px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.gc-branch-picker-empty {
+  padding: 10px 9px;
+  font-size: 12px;
+  color: var(--fg3);
+}
+
+.gc-branch-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--fg);
+
+  &:hover {
+    background: var(--hover);
+  }
+}
+
+.gc-branch-picker-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg3);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+.gc-branch-picker-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
 .gc-command-palette-backdrop {
   z-index: 70;
   place-items: start center;

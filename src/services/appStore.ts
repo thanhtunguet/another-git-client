@@ -28,6 +28,7 @@ export interface PersistedRepositories {
   activeRepoPath: string;
   repoName: string;
   repositoryList: Array<{ name: string; path: string }>;
+  recentBranches?: Record<string, string[]>;
 }
 
 export interface PersistedAppStore {
@@ -62,6 +63,9 @@ export function loadAppStore(): PersistedAppStore | null {
     }
     if (!Array.isArray(parsed.repositories.repositoryList)) {
       parsed.repositories.repositoryList = [];
+    }
+    if (!parsed.repositories.recentBranches || typeof parsed.repositories.recentBranches !== 'object') {
+      parsed.repositories.recentBranches = {};
     }
     return parsed;
   } catch {

@@ -17,7 +17,10 @@ export const StatusBar: React.FC = () => {
     unstagedFiles,
     untrackedFiles,
     consoleOpen,
-    toggleConsole
+    toggleConsole,
+    doSync,
+    actionBusy,
+    activeRemoteAction
   } = useGitClient();
 
   const changedCount = stagedFiles.length + unstagedFiles.length + untrackedFiles.length;
@@ -84,13 +87,33 @@ export const StatusBar: React.FC = () => {
             fontFamily: 'var(--font-mono)'
           }}
         >
-          <i
-            className="ph ph-git-branch"
-            style={{ fontSize: '13px', color: 'var(--color-accent)' }}
-          />
-          <span>{currentBranch}</span>
-          <span style={{ color: 'var(--add)' }}>↓{behindCount}</span>
-          <span style={{ color: 'var(--warn)' }}>↑{aheadCount}</span>
+          <Button
+            variant="ghost"
+            onClick={doSync}
+            disabled={actionBusy}
+            aria-busy={activeRemoteAction === 'pull' || activeRemoteAction === 'push'}
+            title="Synchronize changes with the remote"
+            style={{
+              height: '18px',
+              padding: '0 4px',
+              gap: 'var(--space-2)',
+              color: 'var(--fg2)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11.5px'
+            }}
+          >
+            {activeRemoteAction === 'pull' || activeRemoteAction === 'push' ? (
+              <i className="ph ph-spinner-gap gc-spin" style={{ fontSize: '13px' }} />
+            ) : (
+              <i
+                className="ph ph-git-branch"
+                style={{ fontSize: '13px', color: 'var(--color-accent)' }}
+              />
+            )}
+            <span>{currentBranch}</span>
+            <span style={{ color: 'var(--add)' }}>↓{behindCount}</span>
+            <span style={{ color: 'var(--warn)' }}>↑{aheadCount}</span>
+          </Button>
           <span style={{ color: 'var(--fg3)' }}>·</span>
           <span>{`${changedCount} changed, ${stagedFiles.length} staged`}</span>
         </div>

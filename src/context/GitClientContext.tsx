@@ -430,6 +430,7 @@ interface GitClientContextType {
   doFetch: () => void;
   doPull: () => void;
   doPush: () => void;
+  doSync: () => void;
   createBranch: () => void;
   openRepository: () => void;
   cloneRepository: () => void;
@@ -437,6 +438,7 @@ interface GitClientContextType {
   knownRepositories: Array<{ name: string; path: string }>;
   selectRepository: (path: string) => void;
   forgetRepository: (path: string) => void;
+  recentBranches: string[];
   actionBusy: boolean;
   activeRemoteAction: 'fetch' | 'pull' | 'push' | null;
   aiMessage: () => void;
@@ -572,6 +574,9 @@ export const GitClientProvider: React.FC<{
       return deduped.slice(0, 20);
     }
   );
+  const [recentBranchesByRepo, setRecentBranchesByRepo] = useState<Record<string, string[]>>(
+    () => persistedStore?.repositories.recentBranches || {}
+  );
   const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'No branch');
   const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 0);
   const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 0);
@@ -665,7 +670,8 @@ export const GitClientProvider: React.FC<{
         selectedRepoPath,
         activeRepoPath: repoPath,
         repoName,
-        repositoryList: knownRepositories
+        repositoryList: knownRepositories,
+        recentBranches: recentBranchesByRepo
       }
     });
   }, [
@@ -682,7 +688,8 @@ export const GitClientProvider: React.FC<{
     selectedRepoPath,
     repoPath,
     repoName,
-    knownRepositories
+    knownRepositories,
+    recentBranchesByRepo
   ]);
 
   const log = useCallback((lines: LogEntry[]) => {
@@ -973,6 +980,25 @@ export const GitClientProvider: React.FC<{
       setCurrentBranch(currentBranchName);
     }
   }, [log]);
+
+  const recentBranches = useMemo(
+    () => recentBranchesByRepo[repoPath] || [],
+    [recentBranchesByRepo, repoPath]
+  );
+
+  const recordRecentBranch = useCallback(
+    (branchName: string) => {
+      if (!repoPath || !branchName) {
+        return;
+      }
+      setRecentBranchesByRepo(prev => {
+        const existing = prev[repoPath] || [];
+        const next = [branchName, ...existing.filter(name => name !== branchName)].slice(0, 8);
+        return { ...prev, [repoPath]: next };
+      });
+    },
+    [repoPath]
+  );
 
   const rememberRepository = useCallback((pathValue: string, nameValue: string) => {
     if (!pathValue) {
@@ -1470,6 +1496,53 @@ export const GitClientProvider: React.FC<{
     );
   }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
 
+  const doSync = useCallback(() => {
+    if (actionBusy) {
+      return;
+    }
+    if (!aheadCount && !behindCount) {
+      toastRun('Already up to date', `${currentBranch} has no incoming or outgoing commits`);
+      return;
+    }
+    confirm(
+      `Synchronize ${currentBranch}?`,
+      `This pulls ${behindCount} incoming and pushes ${aheadCount} outgoing commits with the upstream of ${currentBranch}.`,
+      'git pull && git push',
+      'Sync',
+      () => {
+        setPaletteOpen(false);
+        setActionBusy(true);
+        setActiveRemoteAction('pull');
+        log([{ text: '$ git pull', type: 'cmd' }]);
+        void (async () => {
+          try {
+            await waitForNextPaint();
+            const pullResult = await tauriGitBackend.pull(repoPath);
+            appendCommandResult(pullResult);
+            await refreshBranchSummary(repoPath);
+            await refreshRepositorySnapshot(repoPath);
+
+            setActiveRemoteAction('push');
+            log([{ text: '$ git push', type: 'cmd' }]);
+            const pushResult = await tauriGitBackend.push(repoPath);
+            appendCommandResult(pushResult);
+            await refreshBranchSummary(repoPath);
+            await refreshRepositorySnapshot(repoPath);
+
+            toastRun('Sync complete', `${currentBranch} synchronized with remote`);
+            if (props.onPull) props.onPull();
+            if (props.onPush) props.onPush();
+          } catch (error) {
+            log([{ text: `Sync failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          } finally {
+            setActiveRemoteAction(null);
+            setActionBusy(false);
+          }
+        })();
+      }
+    );
+  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
+
 
   const getCompare = useCallback(
     async (leftRef: string, rightRef: string) => {
@@ -1789,13 +1862,14 @@ export const GitClientProvider: React.FC<{
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
+          recordRecentBranch(branchName);
           toastRun("Checked out branch", branchName);
         } catch (error) {
           log([{ text: `Checkout branch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, recordRecentBranch]
   );
 
   const renameBranch = useCallback(
@@ -2751,6 +2825,7 @@ export const GitClientProvider: React.FC<{
         doFetch,
         doPull,
         doPush,
+        doSync,
         createBranch,
         openRepository,
         cloneRepository,
@@ -2758,6 +2833,7 @@ export const GitClientProvider: React.FC<{
         knownRepositories,
         selectRepository,
         forgetRepository,
+        recentBranches,
         actionBusy,
         activeRemoteAction,
         aiMessage,

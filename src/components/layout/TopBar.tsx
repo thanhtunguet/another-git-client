@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
+import { tauriGitBackend } from '../../services/tauriGitBackend';
+import { type BranchNode, normalizeBranchRef, buildBranchMenuItems } from '../../utils/branchMenu';
 
 export const TopBar: React.FC = () => {
   const {
@@ -26,7 +28,67 @@ export const TopBar: React.FC = () => {
     toggleDock,
     dock,
     openMenu,
+    recentBranches,
+    checkoutBranch,
+    renameBranch,
+    mergeBranch,
+    rebaseBranch,
+    resetToRef,
+    setUpstream,
+    deleteBranch,
+    setCompareSeedRef,
+    prompt,
+    confirm,
   } = useGitClient();
+
+  const [branchPickerAnchor, setBranchPickerAnchor] = useState<{ left: number; top: number } | null>(
+    null
+  );
+  const [branchPickerLoading, setBranchPickerLoading] = useState(false);
+  const [pickerBranches, setPickerBranches] = useState<BranchNode[]>([]);
+
+  const closeBranchPicker = () => setBranchPickerAnchor(null);
+
+  const handleBranchFieldClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (branchPickerAnchor) {
+      closeBranchPicker();
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setBranchPickerAnchor({ left: rect.left, top: rect.bottom + 4 });
+    if (!repoPath) return;
+    setBranchPickerLoading(true);
+    void tauriGitBackend
+      .getBranches(repoPath)
+      .then(refs => setPickerBranches(refs.map(normalizeBranchRef)))
+      .catch(() => setPickerBranches([]))
+      .finally(() => setBranchPickerLoading(false));
+  };
+
+  const branchMenuActions = {
+    repoPath,
+    currentBranch,
+    checkoutBranch,
+    renameBranch,
+    mergeBranch,
+    rebaseBranch,
+    resetToRef,
+    setUpstream,
+    deleteBranch,
+    setCompareSeedRef,
+    setView,
+    prompt,
+    confirm,
+  };
+
+  const recentBranchNodes = recentBranches
+    .map(name => pickerBranches.find(b => b.name === name))
+    .filter((b): b is BranchNode => !!b && !b.current);
+  const currentBranchNode = pickerBranches.find(b => b.current);
+  const quickPickBranches = [
+    ...(currentBranchNode ? [currentBranchNode] : []),
+    ...recentBranchNodes
+  ].slice(0, 8);
 
   const handleRepoMenu = (e: React.MouseEvent) => {
     const selectableRepoItems = knownRepositories
@@ -48,10 +110,6 @@ export const TopBar: React.FC = () => {
         ? [{ sep: true } as const, { label: 'Close Repository', run: closeRepository }]
         : [])
     ]);
-  };
-
-  const goToBranchesView = () => {
-    setView('branches');
   };
 
   const themeIcon = theme === 'light' ? 'ph-moon' : 'ph-sun';
@@ -92,10 +150,12 @@ export const TopBar: React.FC = () => {
 
       <Button
         variant="secondary"
-        onClick={goToBranchesView}
+        onClick={handleBranchFieldClick}
         disabled={actionBusy}
         style={{ height: '28px', gap: '6px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}
-        title="Open branches view"
+        title="Switch branch"
+        aria-haspopup="menu"
+        aria-expanded={!!branchPickerAnchor}
       >
         <i
           className="ph ph-git-branch"
@@ -104,7 +164,71 @@ export const TopBar: React.FC = () => {
         <span>{currentBranch}</span>
         <span style={{ color: 'var(--add)' }}>↓{behindCount}</span>
         <span style={{ color: 'var(--warn)' }}>↑{aheadCount}</span>
+        <i className="ph ph-caret-down" style={{ fontSize: '10px', color: 'var(--fg3)' }} />
       </Button>
+
+      {branchPickerAnchor && (
+        <div
+          className="gc-context-menu-overlay"
+          onClick={closeBranchPicker}
+          onContextMenu={closeBranchPicker}
+        >
+          <div
+            className="gc-context-menu gc-branch-picker"
+            role="menu"
+            style={{ left: `${branchPickerAnchor.left}px`, top: `${branchPickerAnchor.top}px` }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="gc-branch-picker-title">Recent branches</div>
+            {branchPickerLoading ? (
+              <div className="gc-branch-picker-empty">Loading branches…</div>
+            ) : quickPickBranches.length === 0 ? (
+              <div className="gc-branch-picker-empty">No recent branches yet</div>
+            ) : (
+              quickPickBranches.map(branch => (
+                <div
+                  key={branch.name}
+                  role="menuitem"
+                  tabIndex={-1}
+                  className="gc-menu-item gc-branch-picker-item"
+                  onClick={() => {
+                    closeBranchPicker();
+                    if (!branch.current) void checkoutBranch(branch.name);
+                  }}
+                  onContextMenu={e => {
+                    e.preventDefault();
+                    closeBranchPicker();
+                    openMenu(e, branch.name, buildBranchMenuItems(branch, branchMenuActions));
+                  }}
+                >
+                  <i
+                    className="ph ph-git-branch"
+                    style={{
+                      fontSize: '12px',
+                      color: branch.current ? 'var(--color-accent)' : 'var(--fg3)'
+                    }}
+                  />
+                  <span style={{ flex: 1, whiteSpace: 'nowrap' }}>{branch.name}</span>
+                  {branch.current && <span className="gc-branch-picker-hint">current</span>}
+                </div>
+              ))
+            )}
+            <div className="gc-branch-picker-sep" />
+            <div
+              role="menuitem"
+              tabIndex={-1}
+              className="gc-menu-item gc-branch-picker-item"
+              onClick={() => {
+                closeBranchPicker();
+                setView('branches');
+              }}
+            >
+              <i className="ph ph-list-bullets" style={{ fontSize: '12px', color: 'var(--fg3)' }} />
+              <span style={{ flex: 1 }}>View all branches</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={openPalette}
