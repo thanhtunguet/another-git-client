@@ -267,9 +267,9 @@ pub fn git_get_branches(repo_path: String) -> Result<Vec<BranchRef>, String> {
     }
 
     let name = if !parts[0].is_empty() {
-      parts[0].to_string()
+      parts[0].trim_end_matches("^{}").to_string()
     } else {
-      parts[1].to_string()
+      parts[1].trim_end_matches("^{}").to_string()
     };
     let upstream = if parts[3].is_empty() {
       None

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-08-14
+- Fixed branch names displaying with `^{}` suffix in the branches view. The `git_get_branches` Rust command used `%(*refname:short)` which dereferences tags and appends `^{}`. Stripped the suffix during parsing in `src-tauri/src/git_backend.rs`. See `docs/changelogs/2026-08-14_branch_name_suffix_fix.md`.
+
 ## 2026-08-05
 - Fixed empty view issues in Diff/Merge tab (DiffView.tsx) when opening clean repositories or inspecting commit diffs.
 - Added live commit file hydration via fetchCommitFiles when viewing commit diffs ("parent" and "refs" modes).
