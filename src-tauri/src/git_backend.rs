@@ -572,11 +572,21 @@ pub fn git_get_worktrees(repo_path: String) -> Result<Vec<WorktreeEntry>, String
 }
 
 #[tauri::command]
-pub fn git_get_submodules(repo_path: String, recursive: Option<bool>) -> Result<Vec<SubmoduleEntry>, String> {
+pub async fn git_get_submodules(
+  repo_path: String,
+  recursive: Option<bool>,
+) -> Result<Vec<SubmoduleEntry>, String> {
   let repo = canonical_repo_path(&repo_path)?;
+  let recursive = recursive.unwrap_or(true);
+  tauri::async_runtime::spawn_blocking(move || get_submodules_for_repo(repo, recursive))
+    .await
+    .map_err(|e| format!("Failed to join submodule refresh task: {e}"))?
+}
+
+fn get_submodules_for_repo(repo: PathBuf, recursive: bool) -> Result<Vec<SubmoduleEntry>, String> {
 
   let mut status_args = vec!["submodule".to_string(), "status".to_string()];
-  if recursive.unwrap_or(true) {
+  if recursive {
     status_args.push("--recursive".to_string());
   }
 
@@ -877,7 +887,7 @@ pub fn git_worktree_remove(
 }
 
 #[tauri::command]
-pub fn git_submodule_update(
+pub async fn git_submodule_update(
   repo_path: String,
   path: Option<String>,
   init: Option<bool>,
@@ -895,11 +905,11 @@ pub fn git_submodule_update(
     args.push("--".to_string());
     args.push(path_value);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_submodule_sync(
+pub async fn git_submodule_sync(
   repo_path: String,
   path: Option<String>,
   recursive: Option<bool>,
@@ -913,11 +923,11 @@ pub fn git_submodule_sync(
     args.push("--".to_string());
     args.push(path_value);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_submodule_deinit(
+pub async fn git_submodule_deinit(
   repo_path: String,
   path: String,
   force: Option<bool>,
@@ -929,7 +939,7 @@ pub fn git_submodule_deinit(
   }
   args.push("--".to_string());
   args.push(path);
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 
@@ -1384,7 +1394,7 @@ pub fn git_open_path_in_terminal(path: String) -> Result<GitCommandResult, Strin
 }
 
 #[tauri::command]
-pub fn git_submodule_init(
+pub async fn git_submodule_init(
   repo_path: String,
   path: Option<String>,
 ) -> Result<GitCommandResult, String> {
@@ -1394,51 +1404,61 @@ pub fn git_submodule_init(
     args.push("--".to_string());
     args.push(p);
   }
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_submodule_pointer_diff(
+pub async fn git_submodule_pointer_diff(
   repo_path: String,
   path: String,
 ) -> Result<String, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let args = vec!["diff".to_string(), "--submodule=log".to_string(), "--".to_string(), path];
-  let result = run_git(&repo, &args)?;
+  let result = run_git_spawn_blocking(repo, args).await?;
   Ok(result.stdout)
 }
 
 #[tauri::command]
-pub fn git_submodule_stage_pointer(
+pub async fn git_submodule_stage_pointer(
   repo_path: String,
   path: String,
 ) -> Result<GitCommandResult, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let args = vec!["add".to_string(), "--".to_string(), path];
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_submodule_checkout_recorded(
+pub async fn git_submodule_checkout_recorded(
   repo_path: String,
   path: String,
 ) -> Result<GitCommandResult, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let args = vec!["submodule".to_string(), "update".to_string(), "--".to_string(), path];
-  run_git(&repo, &args)
+  run_git_spawn_blocking(repo, args).await
 }
 
 #[tauri::command]
-pub fn git_submodule_pull_tracked(
+pub async fn git_submodule_pull_tracked(
   repo_path: String,
   path: String,
 ) -> Result<GitCommandResult, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let sub_dir = repo.join(&path);
   if sub_dir.exists() && sub_dir.is_dir() {
-    run_git(&sub_dir, &["pull".to_string()])
+    run_git_spawn_blocking(sub_dir, vec!["pull".to_string()]).await
   } else {
-    run_git(&repo, &["submodule".to_string(), "update".to_string(), "--remote".to_string(), "--".to_string(), path])
+    run_git_spawn_blocking(
+      repo,
+      vec![
+        "submodule".to_string(),
+        "update".to_string(),
+        "--remote".to_string(),
+        "--".to_string(),
+        path,
+      ],
+    )
+    .await
   }
 }
 

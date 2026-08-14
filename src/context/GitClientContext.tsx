@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Theme,
   GitClientView,
@@ -488,7 +488,8 @@ export const GitClientProvider: React.FC<{
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [toastPct, setToastPct] = useState<number>(0);
-  const [toastTimer, setToastTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const toastGenerationRef = useRef(0);
   const [cloneDialogUrl, setCloneDialogUrl] = useState<string>('');
   const [cloneDialogUseGit, setCloneDialogUseGit] = useState<boolean>(false);
   const [remoteDialogName, setRemoteDialogName] = useState<string>('');
@@ -738,26 +739,72 @@ export const GitClientProvider: React.FC<{
     }
   }, []);
 
-  const runWithActionLock = useCallback(
-    async (task: () => Promise<void>) => {
-      if (actionBusy) {
-        return;
-      }
-      setActionBusy(true);
-      try {
-        await task();
-      } finally {
-        setActionBusy(false);
-      }
-    },
-    [actionBusy]
-  );
-
   const waitForNextPaint = useCallback(async () => {
     await new Promise<void>(resolve => {
       requestAnimationFrame(() => resolve());
     });
   }, []);
+
+  const clearToastTimer = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearInterval(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+  }, []);
+
+  const startProgressToast = useCallback(
+    (title = 'Git operation in progress', detail = 'Running command…') => {
+      clearToastTimer();
+      const generation = ++toastGenerationRef.current;
+      setToast({ title, detail });
+      setToastPct(8);
+
+      let pct = 8;
+      toastTimerRef.current = setInterval(() => {
+        pct = Math.min(90, pct + 4);
+        setToastPct(pct);
+      }, 240);
+
+      return generation;
+    },
+    [clearToastTimer]
+  );
+
+  const finishProgressToast = useCallback(
+    (generation: number) => {
+      if (toastGenerationRef.current !== generation) {
+        return;
+      }
+      clearToastTimer();
+      setToastPct(100);
+      setTimeout(() => {
+        if (toastGenerationRef.current === generation) {
+          setToast(null);
+        }
+      }, 700);
+    },
+    [clearToastTimer]
+  );
+
+  const runWithActionLock = useCallback(
+    async (task: () => Promise<void>) => {
+      if (actionBusy) {
+        return;
+      }
+
+      setActionBusy(true);
+      const toastGeneration = startProgressToast();
+      try {
+        // Let React paint the busy state and progress toast before a native invoke starts.
+        await waitForNextPaint();
+        await task();
+      } finally {
+        setActionBusy(false);
+        finishProgressToast(toastGeneration);
+      }
+    },
+    [actionBusy, finishProgressToast, startProgressToast, waitForNextPaint]
+  );
 
   const appendCommandResult = useCallback((result: GitCommandResult) => {
     const lines: LogEntry[] = [];
@@ -974,7 +1021,8 @@ export const GitClientProvider: React.FC<{
 
   const toastRun = useCallback(
     (title: string, detail: string, done?: () => void) => {
-      if (toastTimer) clearInterval(toastTimer);
+      clearToastTimer();
+      const generation = ++toastGenerationRef.current;
       setToast({ title, detail });
       setToastPct(6);
       let p = 6;
@@ -983,24 +1031,27 @@ export const GitClientProvider: React.FC<{
         if (p >= 100) {
           clearInterval(interval);
           setToastPct(100);
-          setTimeout(() => setToast(null), 700);
+          toastTimerRef.current = null;
+          setTimeout(() => {
+            if (toastGenerationRef.current === generation) {
+              setToast(null);
+            }
+          }, 700);
           if (done) done();
         } else {
           setToastPct(p);
         }
       }, 220);
-      setToastTimer(interval);
+      toastTimerRef.current = interval;
     },
-    [toastTimer]
+    [clearToastTimer]
   );
 
   const cancelToast = useCallback(() => {
-    // The underlying git command has already completed by the time this
-    // confirmation toast is shown (toastRun is invoked after the backend
-    // call resolves), so this only dismisses the notification early.
-    if (toastTimer) clearInterval(toastTimer);
+    clearToastTimer();
+    ++toastGenerationRef.current;
     setToast(null);
-  }, [toastTimer]);
+  }, [clearToastTimer]);
 
   const confirm = useCallback(
     (title: string, body: string, cmd: string, action: string, run?: () => void) => {
