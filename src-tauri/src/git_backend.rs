@@ -411,6 +411,27 @@ pub fn git_get_graph(
 }
 
 #[tauri::command]
+pub fn git_get_ref_graph(
+  repo_path: String,
+  reference: String,
+  max_count: Option<usize>,
+) -> Result<Vec<GraphCommitRow>, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let count = max_count.unwrap_or(3);
+  let args = vec![
+    "log".to_string(),
+    "--date=iso-strict".to_string(),
+    "--decorate=full".to_string(),
+    format!("--max-count={count}"),
+    "--format=%m%x1f%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e".to_string(),
+    reference,
+  ];
+
+  let output = run_git(&repo, &args)?.stdout;
+  Ok(parse_graph_rows(&output))
+}
+
+#[tauri::command]
 pub fn git_get_changed_files(repo_path: String) -> Result<Vec<ChangedFile>, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let args = vec!["status".to_string(), "--porcelain=v1".to_string()];

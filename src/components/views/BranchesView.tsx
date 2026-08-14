@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useGitClient, getHash } from '../../context/GitClientContext';
+import { useGitClient } from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
-import { tauriGitBackend, type TagRef } from '../../services/tauriGitBackend';
+import {
+  tauriGitBackend,
+  type GraphCommitRow,
+  type TagRef
+} from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { type BranchNode, normalizeBranchRef, buildBranchMenuItems } from '../../utils/branchMenu';
@@ -209,7 +213,6 @@ export const BranchesView: React.FC = () => {
     openMenu,
     confirm,
     setView,
-    commits,
     repoPath,
     currentBranch,
     checkoutBranch,
@@ -235,6 +238,9 @@ export const BranchesView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [selectedBranchName, setSelectedBranchName] = useState<string>('');
+  const [selectedBranchCommits, setSelectedBranchCommits] = useState<GraphCommitRow[]>([]);
+  const [branchCommitsLoading, setBranchCommitsLoading] = useState(false);
+  const [branchCommitsError, setBranchCommitsError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -379,6 +385,42 @@ export const BranchesView: React.FC = () => {
     [branches, selectedBranchName]
   );
 
+  useEffect(() => {
+    if (!repoPath || !selectedBranch) {
+      setSelectedBranchCommits([]);
+      setBranchCommitsError(null);
+      setBranchCommitsLoading(false);
+      return;
+    }
+
+    let disposed = false;
+    setBranchCommitsLoading(true);
+    setBranchCommitsError(null);
+
+    void tauriGitBackend
+      .getRefGraph(repoPath, selectedBranch.fullRef, { maxCount: 3 })
+      .then(rows => {
+        if (!disposed) {
+          setSelectedBranchCommits(rows);
+        }
+      })
+      .catch(error => {
+        if (!disposed) {
+          setSelectedBranchCommits([]);
+          setBranchCommitsError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!disposed) {
+          setBranchCommitsLoading(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [repoPath, selectedBranch]);
+
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => ({
       ...prev,
@@ -426,20 +468,6 @@ export const BranchesView: React.FC = () => {
       }
     ]);
   };
-
-  const selectedBranchCommitIndices = useMemo(() => {
-    if (!selectedBranch) return [];
-    const tipIdx = commits.findIndex(c => (c[4] || []).includes(selectedBranch.name));
-    if (tipIdx < 0) return [];
-    const indices: number[] = [];
-    let cur: number | undefined = tipIdx;
-    while (indices.length < 3 && cur !== undefined && cur >= 0) {
-      indices.push(cur);
-      const parents = commits[cur]?.[3] as number[] | undefined;
-      cur = parents && parents.length ? parents[0] : undefined;
-    }
-    return indices;
-  }, [commits, selectedBranch]);
 
   const remoteCount = useMemo(() => {
     return new Set(
@@ -940,18 +968,30 @@ export const BranchesView: React.FC = () => {
           <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>
             Recent commits on this branch
           </h6>
-          {!selectedBranchCommitIndices.length && (
+          {branchCommitsLoading && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              {selectedBranch
-                ? "This branch's tip isn't in the currently loaded graph — open Git Graph and load more commits to see its history."
-                : 'Select a branch to see its recent commits.'}
+              Loading recent commits…
             </div>
           )}
-          {selectedBranchCommitIndices.map(idx => {
-            const c = commits[idx];
+          {!branchCommitsLoading && branchCommitsError && (
+            <div style={{ color: 'var(--danger)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+              Failed to load commits: {branchCommitsError}
+            </div>
+          )}
+          {!branchCommitsLoading && !branchCommitsError && selectedBranch && !selectedBranchCommits.length && (
+            <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+              This branch has no commits yet.
+            </div>
+          )}
+          {!branchCommitsLoading && !branchCommitsError && !selectedBranch && (
+            <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
+              Select a branch to see its recent commits.
+            </div>
+          )}
+          {selectedBranchCommits.map(commit => {
             return (
               <div
-                key={idx}
+                key={commit.sha}
                 style={{
                   display: 'flex',
                   gap: '12px',
@@ -968,7 +1008,7 @@ export const BranchesView: React.FC = () => {
                     fontSize: '11.5px'
                   }}
                 >
-                  {getHash(idx)}
+                  {commit.shortSha}
                 </span>
                 <span
                   style={{
@@ -978,13 +1018,13 @@ export const BranchesView: React.FC = () => {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  {c[0]}
+                  {commit.subject}
                 </span>
-                <span style={{ color: 'var(--fg3)', fontSize: '11.5px' }}>{c[1]}</span>
+                <span style={{ color: 'var(--fg3)', fontSize: '11.5px' }}>{commit.author}</span>
                 <span
                   style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
                 >
-                  {c[2].slice(5, 10)}
+                  {commit.date.replace('T', ' ').replace('Z', '').slice(5, 10)}
                 </span>
               </div>
             );

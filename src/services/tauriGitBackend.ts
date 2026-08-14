@@ -145,6 +145,14 @@ export const tauriGitBackend = {
     });
   },
 
+  getRefGraph(repoPath: string, reference: string, options?: { maxCount?: number }) {
+    return invoke<GraphCommitRow[]>("git_get_ref_graph", {
+      repoPath,
+      reference,
+      maxCount: options?.maxCount
+    });
+  },
+
   getChangedFiles(repoPath: string) {
     return invoke<ChangedFile[]>("git_get_changed_files", { repoPath });
   },

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-08-15
+- Fixed the Branches view recent-commits pane by loading the selected branch's history directly from the Tauri Git backend. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
+
 ## 2026-08-14
 - Added a VS Code-style bottom panel with reorderable, persistent `Output` and interactive integrated `Terminal` tabs (with default letter spacing). The terminal uses a Tauri PTY and starts in the active repository. See `docs/changelogs/2026-08-14_integrated_terminal_tabs.md`.
 - Improved Git action responsiveness: progress now renders before shared Git actions start, and submodule commands run on Tauri blocking workers instead of the command thread. See `docs/changelogs/2026-08-14_git_command_responsiveness.md`.

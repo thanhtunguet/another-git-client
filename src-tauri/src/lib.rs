@@ -12,6 +12,7 @@ pub fn run() {
       git_backend::git_get_tags,
       git_backend::git_get_commit_count,
       git_backend::git_get_graph,
+      git_backend::git_get_ref_graph,
       git_backend::git_get_changed_files,
       git_backend::git_get_worktrees,
       git_backend::git_get_submodules,
