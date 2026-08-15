@@ -51,7 +51,7 @@ function loadBottomPanelState(): BottomPanelState {
 }
 
 export const ConsoleDrawer: React.FC = () => {
-  const { consoleOpen, consoleLines, clearConsole, toggleConsole, repoPath } = useGitClient();
+  const { consoleOpen, consoleLines, clearConsole, toggleConsole, repoPath, confirm } = useGitClient();
   const [panelState, setPanelState] = useState<BottomPanelState>(loadBottomPanelState);
   const [terminalActivated, setTerminalActivated] = useState(
     () => loadBottomPanelState().activeTab === 'terminal'
@@ -116,6 +116,24 @@ export const ConsoleDrawer: React.FC = () => {
       setTerminalActivated(false);
       toggleConsole();
     }
+  };
+
+  const killTerminal = () => {
+    const targetSessionId = terminalSessionIds[terminalSessionIds.length - 1];
+    if (!targetSessionId) return;
+
+    const isFinalTerminal = terminalSessionIds.length <= 1;
+    confirm(
+      isFinalTerminal ? 'Kill Terminal?' : 'Kill Terminal Pane?',
+      isFinalTerminal
+        ? 'This will terminate the active terminal session and close the bottom panel.'
+        : 'This will terminate this terminal pane and close it.',
+      'kill terminal',
+      'Kill Terminal',
+      () => {
+        removeTerminal(targetSessionId);
+      }
+    );
   };
 
   if (!consoleOpen) return null;
@@ -241,22 +259,62 @@ export const ConsoleDrawer: React.FC = () => {
             {activeTab === 'output' ? lastStatus : repoPath || 'no repository open'}
           </span>
           <div style={{ flex: 1 }} />
-          {activeTab === 'output' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {activeTab === 'output' && (
+              <Button
+                variant="secondary"
+                style={{ height: '20px', fontSize: '11px', padding: '0 6px' }}
+                onClick={clearConsole}
+              >
+                Clear
+              </Button>
+            )}
+            {activeTab === 'terminal' && (
+              <>
+                <Button
+                  variant="secondary"
+                  style={{
+                    height: '20px',
+                    fontSize: '11px',
+                    padding: '0 6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Split Terminal"
+                  aria-label="Split Terminal"
+                  onClick={splitTerminal}
+                >
+                  <i className="ph ph-columns" style={{ fontSize: '12px' }} />
+                  <span>Split</span>
+                </Button>
+                <Button
+                  variant="secondary"
+                  style={{
+                    height: '20px',
+                    fontSize: '11px',
+                    padding: '0 6px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Kill Terminal"
+                  aria-label="Kill Terminal"
+                  onClick={killTerminal}
+                >
+                  <i className="ph ph-trash" style={{ fontSize: '12px' }} />
+                  <span>Kill</span>
+                </Button>
+              </>
+            )}
             <Button
               variant="secondary"
-              style={{ height: '20px', fontSize: '11px' }}
-              onClick={clearConsole}
+              style={{ height: '20px', fontSize: '11px', padding: '0 6px' }}
+              onClick={toggleConsole}
             >
-              Clear
+              Hide
             </Button>
-          )}
-          <Button
-            variant="secondary"
-            style={{ height: '20px', fontSize: '11px' }}
-            onClick={toggleConsole}
-          >
-            Hide
-          </Button>
+          </div>
         </div>
         <div
           role="tabpanel"
