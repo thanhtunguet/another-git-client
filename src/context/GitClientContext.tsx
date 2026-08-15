@@ -449,6 +449,7 @@ interface GitClientContextType {
   updateAIConfig: (config: AIConfig) => void;
   updateAll: () => void;
   paletteAll: () => PaletteItem[];
+  runPaletteQuery: (query: string) => Promise<boolean>;
   repoName: string;
   repoPath: string;
   currentBranch: string;
@@ -1875,6 +1876,59 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, recordRecentBranch]
   );
 
+  const runPaletteQuery = useCallback(
+    async (query: string): Promise<boolean> => {
+      const reference = query.trim();
+      if (!repoPath || !reference) {
+        return false;
+      }
+
+      try {
+        const branches = await tauriGitBackend.getBranches(repoPath);
+        const branch = branches.find(candidate => candidate.name === reference);
+        if (branch) {
+          setPaletteOpen(false);
+          await checkoutBranch(branch.name);
+          return true;
+        }
+
+        if (!/^[0-9a-f]{4,40}$/i.test(reference)) {
+          return false;
+        }
+
+        const rows = await tauriGitBackend.getRefGraph(repoPath, reference, { maxCount: 1 });
+        const commit = rows[0];
+        if (!commit) {
+          return false;
+        }
+
+        const existingIndex = graphRows.findIndex(row => row.sha === commit.sha);
+        if (existingIndex >= 0) {
+          setSel([existingIndex]);
+        } else {
+          setGraphRows(previous => [commit, ...previous]);
+          setSel([0]);
+        }
+        setPaletteOpen(false);
+        setView('details');
+        log([
+          { text: `$ git log --max-count=1 ${reference}`, type: 'cmd' },
+          { text: `Viewing commit ${commit.shortSha}`, type: 'ok' }
+        ]);
+        return true;
+      } catch (error) {
+        log([
+          {
+            text: `Could not resolve branch or commit '${reference}': ${error instanceof Error ? error.message : String(error)}`,
+            type: 'warn'
+          }
+        ]);
+        return false;
+      }
+    },
+    [repoPath, checkoutBranch, graphRows, log]
+  );
+
   const renameBranch = useCallback(
     async (oldName: string, newName: string) => {
       await runWithActionLock(async () => {
@@ -2847,6 +2901,7 @@ export const GitClientProvider: React.FC<{
         updateAIConfig,
         updateAll,
         paletteAll,
+        runPaletteQuery,
         repoName,
         repoPath,
         currentBranch,

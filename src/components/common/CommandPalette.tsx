@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 
 export const CommandPalette: React.FC = () => {
-  const { paletteOpen, closePalette, paletteQ, setPaletteQ, paletteAll } = useGitClient();
+  const { paletteOpen, closePalette, paletteQ, setPaletteQ, paletteAll, runPaletteQuery } = useGitClient();
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
 
@@ -23,6 +23,11 @@ export const CommandPalette: React.FC = () => {
   if (!paletteOpen) return null;
 
   const runItem = (index: number) => {
+    const query = paletteQ.trim();
+    if (query && filtered.length === 0) {
+      void runPaletteQuery(query);
+      return;
+    }
     const item = filtered[index];
     if (!item) return;
     closePalette();
@@ -135,6 +140,14 @@ export const CommandPalette: React.FC = () => {
               )}
             </div>
           ))}
+          {filtered.length === 0 && paletteQ.trim() && (
+            <div
+              role="status"
+              style={{ padding: 'var(--space-3)', fontSize: '12px', color: 'var(--fg3)' }}
+            >
+              Press Enter to check out an exact branch name or view a commit ID.
+            </div>
+          )}
         </div>
         <div
           style={{
@@ -150,7 +163,7 @@ export const CommandPalette: React.FC = () => {
           }}
         >
           <span>↑↓ navigate</span>
-          <span>↵ run</span>
+          <span>↵ run / open branch or commit</span>
           <span>esc close</span>
         </div>
       </div>
