@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Displayed changed files as collapsible folder trees in Diff/Merge, Source Control, Commit Detail, and Git Graph. See `docs/changelogs/2026-08-15_changed_files_tree.md`.
 - Suppressed default browser context menus throughout the frontend while preserving item-specific custom menus; text selections now offer Copy. See `docs/changelogs/2026-08-15_frontend_context_menu_policy.md`.
 - Fixed overlapping wrapped text in split Diff/Merge views for modified files by rendering each old/new pair in one shared-height row. See `docs/changelogs/2026-08-15_diff_merge_split_line_alignment.md`.
 - Constrained Diff/Merge text selection to the clicked split pane: line-number gutters are excluded, and Cmd/Ctrl+A now selects only the previous or current change content. See `docs/changelogs/2026-08-15_diff_merge_content_selection.md`.

@@ -5,6 +5,7 @@ import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { Button } from '../common/Button';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
+import { FileTree } from '../common/FileTree';
 import { DiffFile } from '../../types/git-client';
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
@@ -477,52 +478,56 @@ export const DiffView: React.FC = () => {
                 {availableFiles.length === 0 ? 'No files' : 'No matching files'}
               </div>
             ) : (
-              filteredFiles.map(f => (
-                <div
-                  key={f.path}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setDiffTargetPath(f.path)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setDiffTargetPath(f.path);
-                    }
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    height: '24px',
-                    padding: '0 var(--space-3)',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontFamily: 'var(--font-mono)',
-                    background: targetPath === f.path ? 'var(--sel)' : 'transparent'
-                  }}
-                  className="gc-hover-bg"
-                >
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: f.status === 'U' ? 'var(--del)' : 'var(--color-accent)',
-                      fontSize: '11px'
+              <FileTree
+                files={filteredFiles}
+                forceExpand={Boolean(fileQuery.trim())}
+                renderFile={(f, depth) => (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDiffTargetPath(f.path)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDiffTargetPath(f.path);
+                      }
                     }}
-                  >
-                    {f.status}
-                  </span>
-                  <span
                     style={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      height: '24px',
+                      paddingLeft: `${12 + depth * 14}px`,
+                      paddingRight: 'var(--space-3)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontFamily: 'var(--font-mono)',
+                      background: targetPath === f.path ? 'var(--sel)' : 'transparent'
                     }}
+                    className="gc-hover-bg"
                   >
-                    {f.path.split('/').pop()}
-                  </span>
-                </div>
-              ))
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: f.status === 'U' ? 'var(--del)' : 'var(--color-accent)',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {f.status}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {f.path.split('/').pop()}
+                    </span>
+                  </div>
+                )}
+              />
             )}
           </div>
         </div>

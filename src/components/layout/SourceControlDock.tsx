@@ -3,6 +3,7 @@ import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { Textarea, Checkbox } from '../common/FormControls';
 import { Card } from '../common/Card';
+import { FileTree } from '../common/FileTree';
 import { statusColor } from '../../context/GitClientContext';
 import { DiffFile } from '../../types/git-client';
 
@@ -155,6 +156,50 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     ]);
   };
 
+  const renderChangedFile = (file: DiffFile, isStaged: boolean, depth: number) => (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => openFileDiff(file, isStaged)}
+      onKeyDown={activateOnEnter(() => openFileDiff(file, isStaged))}
+      onContextMenu={event => handleFileMenu(event, file, isStaged)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--space-2)',
+        height: '24px',
+        paddingLeft: `${12 + depth * 14}px`,
+        paddingRight: 'var(--space-3)',
+        cursor: 'pointer',
+        fontFamily: 'var(--font-mono)',
+        fontSize: '11.5px'
+      }}
+      className="gc-hover-bg"
+    >
+      <span
+        style={{
+          width: '11px',
+          textAlign: 'center',
+          color: statusColor(file.status === '?' ? 'A' : file.status),
+          fontWeight: 600
+        }}
+      >
+        {file.status}
+      </span>
+      <span
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {file.path.split('/').pop()}
+      </span>
+      <span style={{ color: 'var(--fg3)', fontSize: '11px' }}>{`+${file.add} −${file.del}`}</span>
+    </div>
+  );
+
   return (
     <div className={`gc-dock ${className}`.trim()} style={style}>
       <div
@@ -231,53 +276,10 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 <i className="ph ph-minus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
-            {stagedFiles.map((f, i) => (
-              <div
-                key={i}
-                role="button"
-                tabIndex={0}
-                onClick={() => openFileDiff(f, true)}
-                onKeyDown={activateOnEnter(() => openFileDiff(f, true))}
-                onContextMenu={e => handleFileMenu(e, f, true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  height: '24px',
-                  padding: '0 var(--space-3)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11.5px'
-                }}
-                className="gc-hover-bg"
-              >
-                <span
-                  style={{
-                    width: '11px',
-                    textAlign: 'center',
-                    color: statusColor(f.status),
-                    fontWeight: 600
-                  }}
-                >
-                  {f.status}
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    direction: 'rtl',
-                    textAlign: 'left'
-                  }}
-                >
-                  {f.path}
-                </span>
-                <span
-                  style={{ color: 'var(--fg3)', fontSize: '11px' }}
-                >{`+${f.add} −${f.del}`}</span>
-              </div>
-            ))}
+            <FileTree
+              files={stagedFiles}
+              renderFile={(file, depth) => renderChangedFile(file, true, depth)}
+            />
 
             <div
               style={{
@@ -311,53 +313,10 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 <i className="ph ph-plus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
-            {unstagedFiles.map((f, i) => (
-              <div
-                key={i}
-                role="button"
-                tabIndex={0}
-                onClick={() => openFileDiff(f, false)}
-                onKeyDown={activateOnEnter(() => openFileDiff(f, false))}
-                onContextMenu={e => handleFileMenu(e, f, false)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  height: '24px',
-                  padding: '0 var(--space-3)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11.5px'
-                }}
-                className="gc-hover-bg"
-              >
-                <span
-                  style={{
-                    width: '11px',
-                    textAlign: 'center',
-                    color: statusColor(f.status === '?' ? 'A' : f.status),
-                    fontWeight: 600
-                  }}
-                >
-                  {f.status}
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    direction: 'rtl',
-                    textAlign: 'left'
-                  }}
-                >
-                  {f.path}
-                </span>
-                <span
-                  style={{ color: 'var(--fg3)', fontSize: '11px' }}
-                >{`+${f.add} −${f.del}`}</span>
-              </div>
-            ))}
+            <FileTree
+              files={unstagedFiles}
+              renderFile={(file, depth) => renderChangedFile(file, false, depth)}
+            />
 
             <div
               style={{
@@ -391,53 +350,10 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 <i className="ph ph-plus-square" style={{ fontSize: '12px' }} />
               </Button>
             </div>
-            {untrackedFiles.map((f, i) => (
-              <div
-                key={`untracked-${i}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => openFileDiff(f, false)}
-                onKeyDown={activateOnEnter(() => openFileDiff(f, false))}
-                onContextMenu={e => handleFileMenu(e, f, false)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-2)',
-                  height: '24px',
-                  padding: '0 var(--space-3)',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11.5px'
-                }}
-                className="gc-hover-bg"
-              >
-                <span
-                  style={{
-                    width: '11px',
-                    textAlign: 'center',
-                    color: statusColor('A'),
-                    fontWeight: 600
-                  }}
-                >
-                  ?
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    direction: 'rtl',
-                    textAlign: 'left'
-                  }}
-                >
-                  {f.path}
-                </span>
-                <span
-                  style={{ color: 'var(--fg3)', fontSize: '11px' }}
-                >{`+${f.add} −${f.del}`}</span>
-              </div>
-            ))}
+            <FileTree
+              files={untrackedFiles}
+              renderFile={(file, depth) => renderChangedFile(file, false, depth)}
+            />
           </div>
 
           <div

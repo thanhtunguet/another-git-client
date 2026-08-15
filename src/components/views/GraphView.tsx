@@ -5,6 +5,7 @@ import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { SegmentedControl } from '../common/SegmentedControl';
+import { FileTree } from '../common/FileTree';
 import { GraphRowData, FilterState } from '../../types/git-client';
 
 function laneX(l: number): number {
@@ -584,63 +585,66 @@ export const GraphView: React.FC = () => {
                     <h6 style={{ margin: '0 0 6px', color: 'var(--fg3)' }}>
                       {files.length} files changed
                     </h6>
-                    {files.map((fl, fIdx) => (
-                      <div
-                        key={fIdx}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          toggleSelCommit(i, false);
-                          setDiffTargetSha(rowFullSha);
-                          setDiffTab('parent');
-                          setView('diff');
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
+                    <FileTree
+                      files={files}
+                      renderFile={(file, depth) => (
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
                             toggleSelCommit(i, false);
                             setDiffTargetSha(rowFullSha);
                             setDiffTab('parent');
                             setView('diff');
-                          }
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          height: '22px',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '11.5px',
-                          cursor: 'pointer',
-                          borderRadius: 'var(--radius-sm)',
-                          padding: '0 6px'
-                        }}
-                      >
-                        <span
+                          }}
+                          onKeyDown={event => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              toggleSelCommit(i, false);
+                              setDiffTargetSha(rowFullSha);
+                              setDiffTab('parent');
+                              setView('diff');
+                            }
+                          }}
                           style={{
-                            width: '12px',
-                            textAlign: 'center',
-                            color: statusColor(fl.status),
-                            fontWeight: 600
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            height: '22px',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11.5px',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            paddingLeft: `${6 + depth * 14}px`,
+                            paddingRight: '6px'
                           }}
                         >
-                          {fl.status}
-                        </span>
-                        <span
-                          style={{
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            color: 'var(--fg2)'
-                          }}
-                        >
-                          {fl.path}
-                        </span>
-                        <span style={{ color: 'var(--add)' }}>+{fl.add}</span>
-                        <span style={{ color: 'var(--del)' }}>−{fl.del}</span>
-                      </div>
-                    ))}
+                          <span
+                            style={{
+                              width: '12px',
+                              textAlign: 'center',
+                              color: statusColor(file.status),
+                              fontWeight: 600
+                            }}
+                          >
+                            {file.status}
+                          </span>
+                          <span
+                            style={{
+                              flex: 1,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              color: 'var(--fg2)'
+                            }}
+                          >
+                            {file.path.split('/').pop()}
+                          </span>
+                          <span style={{ color: 'var(--add)' }}>+{file.add}</span>
+                          <span style={{ color: 'var(--del)' }}>−{file.del}</span>
+                        </div>
+                      )}
+                    />
                   </div>
                 </div>
               )}

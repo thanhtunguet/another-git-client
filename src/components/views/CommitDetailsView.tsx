@@ -6,6 +6,7 @@ import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
+import { FileTree } from '../common/FileTree';
 
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
@@ -81,20 +82,13 @@ export const CommitDetailsView: React.FC = () => {
         setLoadingDiff(false);
       }
     }).catch(() => {
-      if (active) {
-        setRawDiffText('');
-        setLoadingDiff(false);
-      }
+        if (active) {
+          setRawDiffText('');
+          setLoadingDiff(false);
+        }
     });
     return () => { active = false; };
   }, [detailIdx, currentFilePath, getCommitFullSha, repoPath]);
-
-  const dirs: Record<string, DiffFile[]> = {};
-  dfiles.forEach(f => {
-    const d = f.path.split('/').slice(0, -1).join('/') || '.';
-    if (!dirs[d]) dirs[d] = [];
-    dirs[d].push(f);
-  });
 
   const detailKicker = isMulti ? `Merged range — ${sel.length} commits, net changes` : 'Commit';
   const detailSubject = isMulti
@@ -290,83 +284,62 @@ export const CommitDetailsView: React.FC = () => {
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-2) 0', minHeight: 0 }}>
-          {Object.keys(dirs).map(d => (
-            <React.Fragment key={d}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  height: '23px',
-                  paddingLeft: '10px',
-                  paddingRight: 'var(--space-4)',
-                  fontSize: '11.5px',
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--fg2)'
-                }}
-              >
-                <i
-                  className="ph ph-caret-down"
-                  style={{ fontSize: '11px', color: 'var(--fg3)', width: '10px' }}
-                />
-                <span>{d}/</span>
-              </div>
-              {dirs[d].map((f, k) => {
-                const isSelected = selectedFile === f.path;
-                return (
-                  <div
-                    key={k}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedFile(f.path)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setSelectedFile(f.path);
-                      }
-                    }}
-                    onContextMenu={e => handleFileMenu(e, f.path)}
+          <FileTree
+            files={dfiles}
+            renderFile={(file, depth) => {
+              const isSelected = selectedFile === file.path;
+              return (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedFile(file.path)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedFile(file.path);
+                    }
+                  }}
+                  onContextMenu={event => handleFileMenu(event, file.path)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    height: '23px',
+                    paddingLeft: `${12 + depth * 14}px`,
+                    paddingRight: 'var(--space-4)',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11.5px',
+                    background: isSelected ? 'var(--sel)' : 'transparent'
+                  }}
+                >
+                  <span
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '7px',
-                      height: '23px',
-                      paddingLeft: '28px',
-                      paddingRight: 'var(--space-4)',
-                      cursor: 'pointer',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: '11.5px',
-                      background: isSelected ? 'var(--sel)' : 'transparent'
+                      width: '11px',
+                      textAlign: 'center',
+                      color: statusColor(file.status),
+                      fontWeight: 600
                     }}
                   >
-                    <span
-                      style={{
-                        width: '11px',
-                        textAlign: 'center',
-                        color: statusColor(f.status),
-                        fontWeight: 600
-                      }}
-                    >
-                      {f.status}
-                    </span>
-                    <span
-                      style={{
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        color: 'var(--fg)'
-                      }}
-                    >
-                      {f.path.split('/').pop()}
-                    </span>
-                    <span style={{ color: 'var(--add)', fontSize: '11px' }}>+{f.add}</span>
-                    <span style={{ color: 'var(--del)', fontSize: '11px' }}>−{f.del}</span>
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ))}
+                    {file.status}
+                  </span>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--fg)'
+                    }}
+                  >
+                    {file.path.split('/').pop()}
+                  </span>
+                  <span style={{ color: 'var(--add)', fontSize: '11px' }}>+{file.add}</span>
+                  <span style={{ color: 'var(--del)', fontSize: '11px' }}>−{file.del}</span>
+                </div>
+              );
+            }}
+          />
         </div>
       </div>
 
