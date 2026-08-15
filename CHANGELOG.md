@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Consolidated Branch and Tag reset actions into one mode-selecting dialog with Soft/Mixed/Hard explanations and command preview. See `docs/changelogs/2026-08-15_branch_tag_reset_dialog.md`.
 - Sorted tags in the Branches view by time descending, including tag path folders ordered by their newest contained tag. See `docs/changelogs/2026-08-15_branches_tag_sorting.md`.
 - Fixed the Branches view recent-commits pane by loading the selected branch's history directly from the Tauri Git backend. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
 - Made tag clicks inspect the tag revision and show its recent commits instead of checking it out; added shared revision actions to the tag context menu. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.

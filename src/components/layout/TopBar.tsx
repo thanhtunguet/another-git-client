@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
+import { ResetDialog } from '../common/ResetDialog';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { type BranchNode, normalizeBranchRef, buildBranchMenuItems } from '../../utils/branchMenu';
 
@@ -46,6 +47,7 @@ export const TopBar: React.FC = () => {
   );
   const [branchPickerLoading, setBranchPickerLoading] = useState(false);
   const [pickerBranches, setPickerBranches] = useState<BranchNode[]>([]);
+  const [resetReference, setResetReference] = useState<string | null>(null);
 
   const closeBranchPicker = () => setBranchPickerAnchor(null);
 
@@ -72,7 +74,7 @@ export const TopBar: React.FC = () => {
     renameBranch,
     mergeBranch,
     rebaseBranch,
-    resetToRef,
+    openResetDialog: setResetReference,
     setUpstream,
     deleteBranch,
     setCompareSeedRef,
@@ -294,6 +296,12 @@ export const TopBar: React.FC = () => {
       >
         Source Control
       </Button>
+      <ResetDialog
+        reference={resetReference}
+        currentBranch={currentBranch}
+        onClose={() => setResetReference(null)}
+        onReset={(reference, mode) => void resetToRef(reference, mode)}
+      />
     </div>
   );
 };

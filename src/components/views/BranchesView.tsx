@@ -10,6 +10,7 @@ import {
 } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
+import { ResetDialog } from '../common/ResetDialog';
 import { type BranchNode, normalizeBranchRef, buildBranchMenuItems } from '../../utils/branchMenu';
 
 type TagNode = {
@@ -268,6 +269,7 @@ export const BranchesView: React.FC = () => {
   const [revisionCommitsLoading, setRevisionCommitsLoading] = useState(false);
   const [revisionCommitsError, setRevisionCommitsError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [resetReference, setResetReference] = useState<string | null>(null);
 
   useEffect(() => {
     if (!repoPath) {
@@ -457,6 +459,10 @@ export const BranchesView: React.FC = () => {
     }));
   };
 
+  const openResetDialog = (reference: string) => {
+    setResetReference(reference);
+  };
+
   const handleBranchMenu = (e: React.MouseEvent, branch: BranchNode) => {
     openMenu(
       e,
@@ -468,7 +474,7 @@ export const BranchesView: React.FC = () => {
         renameBranch,
         mergeBranch,
         rebaseBranch,
-        resetToRef,
+        openResetDialog,
         setUpstream,
         deleteBranch,
         setCompareSeedRef,
@@ -515,19 +521,9 @@ export const BranchesView: React.FC = () => {
       },
       { label: 'Open in Git Graph', run: () => setView('graph') },
       { sep: true },
-      { label: 'Reset current to here — soft', run: () => resetToRef(tag.name, 'soft') },
-      { label: 'Reset current to here — mixed', run: () => resetToRef(tag.name, 'mixed') },
       {
-        label: 'Reset current to here — hard',
-        danger: true,
-        run: () =>
-          confirm(
-            `Hard reset ${currentBranch} to ${tag.name}?`,
-            'All uncommitted changes in the working tree and index will be permanently discarded.',
-            `git reset --hard ${tag.name}`,
-            'Reset --hard',
-            () => void resetToRef(tag.name, 'hard')
-          )
+        label: 'Reset current to here…',
+        run: () => openResetDialog(tag.name)
       },
       { sep: true },
       {
@@ -1114,6 +1110,12 @@ export const BranchesView: React.FC = () => {
           })}
         </div>
       </div>
+      <ResetDialog
+        reference={resetReference}
+        currentBranch={currentBranch}
+        onClose={() => setResetReference(null)}
+        onReset={(reference, mode) => void resetToRef(reference, mode)}
+      />
     </div>
   );
 };

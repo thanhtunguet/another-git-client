@@ -41,7 +41,7 @@ export interface BranchMenuActions {
   renameBranch: (oldName: string, newName: string) => void | Promise<void>;
   mergeBranch: (reference: string) => void | Promise<void>;
   rebaseBranch: (reference: string) => void | Promise<void>;
-  resetToRef: (reference: string, mode: 'soft' | 'mixed' | 'hard') => void | Promise<void>;
+  openResetDialog: (reference: string) => void;
   setUpstream: (branchName?: string, upstreamName?: string) => void | Promise<void>;
   deleteBranch: (branchName: string, isRemote?: boolean, force?: boolean) => void | Promise<void>;
   setCompareSeedRef: (ref: string | null) => void;
@@ -111,19 +111,9 @@ export function buildBranchMenuItems(branch: BranchNode, ctx: BranchMenuActions)
     },
     { label: 'Open in Git Graph', run: () => ctx.setView('graph') },
     { sep: true },
-    { label: 'Reset current to here — soft', run: () => ctx.resetToRef(name, 'soft') },
-    { label: 'Reset current to here — mixed', run: () => ctx.resetToRef(name, 'mixed') },
     {
-      label: 'Reset current to here — hard',
-      danger: true,
-      run: () =>
-        ctx.confirm(
-          `Hard reset ${ctx.currentBranch} to ${name}?`,
-          'All uncommitted changes in the working tree and index will be permanently discarded.',
-          `git reset --hard ${name}`,
-          'Reset --hard',
-          () => void ctx.resetToRef(name, 'hard')
-        )
+      label: 'Reset current to here…',
+      run: () => ctx.openResetDialog(name)
     },
     { sep: true },
     {
