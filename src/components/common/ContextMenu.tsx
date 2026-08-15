@@ -2,11 +2,53 @@ import React, { useEffect, useRef } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 
 export const ContextMenu: React.FC = () => {
-  const { menu, closeMenu } = useGitClient();
+  const { menu, openMenu, closeMenu } = useGitClient();
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
   const actionableIndices = (menu?.items || [])
     .map((m, i) => (m.sep ? -1 : i))
     .filter(i => i >= 0);
+
+  useEffect(() => {
+    const getSelectedText = (target: EventTarget | null) => {
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+        const start = target.selectionStart;
+        const end = target.selectionEnd;
+        return start !== null && end !== null ? target.value.slice(start, end) : '';
+      }
+
+      return window.getSelection()?.toString() || '';
+    };
+
+    const showSelectedTextMenu = (event: MouseEvent) => {
+      const selectedText = getSelectedText(event.target);
+      if (selectedText) {
+        event.preventDefault();
+        event.stopPropagation();
+        openMenu(event, 'Text selection', [
+          {
+            label: 'Copy',
+            hint: '⌘C',
+            run: () => void navigator.clipboard.writeText(selectedText)
+          }
+        ]);
+      }
+    };
+
+    const suppressDefaultContextMenu = (event: MouseEvent) => {
+      // Item-specific custom menus call openMenu(), which has already consumed this event.
+      if (event.defaultPrevented) return;
+
+      event.preventDefault();
+      closeMenu();
+    };
+
+    document.addEventListener('contextmenu', showSelectedTextMenu, true);
+    document.addEventListener('contextmenu', suppressDefaultContextMenu);
+    return () => {
+      document.removeEventListener('contextmenu', showSelectedTextMenu, true);
+      document.removeEventListener('contextmenu', suppressDefaultContextMenu);
+    };
+  }, [closeMenu, openMenu]);
 
   useEffect(() => {
     if (menu && actionableIndices.length) {

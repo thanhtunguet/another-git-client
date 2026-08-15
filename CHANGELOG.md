@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Suppressed default browser context menus throughout the frontend while preserving item-specific custom menus; text selections now offer Copy. See `docs/changelogs/2026-08-15_frontend_context_menu_policy.md`.
 - Fixed overlapping wrapped text in split Diff/Merge views for modified files by rendering each old/new pair in one shared-height row. See `docs/changelogs/2026-08-15_diff_merge_split_line_alignment.md`.
 - Constrained Diff/Merge text selection to the clicked split pane: line-number gutters are excluded, and Cmd/Ctrl+A now selects only the previous or current change content. See `docs/changelogs/2026-08-15_diff_merge_content_selection.md`.
 - Added Quick Git Actions direct lookup: enter an exact branch name to check it out, or a commit ID to open Commit Details. See `docs/changelogs/2026-08-15_quick_git_actions_lookup.md`.
