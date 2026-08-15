@@ -1304,8 +1304,30 @@ pub fn git_show_file_diff(
   repo_path: String,
   path: String,
   staged: Option<bool>,
+  untracked: Option<bool>,
 ) -> Result<String, String> {
   let repo = canonical_repo_path(&repo_path)?;
+  if untracked.unwrap_or(false) {
+    let args = vec![
+      "diff".to_string(),
+      "--no-index".to_string(),
+      "--".to_string(),
+      "/dev/null".to_string(),
+      path,
+    ];
+    let result = run_git_allow_failure(&repo, &args)?;
+    if result.exit_code == 0 || result.exit_code == 1 {
+      return Ok(result.stdout);
+    }
+
+    return Err(format!(
+      "git {} failed with exit code {}: {}",
+      args.join(" "),
+      result.exit_code,
+      result.stderr.trim()
+    ));
+  }
+
   let mut args = vec!["diff".to_string()];
   if staged.unwrap_or(false) {
     args.push("--staged".to_string());

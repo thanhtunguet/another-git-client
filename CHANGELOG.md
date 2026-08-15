@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Fixed Source Control file selection so the Diff view opens the exact clicked file, including untracked files rendered as an add-from-empty diff. See `docs/changelogs/2026-08-15_source_control_file_diff.md`.
 - Consolidated Branch and Tag reset actions into one mode-selecting dialog with Soft/Mixed/Hard explanations and command preview. See `docs/changelogs/2026-08-15_branch_tag_reset_dialog.md`.
 - Sorted tags in the Branches view by time descending, including tag path folders ordered by their newest contained tag. See `docs/changelogs/2026-08-15_branches_tag_sorting.md`.
 - Fixed the Branches view recent-commits pane by loading the selected branch's history directly from the Tauri Git backend. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.

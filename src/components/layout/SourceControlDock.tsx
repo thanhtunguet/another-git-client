@@ -15,6 +15,8 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     scTab,
     setScTab,
     setView,
+    setDiffTab,
+    setDiffTargetPath,
     openMenu,
     commitMsg,
     setCommitMsg,
@@ -41,6 +43,12 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
 
   const [amend, setAmend] = useState(false);
 
+  const openFileDiff = (file: DiffFile, isStaged: boolean) => {
+    setDiffTab(file.status === 'U' ? 'merge' : isStaged ? 'index' : 'work');
+    setDiffTargetPath(file.path);
+    setView('diff');
+  };
+
   const wrapCol = (() => {
     const raw = parseInt(String(preferences.wrapMessageBody ?? '72'), 10);
     return Number.isFinite(raw) && raw >= 20 && raw <= 200 ? raw : 72;
@@ -61,7 +69,7 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
         label: isStaged ? 'Unstage file' : 'Stage file',
         run: () => void (isStaged ? unstageFile(f.path) : stageFile(f.path))
       },
-      { label: 'Open diff', run: () => setView('diff') },
+      { label: 'Open diff', run: () => openFileDiff(f, isStaged) },
       { sep: true },
       {
         label: 'Discard changes',
@@ -228,8 +236,8 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 key={i}
                 role="button"
                 tabIndex={0}
-                onClick={() => setView('diff')}
-                onKeyDown={activateOnEnter(() => setView('diff'))}
+                onClick={() => openFileDiff(f, true)}
+                onKeyDown={activateOnEnter(() => openFileDiff(f, true))}
                 onContextMenu={e => handleFileMenu(e, f, true)}
                 style={{
                   display: 'flex',
@@ -308,8 +316,8 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 key={i}
                 role="button"
                 tabIndex={0}
-                onClick={() => setView('diff')}
-                onKeyDown={activateOnEnter(() => setView('diff'))}
+                onClick={() => openFileDiff(f, false)}
+                onKeyDown={activateOnEnter(() => openFileDiff(f, false))}
                 onContextMenu={e => handleFileMenu(e, f, false)}
                 style={{
                   display: 'flex',
@@ -388,8 +396,8 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
                 key={`untracked-${i}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => setView('diff')}
-                onKeyDown={activateOnEnter(() => setView('diff'))}
+                onClick={() => openFileDiff(f, false)}
+                onKeyDown={activateOnEnter(() => openFileDiff(f, false))}
                 onContextMenu={e => handleFileMenu(e, f, false)}
                 style={{
                   display: 'flex',

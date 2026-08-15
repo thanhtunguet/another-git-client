@@ -342,6 +342,8 @@ interface GitClientContextType {
   toggleSelCommit: (i: number, isMulti: boolean) => void;
   diffTargetSha: string | null;
   setDiffTargetSha: (sha: string | null) => void;
+  diffTargetPath: string | null;
+  setDiffTargetPath: (path: string | null) => void;
   compareSeedRef: string | null;
   setCompareSeedRef: (ref: string | null) => void;
   findCommitIndexBySha: (sha: string) => number;
@@ -502,6 +504,7 @@ export const GitClientProvider: React.FC<{
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [diffTargetSha, setDiffTargetSha] = useState<string | null>(null);
+  const [diffTargetPath, setDiffTargetPath] = useState<string | null>(null);
   const [compareSeedRef, setCompareSeedRef] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
   const [graphLayout, setGraphLayout] = useState<'rows' | 'grouped'>(
@@ -2737,6 +2740,8 @@ export const GitClientProvider: React.FC<{
         toggleSelCommit,
         diffTargetSha,
         setDiffTargetSha,
+        diffTargetPath,
+        setDiffTargetPath,
         compareSeedRef,
         setCompareSeedRef,
         findCommitIndexBySha,

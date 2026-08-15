@@ -21,6 +21,8 @@ export const DiffView: React.FC = () => {
     getCommitFullSha,
     diffTargetSha,
     setDiffTargetSha,
+    diffTargetPath,
+    setDiffTargetPath,
     fetchCommitFiles,
     stageFile,
     unstageFile,
@@ -30,7 +32,6 @@ export const DiffView: React.FC = () => {
     log
   } = useGitClient();
 
-  const [selectedPath, setSelectedPath] = useState<string>('');
   const [rawDiffText, setRawDiffText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [fileQuery, setFileQuery] = useState<string>('');
@@ -86,15 +87,16 @@ export const DiffView: React.FC = () => {
 
   useEffect(() => {
     if (availableFiles.length > 0) {
-      if (!selectedPath || !availableFiles.some(f => f.path === selectedPath)) {
-        setSelectedPath(availableFiles[0].path);
+      if (!diffTargetPath || !availableFiles.some(f => f.path === diffTargetPath)) {
+        setDiffTargetPath(availableFiles[0].path);
       }
     } else {
-      setSelectedPath('');
+      setDiffTargetPath(null);
     }
-  }, [availableFiles, selectedPath]);
+  }, [availableFiles, diffTargetPath, setDiffTargetPath]);
 
-  const targetPath = selectedPath || (availableFiles[0]?.path ?? '');
+  const targetPath = diffTargetPath || (availableFiles[0]?.path ?? '');
+  const currentFileStatus = availableFiles.find(f => f.path === targetPath)?.status;
 
   useEffect(() => {
     if (!repoPath) {
@@ -110,7 +112,12 @@ export const DiffView: React.FC = () => {
         let text = '';
         if (diffTab === 'work') {
           if (targetPath) {
-            text = await tauriGitBackend.showFileDiff(repoPath, targetPath, false);
+            text = await tauriGitBackend.showFileDiff(
+              repoPath,
+              targetPath,
+              false,
+              currentFileStatus === '?'
+            );
           }
         } else if (diffTab === 'index') {
           if (targetPath) {
@@ -144,7 +151,7 @@ export const DiffView: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [repoPath, targetPath, diffTab, activeSha]);
+  }, [repoPath, targetPath, diffTab, activeSha, currentFileStatus]);
 
   const handleCheckoutSide = async (side: 'ours' | 'theirs') => {
     if (!targetPath || !repoPath) return;
@@ -273,7 +280,6 @@ export const DiffView: React.FC = () => {
       return renderEmptyState();
     }
 
-    const currentFileStatus = availableFiles.find(f => f.path === targetPath)?.status;
     const isConflict = diffTab === 'merge' || currentFileStatus === 'U';
 
     return (
@@ -476,11 +482,11 @@ export const DiffView: React.FC = () => {
                   key={f.path}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setSelectedPath(f.path)}
+                  onClick={() => setDiffTargetPath(f.path)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setSelectedPath(f.path);
+                      setDiffTargetPath(f.path);
                     }
                   }}
                   style={{

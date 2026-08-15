@@ -302,8 +302,8 @@ export const tauriGitBackend = {
     return invoke<GitCommandResult>("git_drop_stash", { repoPath, stashRef });
   },
 
-  showFileDiff(repoPath: string, path: string, staged = false) {
-    return invoke<string>("git_show_file_diff", { repoPath, path, staged });
+  showFileDiff(repoPath: string, path: string, staged = false, untracked = false) {
+    return invoke<string>("git_show_file_diff", { repoPath, path, staged, untracked });
   },
 
   addWorktree(
