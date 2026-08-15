@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Button } from './Button';
 import { SegmentedControl } from './SegmentedControl';
 import { useGitClient } from '../../context/GitClientContext';
@@ -158,6 +158,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
   const parsedLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
   const sideBySideRows = useMemo(() => parseSideBySideDiff(parsedLines), [parsedLines]);
+  const splitContentRef = useRef<HTMLDivElement>(null);
+  const leftContentRef = useRef<HTMLDivElement>(null);
+  const rightContentRef = useRef<HTMLDivElement>(null);
+  const activeSplitSideRef = useRef<'left' | 'right' | null>(null);
 
   const monoStyle: React.CSSProperties = {
     fontFamily: 'var(--font-mono)',
@@ -172,6 +176,40 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       void navigator.clipboard.writeText(rawDiffText);
       toastRun('Copied diff patch', filePath || 'diff');
     }
+  };
+
+  const selectSplitSideContent = (side: 'left' | 'right') => {
+    const content = side === 'left' ? leftContentRef.current : rightContentRef.current;
+    const selection = window.getSelection();
+    if (!content || !selection) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
+  const handleSplitContentMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    const side = (event.target as HTMLElement).closest<HTMLElement>('[data-diff-side]')?.dataset
+      .diffSide;
+    if (side !== 'left' && side !== 'right') return;
+
+    activeSplitSideRef.current = side;
+    splitContentRef.current?.focus({ preventScroll: true });
+  };
+
+  const handleSplitContentKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (
+      !(event.metaKey || event.ctrlKey) ||
+      event.key.toLowerCase() !== 'a' ||
+      !activeSplitSideRef.current
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    selectSplitSideContent(activeSplitSideRef.current);
   };
 
   const renderHeaderBar = () => (
@@ -310,69 +348,58 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
         {/* Side-by-side Diff Content */}
         <div
+          ref={splitContentRef}
+          tabIndex={0}
+          onMouseDown={handleSplitContentMouseDown}
+          onKeyDown={handleSplitContentKeyDown}
           style={{
             flex: 1,
             overflow: 'auto',
             minHeight: 0,
-            background: 'var(--color-bg)'
+            background: 'var(--color-bg)',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
+            alignContent: 'start',
+            outline: 'none'
           }}
         >
-          {sideBySideRows.map(row => {
-            if (row.type === 'hunk') {
+          <div ref={leftContentRef} style={{ display: 'contents' }}>
+            {sideBySideRows.map((row, rowIndex) => {
+              if (row.type === 'hunk') return null;
+              const left = row.left;
+              const bg =
+                left?.type === 'del'
+                  ? 'var(--delbg)'
+                  : left?.type === 'context'
+                    ? 'transparent'
+                    : 'transparent';
+              const fg =
+                left?.type === 'del'
+                  ? 'var(--del)'
+                  : left?.type === 'context'
+                    ? 'var(--fg)'
+                    : 'transparent';
+
               return (
                 <div
                   key={row.id}
+                  data-diff-side="left"
                   style={{
-                    display: 'flex',
-                    background: 'var(--raised)',
-                    color: 'var(--fg3)',
-                    padding: '3px 12px',
-                    borderTop: '1px solid var(--line)',
-                    borderBottom: '1px solid var(--line)',
-                    fontWeight: 500,
-                    ...monoStyle
-                  }}
-                >
-                  {row.hunkText}
-                </div>
-              );
-            }
-
-            const left = row.left;
-            const right = row.right;
-
-            const leftBg =
-              left?.type === 'del' ? 'var(--delbg)' : left?.type === 'context' ? 'transparent' : 'transparent';
-            const leftFg =
-              left?.type === 'del' ? 'var(--del)' : left?.type === 'context' ? 'var(--fg)' : 'transparent';
-
-            const rightBg =
-              right?.type === 'add' ? 'var(--addbg)' : right?.type === 'context' ? 'transparent' : 'transparent';
-            const rightFg =
-              right?.type === 'add' ? 'var(--add)' : right?.type === 'context' ? 'var(--fg)' : 'transparent';
-
-            return (
-              <div
-                key={row.id}
-                style={{
-                  display: 'flex',
-                  minHeight: '19px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.02)',
-                  ...monoStyle
-                }}
-              >
-                {/* Left Side (Old) */}
-                <div
-                  style={{
-                    flex: '1 1 0%',
+                    gridColumn: '1',
+                    gridRow: rowIndex + 1,
                     minWidth: 0,
+                    minHeight: '19px',
                     display: 'flex',
-                    background: leftBg,
-                    borderRight: '1px solid var(--line)'
+                    background: bg,
+                    borderRight: '1px solid var(--line)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.02)',
+                    ...monoStyle
                   }}
                 >
                   {showGutterMarkers && (
                     <span
+                      aria-hidden="true"
+                      onMouseDown={event => event.preventDefault()}
                       style={{
                         width: '46px',
                         flex: '0 0 46px',
@@ -380,6 +407,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                         paddingRight: '8px',
                         color: 'var(--fg3)',
                         userSelect: 'none',
+                        WebkitUserSelect: 'none',
                         borderRight: '1px solid var(--line)'
                       }}
                     >
@@ -392,25 +420,53 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                       paddingRight: '8px',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-all',
-                      color: leftFg,
+                      color: fg,
                       flex: 1
                     }}
                   >
                     {left?.text || ''}
                   </span>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Right Side (New) */}
+          <div ref={rightContentRef} style={{ display: 'contents' }}>
+            {sideBySideRows.map((row, rowIndex) => {
+              if (row.type === 'hunk') return null;
+              const right = row.right;
+              const bg =
+                right?.type === 'add'
+                  ? 'var(--addbg)'
+                  : right?.type === 'context'
+                    ? 'transparent'
+                    : 'transparent';
+              const fg =
+                right?.type === 'add'
+                  ? 'var(--add)'
+                  : right?.type === 'context'
+                    ? 'var(--fg)'
+                    : 'transparent';
+
+              return (
                 <div
+                  key={row.id}
+                  data-diff-side="right"
                   style={{
-                    flex: '1 1 0%',
+                    gridColumn: '2',
+                    gridRow: rowIndex + 1,
                     minWidth: 0,
+                    minHeight: '19px',
                     display: 'flex',
-                    background: rightBg
+                    background: bg,
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.02)',
+                    ...monoStyle
                   }}
                 >
                   {showGutterMarkers && (
                     <span
+                      aria-hidden="true"
+                      onMouseDown={event => event.preventDefault()}
                       style={{
                         width: '46px',
                         flex: '0 0 46px',
@@ -418,6 +474,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                         paddingRight: '8px',
                         color: 'var(--fg3)',
                         userSelect: 'none',
+                        WebkitUserSelect: 'none',
                         borderRight: '1px solid var(--line)'
                       }}
                     >
@@ -430,16 +487,37 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
                       paddingRight: '8px',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-all',
-                      color: rightFg,
+                      color: fg,
                       flex: 1
                     }}
                   >
                     {right?.text || ''}
                   </span>
                 </div>
+              );
+            })}
+          </div>
+
+          {sideBySideRows.map((row, rowIndex) =>
+            row.type === 'hunk' ? (
+              <div
+                key={row.id}
+                style={{
+                  gridColumn: '1 / -1',
+                  gridRow: rowIndex + 1,
+                  background: 'var(--raised)',
+                  color: 'var(--fg3)',
+                  padding: '3px 12px',
+                  borderTop: '1px solid var(--line)',
+                  borderBottom: '1px solid var(--line)',
+                  fontWeight: 500,
+                  ...monoStyle
+                }}
+              >
+                {row.hunkText}
               </div>
-            );
-          })}
+            ) : null
+          )}
         </div>
       </div>
     );

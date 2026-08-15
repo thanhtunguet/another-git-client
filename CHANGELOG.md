@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Constrained Diff/Merge text selection to the clicked split pane: line-number gutters are excluded, and Cmd/Ctrl+A now selects only the previous or current change content. See `docs/changelogs/2026-08-15_diff_merge_content_selection.md`.
 - Added Quick Git Actions direct lookup: enter an exact branch name to check it out, or a commit ID to open Commit Details. See `docs/changelogs/2026-08-15_quick_git_actions_lookup.md`.
 - Added integrated-terminal context actions (Clear All, Split Terminal, Kill Terminal), multi-column split panes, and fresh-session cleanup after `exit` or panel close. See `docs/changelogs/2026-08-15_integrated_terminal_actions.md`.
 - Fixed Source Control file selection so the Diff view opens the exact clicked file, including untracked files rendered as an add-from-empty diff. See `docs/changelogs/2026-08-15_source_control_file_diff.md`.
