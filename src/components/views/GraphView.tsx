@@ -198,6 +198,23 @@ export const GraphView: React.FC = () => {
     };
   }, [inlineDiff, repoPath]);
 
+  useEffect(() => {
+    if (!inlineDiff) {
+      return;
+    }
+
+    const closeInlineDiff = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setInlineDiff(null);
+      }
+    };
+
+    window.addEventListener('keydown', closeInlineDiff, true);
+    return () => window.removeEventListener('keydown', closeInlineDiff, true);
+  }, [inlineDiff]);
+
   const expandedCommitSha = useMemo(() => {
     const expandedIndex = Object.keys(expanded).find(index => expanded[Number(index)]);
     return expandedIndex === undefined ? null : getCommitFullSha(Number(expandedIndex));
@@ -352,7 +369,16 @@ export const GraphView: React.FC = () => {
   let lastDay: string | null = null;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+      }}
+    >
       <div
         style={{
           height: '38px',
@@ -460,20 +486,21 @@ export const GraphView: React.FC = () => {
         </div>
       )}
 
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
         <div
           style={{
             flex: inlineDiff ? '0 0 20%' : 1,
-            minWidth: inlineDiff ? '240px' : 0,
+            minWidth: 0,
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
+            overflow: 'hidden',
             borderRight: inlineDiff ? '1px solid var(--line)' : 'none'
           }}
         >
           <div
             id="gc-graph-scroll"
-            style={{ flex: 1, overflow: 'auto', minHeight: 0 }}
+            style={{ flex: 1, minWidth: 0, minHeight: 0, overflowX: 'hidden', overflowY: 'auto' }}
             onScroll={handleGraphScroll}
           >
             <div
@@ -494,9 +521,15 @@ export const GraphView: React.FC = () => {
             >
               <span style={{ width: `${graphData.width}px`, flex: '0 0 auto' }} />
               <span style={{ flex: 1, paddingLeft: '6px' }}>Subject</span>
-              <span style={{ width: '150px', flex: '0 0 auto' }}>Author</span>
-              <span style={{ width: '104px', flex: '0 0 auto' }}>Date</span>
-              <span style={{ width: '74px', flex: '0 0 auto', textAlign: 'right' }}>Commit</span>
+              {!inlineDiff && (
+                <>
+                  <span style={{ width: '150px', flex: '0 0 auto' }}>Author</span>
+                  <span style={{ width: '104px', flex: '0 0 auto' }}>Date</span>
+                  <span style={{ width: '74px', flex: '0 0 auto', textAlign: 'right' }}>
+                    Commit
+                  </span>
+                </>
+              )}
             </div>
 
             {topSpacerHeight > 0 ? <div style={{ height: `${topSpacerHeight}px` }} /> : null}
@@ -543,6 +576,7 @@ export const GraphView: React.FC = () => {
                     tabIndex={0}
                     data-gc-context-menu="commit"
                     aria-selected={isSelected}
+                    title={`${r[1]} · ${r[2]} · ${getCommitHash(i)}`}
                     onClick={e => {
                       e.preventDefault();
                       toggleSelCommit(i, false);
@@ -613,42 +647,46 @@ export const GraphView: React.FC = () => {
                         {r[0]}
                       </span>
                     </span>
-                    <span
-                      style={{
-                        width: '150px',
-                        flex: '0 0 auto',
-                        color: 'var(--fg2)',
-                        fontSize: '12px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}
-                    >
-                      {r[1]}
-                    </span>
-                    <span
-                      style={{
-                        width: '104px',
-                        flex: '0 0 auto',
-                        color: 'var(--fg3)',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '11px'
-                      }}
-                    >
-                      {r[2].slice(5)}
-                    </span>
-                    <span
-                      style={{
-                        width: '74px',
-                        flex: '0 0 auto',
-                        textAlign: 'right',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '11.5px',
-                        color: 'var(--iris)'
-                      }}
-                    >
-                      {getCommitHash(i)}
-                    </span>
+                    {!inlineDiff && (
+                      <>
+                        <span
+                          style={{
+                            width: '150px',
+                            flex: '0 0 auto',
+                            color: 'var(--fg2)',
+                            fontSize: '12px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {r[1]}
+                        </span>
+                        <span
+                          style={{
+                            width: '104px',
+                            flex: '0 0 auto',
+                            color: 'var(--fg3)',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11px'
+                          }}
+                        >
+                          {r[2].slice(5)}
+                        </span>
+                        <span
+                          style={{
+                            width: '74px',
+                            flex: '0 0 auto',
+                            textAlign: 'right',
+                            fontFamily: 'var(--font-mono)',
+                            fontSize: '11.5px',
+                            color: 'var(--iris)'
+                          }}
+                        >
+                          {getCommitHash(i)}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {!enableVirtualRows && isExpanded && (
@@ -763,53 +801,26 @@ export const GraphView: React.FC = () => {
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
+              overflow: 'hidden',
               background: 'var(--panel)'
             }}
           >
             <div
               style={{
-                height: '38px',
-                flex: '0 0 auto',
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
                 display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-2)',
-                padding: '0 var(--space-3)',
-                borderBottom: '1px solid var(--line)'
+                flexDirection: 'column',
+                overflow: 'hidden'
               }}
             >
-              <i className="ph ph-file-diff" style={{ color: 'var(--iris)' }} />
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px'
-                }}
-              >
-                {inlineDiff.path}
-              </span>
-              <span
-                style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}
-              >
-                {inlineDiff.sha.slice(0, 7)}
-              </span>
-              <Button
-                variant="secondary"
-                style={{ height: '25px' }}
-                onClick={() => setInlineDiff(null)}
-              >
-                Close diff
-              </Button>
-            </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
               <DiffViewer
                 filePath={inlineDiff.path}
                 rawDiffText={inlineDiffText}
                 loading={inlineDiffLoading}
                 emptyMessage="No diff output found for this file in the selected commit."
+                onClose={() => setInlineDiff(null)}
               />
             </div>
           </div>

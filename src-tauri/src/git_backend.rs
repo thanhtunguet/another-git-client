@@ -1133,7 +1133,7 @@ pub fn git_get_commit_diff(
   file_path: Option<String>,
 ) -> Result<String, String> {
   let repo = canonical_repo_path(&repo_path)?;
-  let mut args = vec!["show".to_string(), sha];
+  let mut args = vec!["show".to_string(), "--format=".to_string(), sha];
   if let Some(path) = file_path {
     if !path.trim().is_empty() {
       args.push("--".to_string());

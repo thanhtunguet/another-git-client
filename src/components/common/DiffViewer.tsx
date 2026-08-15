@@ -25,9 +25,10 @@ export function parseDiffText(raw: string): DiffLine[] {
       continue;
     }
 
-    const isFileMetadata = /^(?:old mode|new mode|deleted file mode|new file mode|similarity index|dissimilarity index|rename from|rename to|copy from|copy to|Binary files |GIT binary patch|literal |delta )/.test(
-      line
-    );
+    const isFileMetadata =
+      /^(?:old mode|new mode|deleted file mode|new file mode|similarity index|dissimilarity index|rename from|rename to|copy from|copy to|Binary files |GIT binary patch|literal |delta )/.test(
+        line
+      );
 
     if (isFileMetadata) {
       continue;
@@ -150,6 +151,7 @@ export interface DiffViewerProps {
   onStageFile?: () => void;
   onUnstageFile?: () => void;
   onCopyPatch?: () => void;
+  onClose?: () => void;
   isStaged?: boolean;
   isUnstaged?: boolean;
 }
@@ -162,6 +164,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   onStageFile,
   onUnstageFile,
   onCopyPatch,
+  onClose,
   isStaged,
   isUnstaged
 }) => {
@@ -201,7 +204,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   };
 
   const activateSplitSide = (event: React.PointerEvent<HTMLDivElement>) => {
-    const side = (event.target as HTMLElement).closest<HTMLElement>('[data-diff-side]')?.dataset.diffSide;
+    const side = (event.target as HTMLElement).closest<HTMLElement>('[data-diff-side]')?.dataset
+      .diffSide;
     if (side !== 'left' && side !== 'right') return;
 
     clearSplitSelectionRestrictions();
@@ -260,10 +264,20 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
         borderBottom: '1px solid var(--line)'
       }}
     >
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600 }}>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '12px',
+          fontWeight: 600
+        }}
+      >
         {filePath || 'Repository diff'}
       </span>
-      <div style={{ flex: 1 }} />
 
       <SegmentedControl
         options={[
@@ -300,6 +314,17 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
           onClick={handleCopyPatch}
         >
           Copy patch
+        </Button>
+      )}
+      {onClose && (
+        <Button
+          variant="secondary"
+          style={{ width: '24px', height: '22px', padding: 0 }}
+          onClick={onClose}
+          title="Close diff (Esc)"
+          aria-label="Close diff"
+        >
+          <i className="ph ph-x" />
         </Button>
       )}
     </div>
