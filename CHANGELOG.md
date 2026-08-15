@@ -3,6 +3,7 @@
 ## 2026-08-15
 - Sorted tags in the Branches view by time descending, including tag path folders ordered by their newest contained tag. See `docs/changelogs/2026-08-15_branches_tag_sorting.md`.
 - Fixed the Branches view recent-commits pane by loading the selected branch's history directly from the Tauri Git backend. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
+- Made tag clicks inspect the tag revision and show its recent commits instead of checking it out; added shared revision actions to the tag context menu. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
 
 ## 2026-08-14
 - Added a VS Code-style bottom panel with reorderable, persistent `Output` and interactive integrated `Terminal` tabs (with default letter spacing). The terminal uses a Tauri PTY and starts in the active repository. See `docs/changelogs/2026-08-14_integrated_terminal_tabs.md`.

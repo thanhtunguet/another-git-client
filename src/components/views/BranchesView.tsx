@@ -19,6 +19,10 @@ type TagNode = {
   lastCommitEpoch?: number;
 };
 
+type SelectedRevision =
+  | { kind: 'branch'; name: string; fullRef: string; branch: BranchNode }
+  | { kind: 'tag'; name: string; fullRef: string; tag: TagNode };
+
 type TreeRow =
   | { type: 'group'; id: string; label: string; count: number }
   | { type: 'folder'; id: string; label: string; depth: number }
@@ -49,6 +53,14 @@ function normalizeTagRef(tag: TagRef): TagNode {
     sha: tag.sha,
     lastCommitEpoch: tag.lastCommitEpoch
   };
+}
+
+function branchRevisionId(branch: BranchNode): string {
+  return `branch:${branch.fullRef}`;
+}
+
+function tagRevisionId(tag: TagNode): string {
+  return `tag:${tag.fullRef}`;
 }
 
 function buildPathRows(
@@ -251,17 +263,17 @@ export const BranchesView: React.FC = () => {
   const [tags, setTags] = useState<TagNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
-  const [selectedBranchName, setSelectedBranchName] = useState<string>('');
-  const [selectedBranchCommits, setSelectedBranchCommits] = useState<GraphCommitRow[]>([]);
-  const [branchCommitsLoading, setBranchCommitsLoading] = useState(false);
-  const [branchCommitsError, setBranchCommitsError] = useState<string | null>(null);
+  const [selectedRevisionId, setSelectedRevisionId] = useState<string>('');
+  const [selectedRevisionCommits, setSelectedRevisionCommits] = useState<GraphCommitRow[]>([]);
+  const [revisionCommitsLoading, setRevisionCommitsLoading] = useState(false);
+  const [revisionCommitsError, setRevisionCommitsError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!repoPath) {
       setBranches([]);
       setTags([]);
-      setSelectedBranchName('');
+      setSelectedRevisionId('');
       return;
     }
 
@@ -302,19 +314,17 @@ export const BranchesView: React.FC = () => {
   }, [repoPath]);
 
   useEffect(() => {
-    if (!branches.length) {
-      setSelectedBranchName('');
-      return;
-    }
-
-    const selectedStillExists = branches.some(branch => branch.name === selectedBranchName);
+    const selectedStillExists = [
+      ...branches.map(branchRevisionId),
+      ...tags.map(tagRevisionId)
+    ].includes(selectedRevisionId);
     if (selectedStillExists) {
       return;
     }
 
     const current = branches.find(branch => branch.current) ?? branches[0];
-    setSelectedBranchName(current.name);
-  }, [branches, selectedBranchName]);
+    setSelectedRevisionId(current ? branchRevisionId(current) : tags[0] ? tagRevisionId(tags[0]) : '');
+  }, [branches, tags, selectedRevisionId]);
 
   const filteredBranches = useMemo(() => {
     const q = branchQ.trim().toLowerCase();
@@ -394,46 +404,51 @@ export const BranchesView: React.FC = () => {
     return rows;
   }, [expandedFolders, localBranches, remoteBranches, remoteGroups, filteredTags]);
 
-  const selectedBranch = useMemo(
-    () => branches.find(branch => branch.name === selectedBranchName),
-    [branches, selectedBranchName]
-  );
+  const selectedRevision = useMemo<SelectedRevision | null>(() => {
+    const branch = branches.find(item => branchRevisionId(item) === selectedRevisionId);
+    if (branch) {
+      return { kind: 'branch', name: branch.name, fullRef: branch.fullRef, branch };
+    }
+
+    const tag = tags.find(item => tagRevisionId(item) === selectedRevisionId);
+    return tag ? { kind: 'tag', name: tag.name, fullRef: tag.fullRef, tag } : null;
+  }, [branches, tags, selectedRevisionId]);
 
   useEffect(() => {
-    if (!repoPath || !selectedBranch) {
-      setSelectedBranchCommits([]);
-      setBranchCommitsError(null);
-      setBranchCommitsLoading(false);
+    if (!repoPath || !selectedRevision) {
+      setSelectedRevisionCommits([]);
+      setRevisionCommitsError(null);
+      setRevisionCommitsLoading(false);
       return;
     }
 
     let disposed = false;
-    setBranchCommitsLoading(true);
-    setBranchCommitsError(null);
+    setRevisionCommitsLoading(true);
+    setRevisionCommitsError(null);
 
     void tauriGitBackend
-      .getRefGraph(repoPath, selectedBranch.fullRef, { maxCount: 3 })
+      .getRefGraph(repoPath, selectedRevision.fullRef, { maxCount: 3 })
       .then(rows => {
         if (!disposed) {
-          setSelectedBranchCommits(rows);
+          setSelectedRevisionCommits(rows);
         }
       })
       .catch(error => {
         if (!disposed) {
-          setSelectedBranchCommits([]);
-          setBranchCommitsError(error instanceof Error ? error.message : String(error));
+          setSelectedRevisionCommits([]);
+          setRevisionCommitsError(error instanceof Error ? error.message : String(error));
         }
       })
       .finally(() => {
         if (!disposed) {
-          setBranchCommitsLoading(false);
+          setRevisionCommitsLoading(false);
         }
       });
 
     return () => {
       disposed = true;
     };
-  }, [repoPath, selectedBranch]);
+  }, [repoPath, selectedRevision]);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => ({
@@ -467,6 +482,53 @@ export const BranchesView: React.FC = () => {
   const handleTagMenu = (e: React.MouseEvent, tag: TagNode) => {
     openMenu(e, tag.name, [
       { label: 'Checkout', hint: '↵', run: () => checkoutBranch(tag.name) },
+      {
+        label: `New branch from '${tag.name}'…`,
+        run: () => {
+          prompt(
+            `Create new branch from ${tag.name}`,
+            `Enter a name for the new branch based on tag ${tag.name}.`,
+            'Create branch',
+            `${tag.name}-branch`,
+            (newBranch?: string) => {
+              const name = newBranch?.trim();
+              if (!name) {
+                return;
+              }
+              void tauriGitBackend
+                .createBranch(repoPath, name, tag.name)
+                .then(() => checkoutBranch(name))
+                .catch(error => toastRun('Create branch failed', String(error)));
+            }
+          );
+        }
+      },
+      { sep: true },
+      { label: `Merge ${tag.name} into ${currentBranch}`, run: () => mergeBranch(tag.name) },
+      { label: `Rebase ${currentBranch} onto ${tag.name}`, run: () => rebaseBranch(tag.name) },
+      {
+        label: 'Compare with current',
+        run: () => {
+          setCompareSeedRef(tag.name);
+          setView('compare');
+        }
+      },
+      { label: 'Open in Git Graph', run: () => setView('graph') },
+      { sep: true },
+      { label: 'Reset current to here — soft', run: () => resetToRef(tag.name, 'soft') },
+      { label: 'Reset current to here — mixed', run: () => resetToRef(tag.name, 'mixed') },
+      {
+        label: 'Reset current to here — hard',
+        danger: true,
+        run: () =>
+          confirm(
+            `Hard reset ${currentBranch} to ${tag.name}?`,
+            'All uncommitted changes in the working tree and index will be permanently discarded.',
+            `git reset --hard ${tag.name}`,
+            'Reset --hard',
+            () => void resetToRef(tag.name, 'hard')
+          )
+      },
       { sep: true },
       {
         label: `Delete ${tag.name}`,
@@ -555,7 +617,11 @@ export const BranchesView: React.FC = () => {
     ]);
   };
 
-  const selectedBranchMeta = selectedBranch ? formatBranchMeta(selectedBranch) : '';
+  const selectedRevisionMeta = selectedRevision
+    ? selectedRevision.kind === 'branch'
+      ? formatBranchMeta(selectedRevision.branch)
+      : `tag · ${selectedRevision.tag.sha.slice(0, 7)}`
+    : '';
 
   const treePanel = useResizablePanel({
     storageKey: 'ag_panel_branches_tree_width',
@@ -691,21 +757,23 @@ export const BranchesView: React.FC = () => {
 
             if (row.type === 'tag') {
               const padLeft = 10 + row.depth * 12;
+              const isSelected = selectedRevisionId === tagRevisionId(row.tag);
 
               return (
                 <div
                   key={row.id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => void checkoutBranch(row.tag.name)}
+                  aria-selected={isSelected}
+                  onClick={() => setSelectedRevisionId(tagRevisionId(row.tag))}
                   onKeyDown={e => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      void checkoutBranch(row.tag.name);
+                      setSelectedRevisionId(tagRevisionId(row.tag));
                     }
                   }}
                   onContextMenu={e => handleTagMenu(e, row.tag)}
-                  title={`Checkout tag ${row.tag.name}`}
+                  title={`Inspect tag ${row.tag.name}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -714,6 +782,7 @@ export const BranchesView: React.FC = () => {
                     paddingLeft: `${padLeft}px`,
                     paddingRight: 'var(--space-3)',
                     cursor: 'pointer',
+                    background: isSelected ? 'var(--sel)' : 'transparent',
                     color: 'var(--fg)',
                     fontSize: '12.5px',
                     fontFamily: 'var(--font-mono)'
@@ -745,7 +814,7 @@ export const BranchesView: React.FC = () => {
 
             const branch = row.branch;
             const padLeft = 10 + row.depth * 12;
-            const isSelected = selectedBranchName === branch.name;
+            const isSelected = selectedRevisionId === branchRevisionId(branch);
             const iconColor = branch.kind === 'remote' ? 'var(--fg3)' : 'var(--color-accent)';
             const meta = formatBranchMeta(branch);
 
@@ -755,11 +824,11 @@ export const BranchesView: React.FC = () => {
                 role="button"
                 tabIndex={0}
                 aria-selected={isSelected}
-                onClick={() => setSelectedBranchName(branch.name)}
+                onClick={() => setSelectedRevisionId(branchRevisionId(branch))}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setSelectedBranchName(branch.name);
+                    setSelectedRevisionId(branchRevisionId(branch));
                   }
                 }}
                 onContextMenu={e => handleBranchMenu(e, branch)}
@@ -943,28 +1012,28 @@ export const BranchesView: React.FC = () => {
           }}
         >
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-            {selectedBranch?.name || 'No branch selected'}
+            {selectedRevision?.name || 'No revision selected'}
           </span>
           <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
-            {selectedBranchMeta || 'Select a branch to inspect details'}
+            {selectedRevisionMeta || 'Select a branch or tag to inspect details'}
           </span>
           <div style={{ flex: 1 }} />
           <Button
             variant="secondary"
             style={{ height: '25px', padding: '0 10px' }}
             onClick={() => {
-              if (selectedBranch) setCompareSeedRef(selectedBranch.name);
+              if (selectedRevision) setCompareSeedRef(selectedRevision.name);
               setView('compare');
             }}
-            disabled={!selectedBranch}
+            disabled={!selectedRevision}
           >
             Compare with current
           </Button>
           <Button
             variant="primary"
             style={{ height: '25px', padding: '0 10px' }}
-            onClick={selectedBranch ? () => void mergeBranch(selectedBranch.name) : undefined}
-            disabled={!selectedBranch}
+            onClick={selectedRevision ? () => void mergeBranch(selectedRevision.name) : undefined}
+            disabled={!selectedRevision}
           >
             <i className="ph ph-git-merge" style={{ fontSize: '14px' }} /> Merge into{' '}
             {currentBranch}
@@ -980,29 +1049,29 @@ export const BranchesView: React.FC = () => {
           }}
         >
           <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>
-            Recent commits on this branch
+            Recent commits on this revision
           </h6>
-          {branchCommitsLoading && (
+          {revisionCommitsLoading && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
               Loading recent commits…
             </div>
           )}
-          {!branchCommitsLoading && branchCommitsError && (
+          {!revisionCommitsLoading && revisionCommitsError && (
             <div style={{ color: 'var(--danger)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              Failed to load commits: {branchCommitsError}
+              Failed to load commits: {revisionCommitsError}
             </div>
           )}
-          {!branchCommitsLoading && !branchCommitsError && selectedBranch && !selectedBranchCommits.length && (
+          {!revisionCommitsLoading && !revisionCommitsError && selectedRevision && !selectedRevisionCommits.length && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              This branch has no commits yet.
+              This revision has no commits yet.
             </div>
           )}
-          {!branchCommitsLoading && !branchCommitsError && !selectedBranch && (
+          {!revisionCommitsLoading && !revisionCommitsError && !selectedRevision && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              Select a branch to see its recent commits.
+              Select a branch or tag to see its recent commits.
             </div>
           )}
-          {selectedBranchCommits.map(commit => {
+          {selectedRevisionCommits.map(commit => {
             return (
               <div
                 key={commit.sha}
