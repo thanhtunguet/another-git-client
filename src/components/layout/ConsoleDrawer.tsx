@@ -100,11 +100,9 @@ export const ConsoleDrawer: React.FC = () => {
     setTerminalSessionIds(previous => (previous.length ? previous : [createTerminalSessionId()]));
   };
 
-  const clearAllTerminals = () => {
+  const clearTerminal = (sessionId: string) => {
     const command = navigator.userAgent.includes('Windows') ? 'cls\r' : 'clear\r';
-    terminalSessionIds.forEach(sessionId => {
-      void tauriGitBackend.writeTerminal(sessionId, command).catch(() => {});
-    });
+    void tauriGitBackend.writeTerminal(sessionId, command).catch(() => {});
   };
 
   const splitTerminal = () => {
@@ -302,7 +300,7 @@ export const ConsoleDrawer: React.FC = () => {
                 <IntegratedTerminal
                   repoPath={repoPath}
                   sessionId={sessionId}
-                  onClearAll={clearAllTerminals}
+                  onClear={() => clearTerminal(sessionId)}
                   onSplit={splitTerminal}
                   onExit={() => removeTerminal(sessionId)}
                   onKill={() => removeTerminal(sessionId)}

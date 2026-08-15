@@ -14,7 +14,7 @@ interface TerminalOutput {
 interface IntegratedTerminalProps {
   repoPath: string;
   sessionId: string;
-  onClearAll: () => void;
+  onClear: () => void;
   onSplit: () => void;
   onExit: () => void;
   onKill: () => void;
@@ -23,13 +23,14 @@ interface IntegratedTerminalProps {
 export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
   repoPath,
   sessionId,
-  onClearAll,
+  onClear,
   onSplit,
   onExit,
   onKill
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const onExitRef = useRef(onExit);
+  const lifecycleVersionRef = useRef(0);
   const { openMenu } = useGitClient();
 
   useEffect(() => {
@@ -71,6 +72,9 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
     resizeObserver.observe(host);
     let command = '';
     let disposed = false;
+    const lifecycleVersion = lifecycleVersionRef.current + 1;
+    lifecycleVersionRef.current = lifecycleVersion;
+    const ownsLifecycle = () => lifecycleVersionRef.current === lifecycleVersion;
     const inputSubscription = terminal.onData(data => {
       if (data === '\r') {
         if (command.trim() === 'exit') {
@@ -100,7 +104,7 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
       .startTerminal(sessionId, repoPath, { cols: terminal.cols, rows: terminal.rows })
       .then(() => {
         if (disposed) {
-          void tauriGitBackend.stopTerminal(sessionId).catch(() => {});
+          if (ownsLifecycle()) void tauriGitBackend.stopTerminal(sessionId).catch(() => {});
           return;
         }
         resize();
@@ -115,7 +119,9 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
       resizeObserver.disconnect();
       inputSubscription.dispose();
       void unlisten.then(stopListening => stopListening());
-      void tauriGitBackend.stopTerminal(sessionId).catch(() => {});
+      void Promise.resolve().then(() => {
+        if (ownsLifecycle()) return tauriGitBackend.stopTerminal(sessionId).catch(() => {});
+      });
       terminal.dispose();
     };
   }, [repoPath, sessionId]);
@@ -137,7 +143,7 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
       onContextMenu={event => {
         event.preventDefault();
         openMenu(event, 'Terminal', [
-          { label: 'Clear All', run: onClearAll },
+          { label: 'Clear All', run: onClear },
           { label: 'Split Terminal', run: onSplit },
           { sep: true },
           { label: 'Kill Terminal', danger: true, run: onKill }
