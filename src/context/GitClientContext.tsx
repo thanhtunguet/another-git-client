@@ -520,7 +520,7 @@ export const GitClientProvider: React.FC<{
   const [filterOpen, setFilterOpen] = useState<boolean>(
     persistedStore?.settings.filterOpen || false
   );
-  const [f, setF] = useState<FilterState>({ ref: '', author: '', msg: '', from: '', to: '' });
+  const [f, setF] = useState<FilterState>({ refs: [], authors: [], msg: '', from: '', to: '' });
   const [cf, setCf] = useState<CompareFilterState>({
     msg: '',
     author: '',
@@ -1777,13 +1777,15 @@ export const GitClientProvider: React.FC<{
   const matchesFilter = useCallback(
     (i: number) => {
       const r = commits[i];
-      if (f.author && r[1].toLowerCase().indexOf(f.author.toLowerCase()) < 0) return false;
+      if (f.authors.length && !f.authors.some(author => r[1] === author)) return false;
       if (f.msg && r[0].toLowerCase().indexOf(f.msg.toLowerCase()) < 0) return false;
       if (f.from && r[2].slice(0, 10) < f.from) return false;
       if (f.to && r[2].slice(0, 10) > f.to) return false;
-      if (f.ref) {
-        const q = f.ref.replace('*', '').toLowerCase();
-        if (!(r[4] || []).some(x => x.toLowerCase().indexOf(q) >= 0)) return false;
+      if (f.refs.length) {
+        const commitRefs = r[4] || [];
+        if (!f.refs.some(reference => commitRefs.some(decoration => decoration.includes(reference)))) {
+          return false;
+        }
       }
       return true;
     },

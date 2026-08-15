@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-08-15
+- Added searchable multi-select Branch/Tag and Author pickers to Git Graph filtering. Branch/tag selections use OR matching, while filter categories combine with AND semantics. See `docs/changelogs/2026-08-15_git_graph_filter_multi_select.md`.
 - Added the Git Graph commit context menu actions backed by the existing Git commands, including patch creation copied to the clipboard; a normal commit click now opens only that commit's changed-file list and keeps a single active selection. Selecting a changed file opens an inline diff alongside a compact graph list and hides Source Control. See `docs/changelogs/2026-08-15_git_graph_commit_actions.md`.
 - Displayed changed files as collapsible folder trees in Diff/Merge, Source Control, Commit Detail, and Git Graph. See `docs/changelogs/2026-08-15_changed_files_tree.md`.
 - Suppressed default browser context menus throughout the frontend while preserving item-specific custom menus; text selections now offer Copy. See `docs/changelogs/2026-08-15_frontend_context_menu_policy.md`.

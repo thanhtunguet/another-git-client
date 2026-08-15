@@ -178,8 +178,8 @@ export interface PaletteItem {
 }
 
 export interface FilterState {
-  ref: string;
-  author: string;
+  refs: string[];
+  authors: string[];
   msg: string;
   from: string;
   to: string;

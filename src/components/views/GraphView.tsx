@@ -8,7 +8,226 @@ import { SegmentedControl } from '../common/SegmentedControl';
 import { FileTree } from '../common/FileTree';
 import { ResetDialog } from '../common/ResetDialog';
 import { DiffViewer } from '../common/DiffViewer';
-import { DiffFile, GraphRowData, FilterState } from '../../types/git-client';
+import { DiffFile, GraphRowData } from '../../types/git-client';
+
+interface GraphFilterOption {
+  value: string;
+  label: string;
+  detail?: string;
+}
+
+interface GraphFilterMultiSelectProps {
+  label: string;
+  options: GraphFilterOption[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  placeholder: string;
+  mono?: boolean;
+}
+
+const GraphFilterMultiSelect: React.FC<GraphFilterMultiSelectProps> = ({
+  label,
+  options,
+  selected,
+  onChange,
+  placeholder,
+  mono = false
+}) => {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const inputId = React.useId();
+  const listId = React.useId();
+
+  useEffect(() => {
+    const closeWhenOutside = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeWhenOutside);
+    return () => document.removeEventListener('mousedown', closeWhenOutside);
+  }, []);
+
+  const selectedOptions = useMemo(
+    () =>
+      selected
+        .map(value => options.find(option => option.value === value))
+        .filter(Boolean) as GraphFilterOption[],
+    [options, selected]
+  );
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return options.filter(option => {
+      return (
+        !normalizedQuery ||
+        `${option.label} ${option.detail || ''}`.toLowerCase().includes(normalizedQuery)
+      );
+    });
+  }, [options, query]);
+  const toggleOption = (value: string) => {
+    onChange(
+      selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value]
+    );
+  };
+
+  return (
+    <div ref={containerRef} className="field" style={{ position: 'relative', minWidth: 0 }}>
+      <label htmlFor={inputId}>{label}</label>
+      <div style={{ position: 'relative' }}>
+        <input
+          id={inputId}
+          className="input"
+          value={query}
+          onFocus={() => setOpen(true)}
+          onChange={event => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Escape') setOpen(false);
+          }}
+          placeholder={
+            selected.length ? `${selected.length} selected — search to add` : placeholder
+          }
+          aria-label={label}
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={listId}
+          style={{
+            height: '26px',
+            minHeight: 0,
+            fontSize: '12px',
+            fontFamily: mono ? 'var(--font-mono)' : undefined,
+            paddingRight: '24px'
+          }}
+        />
+        <i
+          className="ph ph-caret-down"
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            right: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '12px',
+            pointerEvents: 'none',
+            color: 'var(--fg3)'
+          }}
+        />
+      </div>
+      {selectedOptions.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '5px' }}>
+          {selectedOptions.map(option => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => toggleOption(option.value)}
+              title={`Remove ${option.label}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                maxWidth: '100%',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--sel)',
+                color: 'var(--fg)',
+                padding: '1px 5px',
+                fontSize: '10px',
+                cursor: 'pointer',
+                fontFamily: mono ? 'var(--font-mono)' : undefined
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {option.label}
+              </span>
+              <i className="ph ph-x" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      )}
+      {open && (
+        <div
+          id={listId}
+          role="listbox"
+          aria-multiselectable="true"
+          style={{
+            position: 'absolute',
+            zIndex: 12,
+            top: '100%',
+            left: 0,
+            right: 0,
+            maxHeight: '200px',
+            overflowY: 'auto',
+            marginTop: '4px',
+            padding: '4px',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--panel)',
+            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.22)'
+          }}
+        >
+          {filteredOptions.length ? (
+            filteredOptions.map(option => {
+              const isSelected = selected.includes(option.value);
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => toggleOption(option.value)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: 0,
+                    borderRadius: 'var(--radius-sm)',
+                    background: isSelected ? 'var(--sel)' : 'transparent',
+                    color: 'var(--fg)',
+                    padding: '5px 6px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontFamily: mono ? 'var(--font-mono)' : undefined
+                  }}
+                >
+                  <i
+                    className={isSelected ? 'ph ph-check-square' : 'ph ph-square'}
+                    aria-hidden="true"
+                  />
+                  <span
+                    style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {option.label}
+                  </span>
+                  {option.detail && (
+                    <span style={{ marginLeft: 'auto', color: 'var(--fg3)', fontSize: '10px' }}>
+                      {option.detail}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          ) : (
+            <span
+              style={{ display: 'block', padding: '6px', color: 'var(--fg3)', fontSize: '12px' }}
+            >
+              No matches
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 function laneX(l: number): number {
   return 12 + l * 15;
@@ -124,6 +343,41 @@ export const GraphView: React.FC = () => {
   const [inlineDiffLoading, setInlineDiffLoading] = useState(false);
   const [commitFilesBySha, setCommitFilesBySha] = useState<Record<string, DiffFile[]>>({});
   const [commitFilesLoading, setCommitFilesLoading] = useState<Record<string, boolean>>({});
+  const [graphRefOptions, setGraphRefOptions] = useState<GraphFilterOption[]>([]);
+
+  useEffect(() => {
+    if (!repoPath) {
+      setGraphRefOptions([]);
+      return;
+    }
+
+    let active = true;
+    void Promise.all([tauriGitBackend.getBranches(repoPath), tauriGitBackend.getTags(repoPath)])
+      .then(([branches, tags]) => {
+        if (!active) return;
+        setGraphRefOptions([
+          ...branches.map(branch => ({
+            value: branch.fullRef,
+            label: branch.name,
+            detail: branch.kind === 'remote' ? 'remote branch' : 'branch'
+          })),
+          ...tags.map(tag => ({ value: tag.fullRef, label: tag.name, detail: 'tag' }))
+        ]);
+      })
+      .catch(() => {
+        if (active) setGraphRefOptions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [repoPath]);
+
+  const graphAuthorOptions = useMemo<GraphFilterOption[]>(() => {
+    return Array.from(new Set(commits.map(commit => commit[1]).filter(Boolean)))
+      .sort((left, right) => left.localeCompare(right))
+      .map(author => ({ value: author, label: author }));
+  }, [commits]);
 
   const hasExpandedRows = useMemo(() => Object.values(expanded).some(Boolean), [expanded]);
   const virtualizeEnabled = preferences.virtualizeCommitList !== false;
@@ -364,7 +618,9 @@ export const GraphView: React.FC = () => {
     ]);
   };
 
-  const activeFilterCount = (Object.keys(f) as (keyof FilterState)[]).filter(k => f[k]).length;
+  const activeFilterCount = [f.refs.length, f.authors.length, f.msg, f.from, f.to].filter(
+    Boolean
+  ).length;
   const matchCount = commits.filter((_, i) => matchesFilter(i)).length;
   let lastDay: string | null = null;
 
@@ -433,24 +689,20 @@ export const GraphView: React.FC = () => {
             borderBottom: '1px solid var(--line)'
           }}
         >
-          <Input
-            label="Branch / ref"
-            value={f.ref}
-            onChange={e => setF({ ...f, ref: e.target.value })}
-            placeholder="main, feature/*"
-            style={{
-              height: '26px',
-              minHeight: 0,
-              fontSize: '12px',
-              fontFamily: 'var(--font-mono)'
-            }}
+          <GraphFilterMultiSelect
+            label="Branch / tag"
+            options={graphRefOptions}
+            selected={f.refs}
+            onChange={refs => setF({ ...f, refs })}
+            placeholder="Search branches and tags"
+            mono
           />
-          <Input
+          <GraphFilterMultiSelect
             label="Author"
-            value={f.author}
-            onChange={e => setF({ ...f, author: e.target.value })}
-            placeholder="torvalds"
-            style={{ height: '26px', minHeight: 0, fontSize: '12px' }}
+            options={graphAuthorOptions}
+            selected={f.authors}
+            onChange={authors => setF({ ...f, authors })}
+            placeholder="Search authors"
           />
           <Input
             label="Message contains"
