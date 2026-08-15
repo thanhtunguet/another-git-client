@@ -1,0 +1,4 @@
+- GitClientDesign is a Tauri desktop app with a React + TypeScript frontend and a Rust backend.
+- Live git state is split between `src/context/GitClientContext.tsx` and `src/services/tauriGitBackend.ts` on the frontend, and `src-tauri/src/git_backend.rs` on the backend.
+- The Branches view reads backend branch/tag DTOs directly; the top-bar branch button now opens a live branch dropdown backed by `tauriGitBackend.getBranches()`.
+- Session changelogs live in `docs/changelogs/` and the root `CHANGELOG.md` gets a short summary per session.

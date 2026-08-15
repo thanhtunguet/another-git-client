@@ -1,81 +1,91 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
-import { WorktreeItem } from '../../types/git-client';
+import { WorktreeEntry } from '../../services/tauriGitBackend';
 
 export const WorktreesView: React.FC = () => {
-  const { act, confirm, openMenu } = useGitClient();
+  const {
+    worktrees,
+    addWorktree,
+    removeWorktree,
+    lockWorktree,
+    unlockWorktree,
+    pruneWorktrees,
+    openPathInFileManager,
+    openPathInTerminal,
+    selectRepository,
+    confirm,
+    openMenu,
+    actionBusy
+  } = useGitClient();
 
-  const rawWorktrees: WorktreeItem[] = [
-    {
-      group: 'Current',
-      branch: 'main',
-      path: '~/src/torvalds/linux',
-      state: 'clean',
-      head: 'f3a9c21',
-      dot: 'var(--add)',
-      icon: 'ph-house',
-      mark: 'var(--color-accent)'
-    },
-    {
-      group: 'Other worktrees',
-      branch: 'feature/mlx5-next',
-      path: '~/src/wt/mlx5-next',
-      state: '3 changes',
-      head: '8be1c04',
-      dot: 'var(--warn)',
-      icon: 'ph-folder-open',
-      mark: 'transparent'
-    },
-    {
-      branch: 'release/6.18.y',
-      path: '~/src/wt/6.18.y',
-      state: 'clean',
-      head: 'b0c4e83',
-      dot: 'var(--add)',
-      icon: 'ph-folder-open',
-      mark: 'transparent'
-    },
-    {
-      branch: '(detached at v6.19-rc2)',
-      path: '~/src/wt/bisect',
-      state: 'bisecting',
-      head: '2d77a19',
-      dot: 'var(--iris)',
-      icon: 'ph-folder-open',
-      mark: 'transparent'
-    },
-    {
-      group: 'Locked',
-      branch: 'feature/perf-tui',
-      path: '/Volumes/ext/wt/perf-tui',
-      state: 'locked — “ext disk offline”',
-      head: '91ff2d6',
-      dot: 'var(--color-accent)',
-      icon: 'ph-lock',
-      mark: 'transparent'
-    },
-    {
-      group: 'Prunable / stale',
-      branch: 'fix/kbuild-clang',
-      path: '~/src/wt/kbuild (missing)',
-      state: 'directory missing',
-      head: '—',
-      dot: 'var(--del)',
-      icon: 'ph-warning',
-      mark: 'transparent'
-    }
-  ];
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addPath, setAddPath] = useState('');
+  const [addBranch, setAddBranch] = useState('');
+  const [addNewBranch, setAddNewBranch] = useState('');
+  const [addDetach, setAddDetach] = useState(false);
 
-  const handleMenu = (e: React.MouseEvent, w: WorktreeItem) => {
+  const [showLockDialog, setShowLockDialog] = useState(false);
+  const [lockTarget, setLockTarget] = useState('');
+  const [lockReason, setLockReason] = useState('');
+
+  const registeredCount = worktrees.length;
+  const lockedCount = worktrees.filter(w => w.locked).length;
+  const prunableCount = worktrees.filter(w => Boolean(w.prunableReason)).length;
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addPath.trim()) return;
+    await addWorktree(addPath.trim(), {
+      reference: addBranch.trim() || undefined,
+      newBranch: addNewBranch.trim() || undefined,
+      detach: addDetach
+    });
+    setShowAddDialog(false);
+    setAddPath('');
+    setAddBranch('');
+    setAddNewBranch('');
+    setAddDetach(false);
+  };
+
+  const handleLockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lockTarget) return;
+    await lockWorktree(lockTarget, lockReason.trim() || undefined);
+    setShowLockDialog(false);
+    setLockTarget('');
+    setLockReason('');
+  };
+
+  const handleMenu = (e: React.MouseEvent, w: WorktreeEntry) => {
     openMenu(e, w.path, [
-      { label: 'Open in this window', run: act('Open worktree') },
-      { label: 'Open in new window', run: act('Open worktree in new window') },
-      { label: 'Reveal in Finder', run: act('Reveal') },
-      { label: 'Open terminal here', run: act('Open terminal') },
+      { label: 'Open in this window', run: () => selectRepository(w.path) },
+      { label: 'Reveal in file manager', run: () => openPathInFileManager(w.path) },
+      { label: 'Open terminal here', run: () => openPathInTerminal(w.path) },
       { sep: true },
-      { label: w.state.indexOf('locked') === 0 ? 'Unlock' : 'Lock…', run: act('Lock worktree') },
-      { label: 'Add worktree from this branch…', run: act('Worktree add') },
+      {
+        label: w.locked ? 'Unlock worktree' : 'Lock worktree…',
+        run: () => {
+          if (w.locked) {
+            unlockWorktree(w.path);
+          } else {
+            setLockTarget(w.path);
+            setLockReason('');
+            setShowLockDialog(true);
+          }
+        }
+      },
+      {
+        label: 'Add worktree from this branch…',
+        run: () => {
+          setAddPath('');
+          setAddBranch(w.branch || '');
+          setAddNewBranch('');
+          setAddDetach(false);
+          setShowAddDialog(true);
+        }
+      },
       { sep: true },
       {
         label: 'Remove worktree',
@@ -83,10 +93,10 @@ export const WorktreesView: React.FC = () => {
         run: () =>
           confirm(
             'Remove worktree?',
-            `The directory ${w.path} is unregistered from the repository. Files stay on disk.`,
+            `Unregister directory ${w.path} from repository.`,
             `git worktree remove ${w.path}`,
             'Remove',
-            act('Remove worktree')
+            () => removeWorktree(w.path, false)
           )
       },
       {
@@ -95,32 +105,41 @@ export const WorktreesView: React.FC = () => {
         run: () =>
           confirm(
             'Force remove worktree?',
-            `3 uncommitted changes in this worktree will be destroyed. This cannot be undone.`,
+            `Unregister directory ${w.path} and force discard uncommitted changes.`,
             `git worktree remove --force ${w.path}`,
             'Force remove',
-            act('Force remove')
+            () => removeWorktree(w.path, true)
           )
       }
     ]);
   };
 
-  const handleAddWorktreeMenu = (e: React.MouseEvent) => {
-    openMenu(e, 'Add worktree', [
-      { label: 'From local branch…', run: act('Worktree add') },
-      { label: 'From remote branch (create tracking)…', run: act('Worktree add') },
-      { label: 'From tag…', run: act('Worktree add') },
-      { label: 'From typed revision…', run: act('Worktree add') },
-      { sep: true },
-      { label: 'Also create new branch', run: act('Worktree add -b') },
-      { label: 'Detached HEAD', run: act('Worktree add --detach') },
-      { sep: true },
-      { label: 'Destination: empty folder → use as-is', run: act('Pick destination') },
-      { label: 'Destination: non-empty → auto-named child', run: act('Pick destination') }
-    ]);
-  };
+  // Group worktrees cleanly
+  const groups: Array<{ name: string; items: WorktreeEntry[] }> = [];
+
+  const currentItems = worktrees.filter(w => w.isCurrent);
+  if (currentItems.length > 0) {
+    groups.push({ name: 'Current', items: currentItems });
+  }
+
+  const otherItems = worktrees.filter(w => !w.isCurrent && !w.locked && !w.prunableReason);
+  if (otherItems.length > 0) {
+    groups.push({ name: 'Other worktrees', items: otherItems });
+  }
+
+  const lockedItems = worktrees.filter(w => !w.isCurrent && w.locked && !w.prunableReason);
+  if (lockedItems.length > 0) {
+    groups.push({ name: 'Locked', items: lockedItems });
+  }
+
+  const prunableItems = worktrees.filter(w => Boolean(w.prunableReason));
+  if (prunableItems.length > 0) {
+    groups.push({ name: 'Prunable / stale', items: prunableItems });
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Header toolbar */}
       <div
         style={{
           flex: '0 0 auto',
@@ -135,112 +154,393 @@ export const WorktreesView: React.FC = () => {
       >
         <span style={{ fontWeight: 500 }}>Worktrees</span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
-          5 registered · 1 locked · 1 prunable
+          {registeredCount} registered · {lockedCount} locked · {prunableCount} prunable
         </span>
         <div style={{ flex: 1 }} />
         <Button
           variant="secondary"
           style={{ height: '25px' }}
+          disabled={actionBusy}
           onClick={() =>
             confirm(
-              'Prune 1 stale worktree?',
-              '~/src/wt/kbuild is registered but its directory is missing. Pruning removes the administrative entry.',
-              'git worktree prune --dry-run',
+              'Prune stale worktrees?',
+              'Unregister all stale worktrees whose target directory no longer exists on disk.',
+              'git worktree prune',
               'Prune',
-              act('Prune worktrees')
+              () => pruneWorktrees(false)
             )
           }
         >
-          Preview prune
+          Prune worktrees
         </Button>
-        <Button variant="primary" style={{ height: '25px' }} onClick={handleAddWorktreeMenu}>
+        <Button
+          variant="primary"
+          style={{ height: '25px' }}
+          disabled={actionBusy}
+          onClick={() => {
+            setAddPath('');
+            setAddBranch('');
+            setAddNewBranch('');
+            setAddDetach(false);
+            setShowAddDialog(true);
+          }}
+        >
           <i className="ph ph-plus" style={{ fontSize: '13px' }} /> Add worktree…
         </Button>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: 'var(--space-1) 0' }}>
-        {rawWorktrees.map((w, i) => {
-          const stateColor =
-            w.state === 'clean'
-              ? 'var(--fg3)'
-              : w.dot === 'var(--del)'
-                ? 'var(--del)'
-                : 'var(--warn)';
-
-          return (
-            <div key={i}>
-              {w.group && (
-                <div
+      {/* Add Worktree Dialog Modal */}
+      {showAddDialog && (
+        <div className="dialog-backdrop" style={{ zIndex: 100 }}>
+          <form
+            onSubmit={handleAddSubmit}
+            className="dialog"
+            style={{ width: '420px', animation: 'popIn .1s ease-out' }}
+          >
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+              Add Worktree
+            </div>
+            <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
+              <div>
+                <label
+                  htmlFor="worktree-add-path"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-2)',
-                    height: '26px',
-                    padding: '0 var(--space-4)',
-                    marginTop: 'var(--space-2)',
-                    fontSize: '10.5px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '.07em',
-                    color: 'var(--fg3)'
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
                   }}
                 >
-                  <span>{w.group}</span>
-                  <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
+                  Target Directory Path *
+                </label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input
+                    id="worktree-add-path"
+                    type="text"
+                    value={addPath}
+                    onChange={e => setAddPath(e.target.value)}
+                    placeholder="/path/to/new-worktree"
+                    style={{
+                      flex: 1,
+                      width: '100%',
+                      padding: '6px 10px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--line)',
+                      background: 'var(--color-bg)',
+                      color: 'var(--fg)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px'
+                    }}
+                    autoFocus
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      void openDialog({
+                        directory: true,
+                        multiple: false,
+                        title: 'Select Worktree Directory'
+                      }).then(selected => {
+                        if (typeof selected === 'string') setAddPath(selected);
+                      });
+                    }}
+                  >
+                    Browse…
+                  </Button>
                 </div>
-              )}
-              <div
-                onClick={e => handleMenu(e, w)}
-                onContextMenu={e => handleMenu(e, w)}
+              </div>
+              <div>
+                <label
+                  htmlFor="worktree-add-branch"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Base Branch / Revision (Optional)
+                </label>
+                <input
+                  id="worktree-add-branch"
+                  type="text"
+                  value={addBranch}
+                  onChange={e => setAddBranch(e.target.value)}
+                  placeholder="main, HEAD, tag, or commit SHA"
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--color-bg)',
+                    color: 'var(--fg)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="worktree-add-new-branch"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--fg2)',
+                    display: 'block',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Create New Branch Name (-b, Optional)
+                </label>
+                <input
+                  id="worktree-add-new-branch"
+                  type="text"
+                  value={addNewBranch}
+                  onChange={e => setAddNewBranch(e.target.value)}
+                  placeholder="feature/new-worktree-branch"
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--line)',
+                    background: 'var(--color-bg)',
+                    color: 'var(--fg)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px'
+                  }}
+                />
+              </div>
+              <label
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 'var(--space-4)',
-                  height: '44px',
-                  padding: '0 var(--space-4)',
-                  cursor: 'pointer',
-                  borderLeft: `2px solid ${w.mark}`
+                  gap: '8px',
+                  fontSize: '12px',
+                  cursor: 'pointer'
                 }}
-                className="gc-hover-bg"
               >
-                <i className={`ph ${w.icon}`} style={{ fontSize: '16px', color: w.dot }} />
-                <span
-                  style={{
-                    width: '230px',
-                    flex: '0 0 auto',
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '12.5px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {w.branch}
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: '11.5px',
-                    color: 'var(--fg3)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {w.path}
-                </span>
-                <span style={{ fontSize: '11px', color: stateColor }}>{w.state}</span>
-                <span
-                  style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--iris)' }}
-                >
-                  {w.head}
-                </span>
-                <i className="ph ph-dots-three" style={{ fontSize: '15px', color: 'var(--fg3)' }} />
-              </div>
+                <input
+                  type="checkbox"
+                  checked={addDetach}
+                  onChange={e => setAddDetach(e.target.checked)}
+                />
+                Detach HEAD (--detach)
+              </label>
             </div>
-          );
-        })}
+            <div className="dialog-actions" style={{ marginTop: 'var(--space-4)' }}>
+              <Button type="button" variant="secondary" onClick={() => setShowAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary">
+                Add Worktree
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Lock Worktree Dialog Modal */}
+      {showLockDialog && (
+        <div className="dialog-backdrop" style={{ zIndex: 100 }}>
+          <form
+            onSubmit={handleLockSubmit}
+            className="dialog"
+            style={{ width: '400px', animation: 'popIn .1s ease-out' }}
+          >
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
+              Lock Worktree
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--fg3)', marginBottom: 'var(--space-3)' }}>
+              Locking prevents git from pruning or deleting this worktree.
+            </div>
+            <div>
+              <label
+                htmlFor="worktree-lock-reason"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--fg2)',
+                  display: 'block',
+                  marginBottom: '4px'
+                }}
+              >
+                Lock Reason (Optional)
+              </label>
+              <input
+                id="worktree-lock-reason"
+                type="text"
+                value={lockReason}
+                onChange={e => setLockReason(e.target.value)}
+                placeholder="Disk offline, temporary backup, etc."
+                style={{
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--line)',
+                  background: 'var(--color-bg)',
+                  color: 'var(--fg)',
+                  fontSize: '12px'
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="dialog-actions" style={{ marginTop: 'var(--space-4)' }}>
+              <Button type="button" variant="secondary" onClick={() => setShowLockDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary">
+                Lock Worktree
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Worktree List View */}
+      <div style={{ flex: 1, overflow: 'auto', minHeight: 0, padding: 'var(--space-1) 0' }}>
+        {worktrees.length === 0 ? (
+          <div
+            style={{
+              padding: 'var(--space-6)',
+              textAlign: 'center',
+              color: 'var(--fg3)',
+              fontSize: '13px'
+            }}
+          >
+            No worktrees found in this repository.
+          </div>
+        ) : (
+          groups.map((g, gi) => (
+            <div key={gi}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  height: '26px',
+                  padding: '0 var(--space-4)',
+                  marginTop: 'var(--space-2)',
+                  fontSize: '10.5px',
+                  textTransform: 'uppercase',
+                  color: 'var(--fg3)'
+                }}
+              >
+                <span>{g.name}</span>
+                <span style={{ flex: 1, height: '1px', background: 'var(--line)' }} />
+              </div>
+              {g.items.map((w, i) => {
+                const icon = w.isCurrent
+                  ? 'ph-house'
+                  : w.locked
+                    ? 'ph-lock'
+                    : w.prunableReason
+                      ? 'ph-warning'
+                      : 'ph-folder-open';
+
+                const dot = w.prunableReason
+                  ? 'var(--del)'
+                  : w.isCurrent
+                    ? 'var(--add)'
+                    : w.isDirty
+                      ? 'var(--warn)'
+                      : w.locked
+                        ? 'var(--color-accent)'
+                        : 'var(--add)';
+
+                const mark = w.isCurrent ? 'var(--color-accent)' : 'transparent';
+
+                const stateText = w.prunableReason
+                  ? w.prunableReason
+                  : w.locked
+                    ? `locked${w.lockReason ? ` — “${w.lockReason}”` : ''}`
+                    : w.isDirty
+                      ? 'uncommitted changes'
+                      : 'clean';
+
+                const stateColor = w.prunableReason
+                  ? 'var(--del)'
+                  : w.isDirty
+                    ? 'var(--warn)'
+                    : 'var(--fg3)';
+
+                const branchLabel = w.branch
+                  ? w.branch
+                  : w.detached
+                    ? `(detached at ${w.head ? w.head.slice(0, 7) : 'HEAD'})`
+                    : '—';
+
+                return (
+                  <div
+                    key={i}
+                    role="button"
+                    tabIndex={0}
+                    onClick={e => handleMenu(e, w)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMenu(e as unknown as React.MouseEvent, w);
+                      }
+                    }}
+                    onContextMenu={e => handleMenu(e, w)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-4)',
+                      height: '44px',
+                      padding: '0 var(--space-4)',
+                      cursor: 'pointer',
+                      borderLeft: `2px solid ${mark}`
+                    }}
+                    className="gc-hover-bg"
+                  >
+                    <i className={`ph ${icon}`} style={{ fontSize: '16px', color: dot }} />
+                    <span
+                      style={{
+                        width: '230px',
+                        flex: '0 0 auto',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '12.5px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {branchLabel}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11.5px',
+                        color: 'var(--fg3)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {w.path}
+                    </span>
+                    <span style={{ fontSize: '11px', color: stateColor }}>{stateText}</span>
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        color: 'var(--iris)'
+                      }}
+                    >
+                      {w.head ? w.head.slice(0, 7) : '—'}
+                    </span>
+                    <i
+                      className="ph ph-dots-three"
+                      style={{ fontSize: '15px', color: 'var(--fg3)' }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,4 @@
+- Frontend: React + TypeScript 7 + Vite + SCSS/Tailwind utilities.
+- Backend: Rust + Tauri.
+- Tauri frontend config uses `vite.tauri.config.ts` in addition to the normal Vite config.
+- The app uses `@tauri-apps/api/core` invokes via `src/services/tauriGitBackend.ts`.

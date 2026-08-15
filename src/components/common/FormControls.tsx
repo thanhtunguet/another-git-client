@@ -9,13 +9,16 @@ export const Input: React.FC<InputProps> = ({
   label,
   fieldClassName = '',
   className = '',
+  id,
   ...props
 }) => {
-  const inputEl = <input className={`input ${className}`.trim()} {...props} />;
+  const generatedId = React.useId();
+  const fieldId = id || generatedId;
+  const inputEl = <input id={fieldId} className={`input ${className}`.trim()} {...props} />;
   if (label) {
     return (
       <div className={`field ${fieldClassName}`.trim()}>
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         {inputEl}
       </div>
     );
@@ -32,13 +35,16 @@ export const Textarea: React.FC<TextareaProps> = ({
   label,
   fieldClassName = '',
   className = '',
+  id,
   ...props
 }) => {
-  const textareaEl = <textarea className={`input ${className}`.trim()} {...props} />;
+  const generatedId = React.useId();
+  const fieldId = id || generatedId;
+  const textareaEl = <textarea id={fieldId} className={`input ${className}`.trim()} {...props} />;
   if (label) {
     return (
       <div className={`field ${fieldClassName}`.trim()}>
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         {textareaEl}
       </div>
     );
@@ -58,10 +64,13 @@ export const Select: React.FC<SelectProps> = ({
   children,
   fieldClassName = '',
   className = '',
+  id,
   ...props
 }) => {
+  const generatedId = React.useId();
+  const fieldId = id || generatedId;
   const selectEl = (
-    <select className={`input ${className}`.trim()} {...props}>
+    <select id={fieldId} className={`input ${className}`.trim()} {...props}>
       {children ||
         options.map(opt => (
           <option key={opt} value={opt}>
@@ -74,7 +83,7 @@ export const Select: React.FC<SelectProps> = ({
   if (label) {
     return (
       <div className={`field ${fieldClassName}`.trim()}>
-        <label>{label}</label>
+        <label htmlFor={fieldId}>{label}</label>
         {selectEl}
       </div>
     );

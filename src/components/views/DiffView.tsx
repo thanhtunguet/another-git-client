@@ -1,307 +1,360 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
+import { tauriGitBackend } from '../../services/tauriGitBackend';
+import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { Button } from '../common/Button';
+import { ResizeHandle } from '../common/ResizeHandle';
+import { DiffViewer } from '../common/DiffViewer';
+import { FileTree } from '../common/FileTree';
+import { DiffFile } from '../../types/git-client';
+export { parseDiffText } from '../common/DiffViewer';
+export type { DiffLine } from '../common/DiffViewer';
 
 export const DiffView: React.FC = () => {
-  const { diffTab, setDiffTab, act } = useGitClient();
+  const {
+    diffTab,
+    setDiffTab,
+    repoPath,
+    stagedFiles,
+    unstagedFiles,
+    untrackedFiles,
+    sel,
+    getCommitFullSha,
+    diffTargetSha,
+    setDiffTargetSha,
+    diffTargetPath,
+    setDiffTargetPath,
+    fetchCommitFiles,
+    stageFile,
+    unstageFile,
+    setView,
+    setDock,
+    toastRun,
+    log
+  } = useGitClient();
 
-  const tabs: [id: 'work' | 'index' | 'parent' | 'refs' | 'merge' | 'sources', label: string][] = [
+  const [rawDiffText, setRawDiffText] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [fileQuery, setFileQuery] = useState<string>('');
+
+  const [commitFiles, setCommitFiles] = useState<DiffFile[]>([]);
+  const [commitLoading, setCommitLoading] = useState<boolean>(false);
+
+  const activeSha = diffTargetSha || (sel.length > 0 ? getCommitFullSha(sel[0]) : '');
+
+  // Fetch commit files when viewing commit diffs
+  useEffect(() => {
+    if ((diffTab === 'parent' || diffTab === 'refs') && activeSha && repoPath) {
+      let active = true;
+      setCommitLoading(true);
+      void (async () => {
+        try {
+          const files = await fetchCommitFiles(activeSha);
+          if (active) {
+            setCommitFiles(files);
+            setCommitLoading(false);
+          }
+        } catch {
+          if (active) {
+            setCommitFiles([]);
+            setCommitLoading(false);
+          }
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }
+  }, [diffTab, activeSha, repoPath, fetchCommitFiles]);
+
+  const conflictedFiles = useMemo(
+    () => [...stagedFiles, ...unstagedFiles].filter(f => f.status === 'U'),
+    [stagedFiles, unstagedFiles]
+  );
+
+  const availableFiles = useMemo(() => {
+    if (diffTab === 'index') return stagedFiles;
+    if (diffTab === 'work') return [...unstagedFiles, ...untrackedFiles];
+    if (diffTab === 'merge') return conflictedFiles;
+    if (diffTab === 'parent' || diffTab === 'refs') return commitFiles;
+    return [...stagedFiles, ...unstagedFiles, ...untrackedFiles];
+  }, [diffTab, stagedFiles, unstagedFiles, untrackedFiles, conflictedFiles, commitFiles]);
+
+  const filteredFiles = useMemo(() => {
+    if (!fileQuery.trim()) return availableFiles;
+    const q = fileQuery.toLowerCase();
+    return availableFiles.filter(f => f.path.toLowerCase().includes(q));
+  }, [availableFiles, fileQuery]);
+
+  useEffect(() => {
+    if (availableFiles.length > 0) {
+      if (!diffTargetPath || !availableFiles.some(f => f.path === diffTargetPath)) {
+        setDiffTargetPath(availableFiles[0].path);
+      }
+    } else {
+      setDiffTargetPath(null);
+    }
+  }, [availableFiles, diffTargetPath, setDiffTargetPath]);
+
+  const targetPath = diffTargetPath || (availableFiles[0]?.path ?? '');
+  const currentFileStatus = availableFiles.find(f => f.path === targetPath)?.status;
+
+  useEffect(() => {
+    if (!repoPath) {
+      setRawDiffText('');
+      setLoading(false);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+
+    void (async () => {
+      try {
+        let text = '';
+        if (diffTab === 'work') {
+          if (targetPath) {
+            text = await tauriGitBackend.showFileDiff(
+              repoPath,
+              targetPath,
+              false,
+              currentFileStatus === '?'
+            );
+          }
+        } else if (diffTab === 'index') {
+          if (targetPath) {
+            text = await tauriGitBackend.showFileDiff(repoPath, targetPath, true);
+          }
+        } else if (diffTab === 'merge') {
+          if (targetPath) {
+            text = await tauriGitBackend.showFileDiff(repoPath, targetPath, false);
+          }
+        } else if (diffTab === 'parent' || diffTab === 'refs') {
+          if (activeSha) {
+            text = await tauriGitBackend.getCommitDiff(
+              repoPath,
+              activeSha,
+              targetPath || undefined
+            );
+          }
+        }
+        if (active) {
+          setRawDiffText(text || '');
+          setLoading(false);
+        }
+      } catch {
+        if (active) {
+          setRawDiffText('');
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [repoPath, targetPath, diffTab, activeSha, currentFileStatus]);
+
+  const handleCheckoutSide = async (side: 'ours' | 'theirs') => {
+    if (!targetPath || !repoPath) return;
+    try {
+      log([{ text: `$ git checkout --${side} -- ${targetPath}`, type: 'cmd' }]);
+      const res = await tauriGitBackend.checkoutBranch(repoPath, `--${side} -- ${targetPath}`);
+      if (res.exitCode === 0) {
+        toastRun(`Checked out ${side} version`, targetPath);
+        await stageFile(targetPath);
+      }
+    } catch (e) {
+      log([{ text: `Checkout ${side} failed: ${String(e)}`, type: 'err' }]);
+    }
+  };
+
+  const tabs: [
+    id: 'work' | 'index' | 'parent' | 'refs' | 'merge',
+    label: string,
+    badge?: number
+  ][] = [
     ['work', 'Working tree ↔ HEAD'],
     ['index', 'Index ↔ HEAD'],
     ['parent', 'Commit ↔ parent'],
-    ['refs', 'main ↔ feature/mlx5-next'],
-    ['merge', '3-way merge — 2 conflicts'],
-    ['sources', 'Compare two text sources']
+    ['refs', 'Selected commit diff'],
+    ['merge', 'Merge conflicts', conflictedFiles.length > 0 ? conflictedFiles.length : undefined]
   ];
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '11.8px',
-    lineHeight: '18px'
-  };
+  const renderEmptyState = () => {
+    let icon = 'ph-git-diff';
+    let title = 'No diff to display';
+    let description = 'Select a file or commit to inspect differences.';
+    let primaryAction: { label: string; run: () => void } | null = null;
+    let secondaryAction: { label: string; run: () => void } | null = null;
 
-  const renderDiffPane = () => {
-    if (diffTab === 'merge') {
-      const col = (title: string, tint: string, lines: [string, number][], fill: string) => (
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            borderRight: '1px solid var(--line)'
-          }}
-        >
-          <div
-            style={{
-              height: '26px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '0 10px',
-              background: 'var(--panel)',
-              borderBottom: '1px solid var(--line)',
-              fontSize: '11px'
-            }}
-          >
-            <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: tint }} />{' '}
-            {title}
-          </div>
-          <div style={{ flex: 1, overflow: 'auto', padding: '6px 0' }}>
-            {lines.map((l, i) => (
-              <div
-                key={i}
-                style={{
-                  ...monoStyle,
-                  whiteSpace: 'pre',
-                  padding: '0 10px',
-                  background: l[1] ? fill : 'transparent',
-                  color: l[1] ? 'var(--fg)' : 'var(--fg2)'
-                }}
-              >
-                {l[0]}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-
-      const left: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['\tmlx5e_reporter_tx_err_cqe(sq);', 1],
-        ['\tqueue_work(priv->wq, &sq->recover_work);', 1]
-      ];
-      const mid: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['<<<<<<< HEAD', 1],
-        ['\tmlx5e_reporter_tx_err_cqe(sq);', 1],
-        ['=======', 1],
-        ['\tmlx5e_reporter_tx_err_cqe(sq, ctx);', 1],
-        ['>>>>>>> feature/mlx5-next', 1]
-      ];
-      const right: [string, number][] = [
-        ['\tif (unlikely(!priv->channels.num))', 0],
-        ['\t\treturn;', 0],
-        ['\tmlx5e_reporter_tx_err_cqe(sq, ctx);', 1],
-        ['\tmlx5e_tx_flush(sq);', 1]
-      ];
-
-      return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div
-            style={{
-              flex: '0 0 auto',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '0 12px',
-              background: 'var(--panel)',
-              borderBottom: '1px solid var(--line)'
-            }}
-          >
-            <span style={{ fontSize: '11.5px', color: 'var(--warn)' }}>2 conflicts remaining</span>
-            <span style={{ flex: 1 }} />
-            <Button
-              variant="secondary"
-              onClick={act('Previous conflict')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              ↑ Previous
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Next conflict')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              ↓ Next
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Take left')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Take left
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={act('Take right')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Take right
-            </Button>
-            <Button
-              variant="primary"
-              onClick={act('Mark resolved')}
-              style={{ height: '22px', fontSize: '11.5px' }}
-            >
-              Resolve
-            </Button>
-          </div>
-          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-            {col('Local — main', 'var(--color-accent)', left, 'var(--delbg)')}
-            {col('Result — working tree', 'var(--warn)', mid, 'var(--raised)')}
-            {col('Remote — feature/mlx5-next', 'var(--add)', right, 'var(--addbg)')}
-          </div>
-        </div>
-      );
+    if (diffTab === 'work') {
+      icon = 'ph-check-circle';
+      title = 'Working tree is clean';
+      description = 'There are no uncommitted changes in your workspace.';
+      primaryAction = { label: 'Go to Git Graph', run: () => setView('graph') };
+      if (stagedFiles.length > 0) {
+        secondaryAction = { label: 'View Staged Changes', run: () => setDiffTab('index') };
+      }
+    } else if (diffTab === 'index') {
+      icon = 'ph-stack';
+      title = 'No staged changes';
+      description = 'No files have been staged for commit yet.';
+      if (unstagedFiles.length > 0) {
+        primaryAction = { label: 'View Working Tree Changes', run: () => setDiffTab('work') };
+      } else {
+        primaryAction = { label: 'Go to Git Graph', run: () => setView('graph') };
+      }
+      secondaryAction = { label: 'Open Source Control Dock', run: () => setDock(true) };
+    } else if (diffTab === 'merge') {
+      icon = 'ph-git-merge';
+      title = 'No merge conflicts';
+      description = 'The workspace has no conflicted files to resolve.';
+      primaryAction = { label: 'Go to Working Tree Diff', run: () => setDiffTab('work') };
+    } else if (diffTab === 'parent' || diffTab === 'refs') {
+      icon = 'ph-git-commit';
+      title = activeSha ? `Commit ${activeSha.slice(0, 7)}` : 'No commit selected';
+      description = activeSha
+        ? commitLoading
+          ? 'Loading commit files…'
+          : 'This commit has no file changes or patch output.'
+        : 'Select a commit in Git Graph or Commit Details to view its changes.';
+      primaryAction = { label: 'Select Commit in Git Graph', run: () => setView('graph') };
     }
 
-    const hunk: [string, string][] = [
-      [
-        '@@ -412,9 +412,14 @@ static void mlx5e_tx_err_cqe_work(struct work_struct *recover_work)',
-        'h'
-      ],
-      [' \tstruct mlx5e_txqsq *sq = container_of(recover_work, struct mlx5e_txqsq,', ' '],
-      [' \t\t\t\t      recover_work);', ' '],
-      [' ', ' '],
-      ['-\tmlx5e_reporter_tx_err_cqe(sq);', '-'],
-      ['-\tif (unlikely(!priv->channels.num))', '-'],
-      ['+\tif (unlikely(!priv->channels.num ||', '+'],
-      ['+\t\t     !test_bit(MLX5E_STATE_OPENED, &priv->state)))', '+'],
-      ['+\t\treturn;', '+'],
-      ['+', '+'],
-      ['+\tmlx5e_reporter_tx_err_cqe(sq);', '+'],
-      [' \t\treturn;', ' '],
-      [' }', ' '],
-      [
-        '@@ -488,6 +493,8 @@ int mlx5e_open_txqsq(struct mlx5e_channel *c, u32 tisn, int txq_ix,',
-        'h'
-      ],
-      [' \tsq->stop_room = param->stop_room;', ' '],
-      ['+\tsq->tunnel_steering = MLX5_CAP_ETH(mdev, tunnel_stateless_gre);', '+'],
-      [' \tINIT_WORK(&sq->recover_work, mlx5e_tx_err_cqe_work);', ' ']
-    ];
-
-    let oldN = 411;
-    let newN = 411;
-
-    const rows = hunk.map((h, i) => {
-      const text = h[0];
-      const k = h[1];
-      const bg =
-        k === '+'
-          ? 'var(--addbg)'
-          : k === '-'
-            ? 'var(--delbg)'
-            : k === 'h'
-              ? 'var(--raised)'
-              : 'transparent';
-      const fg =
-        k === '+'
-          ? 'var(--add)'
-          : k === '-'
-            ? 'var(--del)'
-            : k === 'h'
-              ? 'var(--fg3)'
-              : 'var(--fg)';
-      let ln1: string | number = '';
-      let ln2: string | number = '';
-
-      if (k === 'h') {
-        const m = /\+(\d+)/.exec(text);
-        if (m) {
-          newN = +m[1] - 1;
-          oldN = +m[1] - 1;
-        }
-      } else {
-        if (k !== '+') ln1 = ++oldN;
-        if (k !== '-') ln2 = ++newN;
-      }
-
-      return (
-        <div key={i} style={{ display: 'flex', background: bg, ...monoStyle }}>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '8px',
-              color: 'var(--fg3)',
-              userSelect: 'none'
-            }}
-          >
-            {ln1}
-          </span>
-          <span
-            style={{
-              width: '46px',
-              flex: '0 0 auto',
-              textAlign: 'right',
-              paddingRight: '10px',
-              color: 'var(--fg3)',
-              userSelect: 'none',
-              borderRight: '1px solid var(--line)'
-            }}
-          >
-            {ln2}
-          </span>
-          <span style={{ paddingLeft: '10px', whiteSpace: 'pre', color: fg, flex: 1 }}>{text}</span>
-        </div>
-      );
-    });
-
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <div
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--space-6)',
+          textAlign: 'center',
+          background: 'var(--color-bg)'
+        }}
+      >
+        <i
+          className={`ph ${icon}`}
+          style={{ fontSize: '42px', color: 'var(--fg3)', marginBottom: '12px' }}
+        />
+        <h3 style={{ margin: '0 0 6px', fontSize: '15px', fontWeight: 600, color: 'var(--fg)' }}>
+          {title}
+        </h3>
+        <p
           style={{
-            flex: '0 0 auto',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '0 12px',
-            background: 'var(--panel)',
-            borderBottom: '1px solid var(--line)'
+            margin: '0 0 16px',
+            fontSize: '12.5px',
+            color: 'var(--fg3)',
+            maxWidth: '420px',
+            lineHeight: '1.5'
           }}
         >
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-            drivers/net/ethernet/mellanox/mlx5/core/en_tx.c
-          </span>
-          <span style={{ fontSize: '11px', color: 'var(--add)' }}>+7</span>
-          <span style={{ fontSize: '11px', color: 'var(--del)' }}>−2</span>
-          <span style={{ flex: 1 }} />
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={() => setDiffTab(diffTab === 'sources' ? 'work' : 'sources')}
-          >
-            {diffTab === 'sources' ? 'Unified' : 'Split'}
-          </Button>
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={act('Stage hunk')}
-          >
-            Stage hunk
-          </Button>
-          <Button
-            variant="secondary"
-            style={{ height: '22px', fontSize: '11.5px' }}
-            onClick={act('Copy patch')}
-          >
-            Copy patch
-          </Button>
-        </div>
-        <div
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            minHeight: 0,
-            padding: '6px 0',
-            background: 'var(--color-bg)'
-          }}
-        >
-          {rows}
+          {description}
+        </p>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {primaryAction && (
+            <Button
+              variant="primary"
+              style={{ height: '28px', fontSize: '12px' }}
+              onClick={primaryAction.run}
+            >
+              {primaryAction.label}
+            </Button>
+          )}
+          {secondaryAction && (
+            <Button
+              variant="secondary"
+              style={{ height: '28px', fontSize: '12px' }}
+              onClick={secondaryAction.run}
+            >
+              {secondaryAction.label}
+            </Button>
+          )}
         </div>
       </div>
     );
   };
 
+  const renderDiffPane = () => {
+    if (!targetPath && availableFiles.length === 0) {
+      return renderEmptyState();
+    }
+
+    const isConflict = diffTab === 'merge' || currentFileStatus === 'U';
+
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {isConflict && targetPath && (
+          <div
+            style={{
+              flex: '0 0 auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '6px 12px',
+              background: 'var(--delbg)',
+              borderBottom: '1px solid var(--line)',
+              fontSize: '12px'
+            }}
+          >
+            <span style={{ color: 'var(--del)', fontWeight: 600 }}>Merge Conflict:</span>
+            <span style={{ flex: 1, color: 'var(--fg2)', fontFamily: 'var(--font-mono)' }}>
+              {targetPath}
+            </span>
+            <Button
+              variant="secondary"
+              style={{ height: '22px', fontSize: '11px' }}
+              onClick={() => handleCheckoutSide('ours')}
+            >
+              Keep Ours (HEAD)
+            </Button>
+            <Button
+              variant="secondary"
+              style={{ height: '22px', fontSize: '11px' }}
+              onClick={() => handleCheckoutSide('theirs')}
+            >
+              Keep Theirs (Incoming)
+            </Button>
+            <Button
+              variant="primary"
+              style={{ height: '22px', fontSize: '11px' }}
+              onClick={() => void stageFile(targetPath)}
+            >
+              Mark Resolved
+            </Button>
+          </div>
+        )}
+
+        <DiffViewer
+          filePath={targetPath}
+          rawDiffText={rawDiffText}
+          loading={loading || commitLoading}
+          emptyMessage={targetPath ? `No diff output found for ${targetPath}` : 'No file selected.'}
+          onStageFile={() => void stageFile(targetPath)}
+          onUnstageFile={() => void unstageFile(targetPath)}
+          onCopyPatch={() => {
+            void navigator.clipboard.writeText(rawDiffText);
+            toastRun('Copied diff patch', targetPath || 'diff');
+          }}
+          isStaged={targetPath ? diffTab === 'index' : false}
+          isUnstaged={targetPath ? diffTab === 'work' : false}
+        />
+      </div>
+    );
+  };
+
+  const sidebarPanel = useResizablePanel({
+    storageKey: 'ag_panel_diff_sidebar_width',
+    defaultSize: 240,
+    minSize: 160,
+    maxSize: 500,
+    direction: 'horizontal'
+  });
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {/* Top tabs */}
       <div
         style={{
           flex: '0 0 auto',
@@ -321,38 +374,176 @@ export const DiffView: React.FC = () => {
             <Button
               key={t[0]}
               variant="secondary"
-              onClick={() => setDiffTab(t[0])}
+              aria-pressed={active}
+              onClick={() => {
+                if (t[0] !== 'parent' && t[0] !== 'refs') {
+                  setDiffTargetSha(null);
+                }
+                setDiffTab(t[0]);
+              }}
               style={{
                 flex: '0 0 auto',
                 height: '25px',
                 fontSize: '11.5px',
                 whiteSpace: 'nowrap',
                 color: active ? 'var(--color-accent)' : 'var(--fg2)',
-                boxShadow: active ? 'inset 0 0 0 1px var(--color-accent)' : 'none'
+                boxShadow: active ? 'inset 0 0 0 1px var(--color-accent)' : 'none',
+                position: 'relative'
               }}
             >
               {t[1]}
+              {t[2] !== undefined && t[2] > 0 && (
+                <span
+                  style={{
+                    marginLeft: '5px',
+                    padding: '1px 5px',
+                    borderRadius: '8px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    background: 'var(--del)',
+                    color: '#fff'
+                  }}
+                >
+                  {t[2]}
+                </span>
+              )}
             </Button>
           );
         })}
-        <div style={{ flex: 1, minWidth: '20px' }} />
-        <Button
-          variant="secondary"
-          onClick={act('Swap diff direction')}
-          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
-        >
-          <i className="ph ph-arrows-left-right" style={{ fontSize: '13px' }} /> Swap direction
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={act('Compare with revision')}
-          style={{ flex: '0 0 auto', height: '25px', fontSize: '11.5px' }}
-        >
-          Compare with Revision…
-        </Button>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-        {renderDiffPane()}
+
+      {/* Main split */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+        {/* File selector strip */}
+        <div
+          style={{
+            width: `${sidebarPanel.size}px`,
+            flex: '0 0 auto',
+            borderRight: '1px solid var(--line)',
+            background: 'var(--panel)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden'
+          }}
+        >
+          <div
+            style={{
+              padding: 'var(--space-2) var(--space-3)',
+              fontSize: '10.5px',
+              textTransform: 'uppercase',
+              color: 'var(--fg3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid var(--line)'
+            }}
+          >
+            <span>
+              {diffTab === 'parent' || diffTab === 'refs' ? 'Commit Files' : 'Changed Files'} (
+              {availableFiles.length})
+            </span>
+          </div>
+
+          {availableFiles.length > 5 && (
+            <div style={{ padding: '4px 8px', borderBottom: '1px solid var(--line)' }}>
+              <input
+                type="text"
+                value={fileQuery}
+                onChange={e => setFileQuery(e.target.value)}
+                placeholder="Filter files…"
+                style={{
+                  width: '100%',
+                  height: '22px',
+                  fontSize: '11px',
+                  padding: '0 6px',
+                  borderRadius: '3px',
+                  border: '1px solid var(--line)',
+                  background: 'var(--color-bg)',
+                  color: 'var(--fg)'
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ flex: 1, overflow: 'auto', padding: 'var(--space-1) 0' }}>
+            {filteredFiles.length === 0 ? (
+              <div
+                style={{
+                  padding: 'var(--space-3)',
+                  fontSize: '11.5px',
+                  color: 'var(--fg3)',
+                  fontStyle: 'italic'
+                }}
+              >
+                {availableFiles.length === 0 ? 'No files' : 'No matching files'}
+              </div>
+            ) : (
+              <FileTree
+                files={filteredFiles}
+                forceExpand={Boolean(fileQuery.trim())}
+                renderFile={(f, depth) => (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setDiffTargetPath(f.path)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDiffTargetPath(f.path);
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      height: '24px',
+                      paddingLeft: `${12 + depth * 14}px`,
+                      paddingRight: 'var(--space-3)',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontFamily: 'var(--font-mono)',
+                      background: targetPath === f.path ? 'var(--sel)' : 'transparent'
+                    }}
+                    className="gc-hover-bg"
+                  >
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: f.status === 'U' ? 'var(--del)' : 'var(--color-accent)',
+                        fontSize: '11px'
+                      }}
+                    >
+                      {f.status}
+                    </span>
+                    <span
+                      style={{
+                        flex: 1,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {f.path.split('/').pop()}
+                    </span>
+                  </div>
+                )}
+              />
+            )}
+          </div>
+        </div>
+
+        <ResizeHandle
+          direction="horizontal"
+          isDragging={sidebarPanel.isDragging}
+          onMouseDown={sidebarPanel.handleMouseDown}
+          onDoubleClick={sidebarPanel.resetSize}
+          title="Drag to resize file selector panel (Double-click to reset)"
+        />
+
+        {/* Diff content */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {renderDiffPane()}
+        </div>
       </div>
     </div>
   );

@@ -15,18 +15,30 @@ import { DiffView } from './views/DiffView';
 import { WorktreesView } from './views/WorktreesView';
 import { SubmodulesView } from './views/SubmodulesView';
 import { SettingsView } from './views/SettingsView';
-import { ComponentsView } from './views/ComponentsView';
+import { WelcomeView } from './views/WelcomeView';
 
 import { ContextMenu } from './common/ContextMenu';
 import { CommandPalette } from './common/CommandPalette';
 import { Dialog } from './common/Dialog';
 import { ProgressToast } from './common/ProgressToast';
 
+import { useResizablePanel } from '../hooks/useResizablePanel';
+import { ResizeHandle } from './common/ResizeHandle';
+
 const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties }> = ({
   className = '',
   style
 }) => {
-  const { view } = useGitClient();
+  const { view, dock, repoPath } = useGitClient();
+
+  const dockPanel = useResizablePanel({
+    storageKey: 'ag_panel_sc_dock_width',
+    defaultSize: 330,
+    minSize: 220,
+    maxSize: 600,
+    direction: 'horizontal',
+    reverse: true
+  });
 
   const renderActiveView = () => {
     switch (view) {
@@ -46,12 +58,21 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
         return <SubmodulesView />;
       case 'settings':
         return <SettingsView />;
-      case 'components':
-        return <ComponentsView />;
       default:
         return <GraphView />;
     }
   };
+
+  if (!repoPath) {
+    return (
+      <div className={`gc-container ${className}`.trim()} style={style}>
+        <WelcomeView />
+        <ContextMenu />
+        <Dialog />
+        <ProgressToast />
+      </div>
+    );
+  }
 
   return (
     <div className={`gc-container ${className}`.trim()} style={style}>
@@ -62,7 +83,18 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
           {renderActiveView()}
           <ConsoleDrawer />
         </div>
-        <SourceControlDock />
+        {dock && (
+          <>
+            <ResizeHandle
+              direction="horizontal"
+              isDragging={dockPanel.isDragging}
+              onMouseDown={dockPanel.handleMouseDown}
+              onDoubleClick={dockPanel.resetSize}
+              title="Drag to resize source control dock (Double-click to reset)"
+            />
+            <SourceControlDock style={{ width: `${dockPanel.size}px` }} />
+          </>
+        )}
       </div>
       <StatusBar />
 

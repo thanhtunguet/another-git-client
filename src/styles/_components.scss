@@ -281,6 +281,14 @@ textarea.input {
   color: var(--fg2);
   border: 0;
 
+  &:first-child {
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+  }
+
+  &:last-child {
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  }
+
   + .seg-opt {
     border-left: 1px solid var(--color-divider);
   }
