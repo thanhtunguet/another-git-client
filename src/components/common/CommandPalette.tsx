@@ -1,16 +1,141 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
+import {
+  tauriGitBackend,
+  type BranchRef,
+  type GraphCommitRow,
+  type TagRef
+} from '../../services/tauriGitBackend';
+import { type PaletteItem } from '../../types/git-client';
+
+const fuzzyMatch = (query: string, candidate: string) => {
+  const needle = query.toLowerCase().replace(/[\s/_-]/g, '');
+  const haystack = candidate.toLowerCase().replace(/[\s/_-]/g, '');
+  let candidateIndex = 0;
+
+  for (const character of needle) {
+    candidateIndex = haystack.indexOf(character, candidateIndex);
+    if (candidateIndex < 0) return false;
+    candidateIndex += 1;
+  }
+  return true;
+};
+
+const isCommitId = (value: string) => /^[0-9a-f]{4,40}$/i.test(value);
 
 export const CommandPalette: React.FC = () => {
-  const { paletteOpen, closePalette, paletteQ, setPaletteQ, paletteAll, runPaletteQuery } = useGitClient();
+  const {
+    paletteOpen,
+    closePalette,
+    paletteQ,
+    setPaletteQ,
+    paletteAll,
+    repoPath,
+    runPaletteQuery
+  } = useGitClient();
   const [activeIndex, setActiveIndex] = useState(0);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [branches, setBranches] = useState<BranchRef[]>([]);
+  const [tags, setTags] = useState<TagRef[]>([]);
+  const [commitMatch, setCommitMatch] = useState<GraphCommitRow | null>(null);
 
-  const items = paletteOpen ? paletteAll() : [];
-  const pq = paletteQ.toLowerCase();
-  const filtered = items.filter(
-    p => !pq || (p.group + ' ' + p.label).toLowerCase().indexOf(pq) >= 0
+  const query = paletteQ.trim();
+  const actionMatches = useMemo(
+    () =>
+      paletteOpen
+        ? paletteAll().filter(item => !query || fuzzyMatch(query, `${item.group} ${item.label}`))
+        : [],
+    [paletteOpen, paletteAll, query]
   );
+  const referenceMatches = useMemo((): PaletteItem[] => {
+    if (!query) return [];
+    return [
+      ...branches
+        .filter(branch => fuzzyMatch(query, branch.name))
+        .slice(0, 12)
+        .map(branch => ({
+          group: 'Branch',
+          label: branch.name,
+          hint: branch.current ? 'current' : 'Checkout',
+          run: () => void runPaletteQuery(branch.name)
+        })),
+      ...tags
+        .filter(tag => fuzzyMatch(query, tag.name))
+        .slice(0, 12)
+        .map(tag => ({
+          group: 'Tag',
+          label: tag.name,
+          hint: 'View commit',
+          run: () => void runPaletteQuery(tag.name)
+        }))
+    ];
+  }, [query, branches, tags, runPaletteQuery]);
+  const shouldSearchCommit =
+    !!query && (isCommitId(query) || (actionMatches.length === 0 && referenceMatches.length === 0));
+
+  useEffect(() => {
+    if (!paletteOpen || !repoPath) {
+      setBranches([]);
+      setTags([]);
+      return;
+    }
+
+    let active = true;
+    void Promise.all([tauriGitBackend.getBranches(repoPath), tauriGitBackend.getTags(repoPath)])
+      .then(([branchList, tagList]) => {
+        if (!active) return;
+        setBranches(branchList);
+        setTags(tagList);
+      })
+      .catch(() => {
+        if (!active) return;
+        setBranches([]);
+        setTags([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paletteOpen, repoPath]);
+
+  useEffect(() => {
+    if (!paletteOpen || !repoPath || !shouldSearchCommit) {
+      setCommitMatch(null);
+      return;
+    }
+
+    let active = true;
+    const timeoutId = window.setTimeout(() => {
+      void tauriGitBackend
+        .getRefGraph(repoPath, query, { maxCount: 1 })
+        .then(rows => {
+          if (active) setCommitMatch(rows[0] || null);
+        })
+        .catch(() => {
+          if (active) setCommitMatch(null);
+        });
+    }, 150);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [paletteOpen, query, repoPath, shouldSearchCommit]);
+
+  const filtered = useMemo((): PaletteItem[] => {
+    const commit: PaletteItem[] = commitMatch
+      ? [
+          {
+            group: 'Commit',
+            label: `${commitMatch.shortSha}  ${commitMatch.subject}`,
+            hint: 'View details',
+            run: () => void runPaletteQuery(commitMatch.sha)
+          }
+        ]
+      : [];
+
+    return [...actionMatches, ...referenceMatches, ...commit];
+  }, [actionMatches, referenceMatches, commitMatch, runPaletteQuery]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -145,7 +270,7 @@ export const CommandPalette: React.FC = () => {
               role="status"
               style={{ padding: 'var(--space-3)', fontSize: '12px', color: 'var(--fg3)' }}
             >
-              Press Enter to check out an exact branch name or view a commit ID.
+              No matching actions, branches, tags, or commit IDs.
             </div>
           )}
         </div>
@@ -163,7 +288,7 @@ export const CommandPalette: React.FC = () => {
           }}
         >
           <span>↑↓ navigate</span>
-          <span>↵ run / open branch or commit</span>
+          <span>↵ select</span>
           <span>esc close</span>
         </div>
       </div>

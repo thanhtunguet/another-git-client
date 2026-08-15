@@ -1884,7 +1884,10 @@ export const GitClientProvider: React.FC<{
       }
 
       try {
-        const branches = await tauriGitBackend.getBranches(repoPath);
+        const [branches, tags] = await Promise.all([
+          tauriGitBackend.getBranches(repoPath),
+          tauriGitBackend.getTags(repoPath)
+        ]);
         const branch = branches.find(candidate => candidate.name === reference);
         if (branch) {
           setPaletteOpen(false);
@@ -1892,11 +1895,13 @@ export const GitClientProvider: React.FC<{
           return true;
         }
 
-        if (!/^[0-9a-f]{4,40}$/i.test(reference)) {
+        const tag = tags.find(candidate => candidate.name === reference);
+        if (!tag && !/^[0-9a-f]{4,40}$/i.test(reference)) {
           return false;
         }
 
-        const rows = await tauriGitBackend.getRefGraph(repoPath, reference, { maxCount: 1 });
+        const commitReference = tag?.name || reference;
+        const rows = await tauriGitBackend.getRefGraph(repoPath, commitReference, { maxCount: 1 });
         const commit = rows[0];
         if (!commit) {
           return false;
@@ -1912,14 +1917,14 @@ export const GitClientProvider: React.FC<{
         setPaletteOpen(false);
         setView('details');
         log([
-          { text: `$ git log --max-count=1 ${reference}`, type: 'cmd' },
+          { text: `$ git log --max-count=1 ${commitReference}`, type: 'cmd' },
           { text: `Viewing commit ${commit.shortSha}`, type: 'ok' }
         ]);
         return true;
       } catch (error) {
         log([
           {
-            text: `Could not resolve branch or commit '${reference}': ${error instanceof Error ? error.message : String(error)}`,
+            text: `Could not resolve branch, tag, or commit '${reference}': ${error instanceof Error ? error.message : String(error)}`,
             type: 'warn'
           }
         ]);
