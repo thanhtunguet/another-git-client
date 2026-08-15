@@ -1779,8 +1779,8 @@ export const GitClientProvider: React.FC<{
       const r = commits[i];
       if (f.authors.length && !f.authors.some(author => r[1] === author)) return false;
       if (f.msg && r[0].toLowerCase().indexOf(f.msg.toLowerCase()) < 0) return false;
-      if (f.from && r[2].slice(0, 10) < f.from) return false;
-      if (f.to && r[2].slice(0, 10) > f.to) return false;
+      if (f.from && r[2] < `${f.from} 00:00`) return false;
+      if (f.to && r[2] > `${f.to} 23:59`) return false;
       if (f.refs.length) {
         const commitRefs = r[4] || [];
         if (!f.refs.some(reference => commitRefs.some(decoration => decoration.includes(reference)))) {

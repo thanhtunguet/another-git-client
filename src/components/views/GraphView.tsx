@@ -713,9 +713,9 @@ export const GraphView: React.FC = () => {
           />
           <Input
             label="From"
+            type="date"
             value={f.from}
             onChange={e => setF({ ...f, from: e.target.value })}
-            placeholder="2026-07-20"
             style={{
               height: '26px',
               minHeight: 0,
@@ -725,9 +725,9 @@ export const GraphView: React.FC = () => {
           />
           <Input
             label="To"
+            type="date"
             value={f.to}
             onChange={e => setF({ ...f, to: e.target.value })}
-            placeholder="2026-07-31"
             style={{
               height: '26px',
               minHeight: 0,

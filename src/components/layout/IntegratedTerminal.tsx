@@ -41,12 +41,17 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
     const host = hostRef.current;
     if (!host || !repoPath) return;
 
+    const computedFont =
+      getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() ||
+      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+
     const terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
-      fontFamily: 'var(--font-mono)',
+      fontFamily: computedFont,
       fontSize: 12,
-      lineHeight: 1.25,
+      lineHeight: 1.2,
+      letterSpacing: 0,
       theme: {
         background: '#00000000',
         foreground: '#d6d8de',
