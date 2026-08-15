@@ -1279,7 +1279,7 @@ export const GitClientProvider: React.FC<{
   );
 
   const toggleExpandCommit = useCallback((i: number) => {
-    setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
+    setExpanded(prev => (prev[i] ? {} : { [i]: true }));
   }, []);
 
   const openRepository = useCallback(() => {

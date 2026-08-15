@@ -20,6 +20,11 @@ export const ContextMenu: React.FC = () => {
     };
 
     const showSelectedTextMenu = (event: MouseEvent) => {
+      // Let item-specific menus handle their own context action even when their text is selected.
+      if (event.target instanceof Element && event.target.closest('[data-gc-context-menu]')) {
+        return;
+      }
+
       const selectedText = getSelectedText(event.target);
       if (selectedText) {
         event.preventDefault();

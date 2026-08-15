@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { FileTree } from '../common/FileTree';
+import { ResetDialog } from '../common/ResetDialog';
 import { GraphRowData, FilterState } from '../../types/git-client';
 
 function laneX(l: number): number {
@@ -89,6 +90,7 @@ export const GraphView: React.FC = () => {
     cherryPickCommit,
     revertCommit,
     resetToRef,
+    createPatch,
     confirm,
     currentBranch,
     toastRun,
@@ -114,6 +116,7 @@ export const GraphView: React.FC = () => {
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const [resetReference, setResetReference] = useState<string | null>(null);
 
   const hasExpandedRows = useMemo(() => Object.values(expanded).some(Boolean), [expanded]);
   const virtualizeEnabled = preferences.virtualizeCommitList !== false;
@@ -237,20 +240,9 @@ export const GraphView: React.FC = () => {
         }
       },
       { sep: true },
-      { label: 'Reset HEAD to here — soft', run: () => void resetToRef(fullSha, 'soft') },
-      { label: 'Reset HEAD to here — mixed', run: () => void resetToRef(fullSha, 'mixed') },
       {
-        label: 'Reset HEAD to here — hard',
-        danger: true,
-        run: () => {
-          confirm(
-            `Hard reset ${currentBranch || 'HEAD'} to ${hash}?`,
-            'All uncommitted changes in the working tree and index will be permanently discarded.',
-            `git reset --hard ${fullSha}`,
-            'Reset --hard',
-            () => void resetToRef(fullSha, 'hard')
-          );
-        }
+        label: 'Reset current branch to here…',
+        run: () => setResetReference(fullSha)
       },
       {
         sep: true
@@ -260,6 +252,17 @@ export const GraphView: React.FC = () => {
         run: () => {
           setCompareSeedRef(fullSha);
           setView('compare');
+        }
+      },
+      {
+        label: 'Create patch…',
+        run: () => {
+          void createPatch(fullSha).then(patch => {
+            if (patch) {
+              void navigator.clipboard.writeText(patch);
+              toastRun('Patch copied to clipboard', hash);
+            }
+          });
         }
       },
       {
@@ -317,11 +320,7 @@ export const GraphView: React.FC = () => {
         </span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>·</span>
         <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>
-          {sel.length > 1
-            ? `${sel.length} commits selected — range details`
-            : sel.length === 1
-              ? '1 selected'
-              : 'No selection'}
+          {sel.length === 1 ? '1 selected' : 'No selection'}
         </span>
       </div>
 
@@ -459,14 +458,20 @@ export const GraphView: React.FC = () => {
               <div
                 role="button"
                 tabIndex={0}
+                data-gc-context-menu="commit"
                 aria-selected={isSelected}
-                onClick={e => toggleSelCommit(i, e.shiftKey || e.metaKey || e.ctrlKey)}
+                onClick={e => {
+                  e.preventDefault();
+                  toggleSelCommit(i, false);
+                  toggleExpandCommit(i);
+                }}
                 onDoubleClick={() => toggleExpandCommit(i)}
                 onContextMenu={e => handleCommitMenu(e, i)}
                 onKeyDown={e => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    toggleSelCommit(i, e.shiftKey || e.metaKey || e.ctrlKey);
+                    toggleSelCommit(i, false);
+                    toggleExpandCommit(i);
                   }
                 }}
                 style={{
@@ -668,6 +673,12 @@ export const GraphView: React.FC = () => {
           </div>
         )}
       </div>
+      <ResetDialog
+        reference={resetReference}
+        currentBranch={currentBranch}
+        onClose={() => setResetReference(null)}
+        onReset={(reference, mode) => void resetToRef(reference, mode)}
+      />
     </div>
   );
 };
