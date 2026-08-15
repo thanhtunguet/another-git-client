@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Button } from './Button';
 import { SegmentedControl } from './SegmentedControl';
 import { useGitClient } from '../../context/GitClientContext';
@@ -16,10 +16,20 @@ export function parseDiffText(raw: string): DiffLine[] {
   const result: DiffLine[] = [];
   let oldN = 0;
   let newN = 0;
+  let mergeNextRangeIntoFileHeader = false;
 
   for (const line of lines) {
     if (line.startsWith('diff --git')) {
       result.push({ text: line, type: 'hunk' });
+      mergeNextRangeIntoFileHeader = true;
+      continue;
+    }
+
+    const isFileMetadata = /^(?:old mode|new mode|deleted file mode|new file mode|similarity index|dissimilarity index|rename from|rename to|copy from|copy to|Binary files |GIT binary patch|literal |delta )/.test(
+      line
+    );
+
+    if (isFileMetadata) {
       continue;
     }
     if (line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
@@ -31,17 +41,26 @@ export function parseDiffText(raw: string): DiffLine[] {
         oldN = parseInt(match[1], 10) - 1;
         newN = parseInt(match[2], 10) - 1;
       }
-      result.push({ text: line, type: 'hunk' });
+      const previousLine = result[result.length - 1];
+      if (mergeNextRangeIntoFileHeader && previousLine?.type === 'hunk') {
+        previousLine.text = `${previousLine.text} · ${line}`;
+      } else {
+        result.push({ text: line, type: 'hunk' });
+      }
+      mergeNextRangeIntoFileHeader = false;
     } else if (line.startsWith('+')) {
       newN++;
+      mergeNextRangeIntoFileHeader = false;
       result.push({ text: line.slice(1), type: 'add', newLine: newN });
     } else if (line.startsWith('-')) {
       oldN++;
+      mergeNextRangeIntoFileHeader = false;
       result.push({ text: line.slice(1), type: 'del', oldLine: oldN });
     } else {
       const content = line.startsWith(' ') ? line.slice(1) : line;
       oldN++;
       newN++;
+      mergeNextRangeIntoFileHeader = false;
       result.push({ text: content, type: 'context', oldLine: oldN, newLine: newN });
     }
   }
@@ -154,6 +173,8 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
   const parsedLines = useMemo(() => parseDiffText(rawDiffText), [rawDiffText]);
   const sideBySideRows = useMemo(() => parseSideBySideDiff(parsedLines), [parsedLines]);
+  const splitContentRef = useRef<HTMLDivElement>(null);
+  const activeSplitSideRef = useRef<'left' | 'right' | null>(null);
 
   const monoStyle: React.CSSProperties = {
     fontFamily: 'var(--font-mono)',
@@ -169,6 +190,62 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       toastRun('Copied diff patch', filePath || 'diff');
     }
   };
+
+  const clearSplitSelectionRestrictions = () => {
+    splitContentRef.current
+      ?.querySelectorAll<HTMLElement>('[data-diff-side], [data-diff-hunk]')
+      .forEach(element => {
+        element.style.removeProperty('user-select');
+        element.style.removeProperty('-webkit-user-select');
+      });
+  };
+
+  const activateSplitSide = (event: React.PointerEvent<HTMLDivElement>) => {
+    const side = (event.target as HTMLElement).closest<HTMLElement>('[data-diff-side]')?.dataset.diffSide;
+    if (side !== 'left' && side !== 'right') return;
+
+    clearSplitSelectionRestrictions();
+    activeSplitSideRef.current = side;
+    splitContentRef.current?.focus({ preventScroll: true });
+  };
+
+  const deactivateSplitSide = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      activeSplitSideRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'a') return;
+
+      const activeSide = activeSplitSideRef.current;
+      const content = splitContentRef.current;
+      const selection = window.getSelection();
+      if ((activeSide !== 'left' && activeSide !== 'right') || !content || !selection) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      content.querySelectorAll<HTMLElement>('[data-diff-side]').forEach(element => {
+        if (element.dataset.diffSide === activeSide) return;
+        element.style.userSelect = 'none';
+        element.style.webkitUserSelect = 'none';
+      });
+      content.querySelectorAll<HTMLElement>('[data-diff-hunk]').forEach(element => {
+        element.style.userSelect = 'none';
+        element.style.webkitUserSelect = 'none';
+      });
+
+      const range = document.createRange();
+      range.selectNodeContents(content);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    window.addEventListener('keydown', handleWindowKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleWindowKeyDown, { capture: true });
+  }, []);
 
   const renderHeaderBar = () => (
     <div
@@ -310,6 +387,10 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
 
         {/* Side-by-side Diff Content */}
         <div
+          ref={splitContentRef}
+          tabIndex={-1}
+          onPointerDown={activateSplitSide}
+          onBlur={deactivateSplitSide}
           style={{
             flex: 1,
             overflow: 'auto',
@@ -322,6 +403,7 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
               return (
                 <div
                   key={row.id}
+                  data-diff-hunk
                   style={{
                     display: 'flex',
                     background: 'var(--raised)',
