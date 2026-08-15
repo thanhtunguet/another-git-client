@@ -3,6 +3,7 @@ import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
+import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { IntegratedTerminal } from './IntegratedTerminal';
 
 type BottomPanelTab = 'output' | 'terminal';
@@ -17,6 +18,12 @@ const BOTTOM_PANEL_TABS: Array<{ id: BottomPanelTab; label: string }> = [
   { id: 'output', label: 'Output' },
   { id: 'terminal', label: 'Terminal' }
 ];
+let terminalSessionSequence = 0;
+
+function createTerminalSessionId() {
+  terminalSessionSequence += 1;
+  return `bottom-panel-terminal-${Date.now()}-${terminalSessionSequence}`;
+}
 
 function loadBottomPanelState(): BottomPanelState {
   const fallback: BottomPanelState = { activeTab: 'output', tabOrder: ['output', 'terminal'] };
@@ -49,6 +56,9 @@ export const ConsoleDrawer: React.FC = () => {
   const [terminalActivated, setTerminalActivated] = useState(
     () => loadBottomPanelState().activeTab === 'terminal'
   );
+  const [terminalSessionIds, setTerminalSessionIds] = useState<string[]>(() => [
+    createTerminalSessionId()
+  ]);
   const [draggedTab, setDraggedTab] = useState<BottomPanelTab | null>(null);
   const { activeTab, tabOrder } = panelState;
 
@@ -60,6 +70,22 @@ export const ConsoleDrawer: React.FC = () => {
     }
   }, [panelState]);
 
+  useEffect(() => {
+    if (consoleOpen && activeTab === 'terminal' && !terminalActivated) {
+      setTerminalActivated(true);
+      setTerminalSessionIds(previous =>
+        previous.length ? previous : [createTerminalSessionId()]
+      );
+    }
+  }, [activeTab, consoleOpen, terminalActivated]);
+
+  useEffect(() => {
+    if (!consoleOpen && terminalActivated) {
+      setTerminalActivated(false);
+      setTerminalSessionIds([]);
+    }
+  }, [consoleOpen, terminalActivated]);
+
   const consolePanel = useResizablePanel({
     storageKey: 'ag_panel_console_height',
     defaultSize: 200,
@@ -68,6 +94,31 @@ export const ConsoleDrawer: React.FC = () => {
     direction: 'vertical',
     reverse: true
   });
+
+  const activateTerminal = () => {
+    setTerminalActivated(true);
+    setTerminalSessionIds(previous => (previous.length ? previous : [createTerminalSessionId()]));
+  };
+
+  const clearAllTerminals = () => {
+    const command = navigator.userAgent.includes('Windows') ? 'cls\r' : 'clear\r';
+    terminalSessionIds.forEach(sessionId => {
+      void tauriGitBackend.writeTerminal(sessionId, command).catch(() => {});
+    });
+  };
+
+  const splitTerminal = () => {
+    setTerminalSessionIds(previous => [...previous, createTerminalSessionId()]);
+  };
+
+  const removeTerminal = (sessionId: string) => {
+    const isFinalTerminal = terminalSessionIds.length === 1;
+    setTerminalSessionIds(previous => previous.filter(id => id !== sessionId));
+    if (isFinalTerminal) {
+      setTerminalActivated(false);
+      toggleConsole();
+    }
+  };
 
   if (!consoleOpen) return null;
 
@@ -161,7 +212,7 @@ export const ConsoleDrawer: React.FC = () => {
                 onDragEnd={() => setDraggedTab(null)}
                 onClick={() => {
                   setPanelState(previous => ({ ...previous, activeTab: tab.id }));
-                  if (tab.id === 'terminal') setTerminalActivated(true);
+                  if (tab.id === 'terminal') activateTerminal();
                 }}
                 style={{
                   alignSelf: 'stretch',
@@ -209,33 +260,57 @@ export const ConsoleDrawer: React.FC = () => {
             Hide
           </Button>
         </div>
-      <div
-        role="tabpanel"
-        hidden={activeTab !== 'output'}
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: 'var(--space-2) var(--space-3)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: '11.5px',
-          lineHeight: 1.6
-        }}
-      >
-        {consoleLines.map((l, i) => (
-          <div key={i} style={{ color: getColor(l.type), whiteSpace: 'pre-wrap' }}>
-            {l.text}
-          </div>
-        ))}
-      </div>
-      {terminalActivated && (
         <div
           role="tabpanel"
-          hidden={activeTab !== 'terminal'}
-          style={{ flex: 1, minHeight: 0, display: 'flex' }}
+          hidden={activeTab !== 'output'}
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: 'var(--space-2) var(--space-3)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11.5px',
+            lineHeight: 1.6
+          }}
         >
-          <IntegratedTerminal repoPath={repoPath} />
+          {consoleLines.map((l, i) => (
+            <div key={i} style={{ color: getColor(l.type), whiteSpace: 'pre-wrap' }}>
+              {l.text}
+            </div>
+          ))}
         </div>
-      )}
+        {terminalActivated && (
+          <div
+            role="tabpanel"
+            hidden={activeTab !== 'terminal'}
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateColumns: `repeat(${terminalSessionIds.length}, minmax(0, 1fr))`
+            }}
+          >
+            {terminalSessionIds.map((sessionId, index) => (
+              <div
+                key={sessionId}
+                style={{
+                  display: 'flex',
+                  minWidth: 0,
+                  minHeight: 0,
+                  borderLeft: index === 0 ? undefined : '1px solid var(--line)'
+                }}
+              >
+                <IntegratedTerminal
+                  repoPath={repoPath}
+                  sessionId={sessionId}
+                  onClearAll={clearAllTerminals}
+                  onSplit={splitTerminal}
+                  onExit={() => removeTerminal(sessionId)}
+                  onKill={() => removeTerminal(sessionId)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
+import { useGitClient } from '../../context/GitClientContext';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 
 interface TerminalOutput {
@@ -12,12 +13,28 @@ interface TerminalOutput {
 
 interface IntegratedTerminalProps {
   repoPath: string;
+  sessionId: string;
+  onClearAll: () => void;
+  onSplit: () => void;
+  onExit: () => void;
+  onKill: () => void;
 }
 
-const TERMINAL_SESSION_ID = 'bottom-panel-terminal';
-
-export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({ repoPath }) => {
+export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
+  repoPath,
+  sessionId,
+  onClearAll,
+  onSplit,
+  onExit,
+  onKill
+}) => {
   const hostRef = useRef<HTMLDivElement>(null);
+  const onExitRef = useRef(onExit);
+  const { openMenu } = useGitClient();
+
+  useEffect(() => {
+    onExitRef.current = onExit;
+  }, [onExit]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -44,7 +61,7 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({ repoPath
       try {
         fitAddon.fit();
         const { cols, rows } = terminal;
-        void tauriGitBackend.resizeTerminal(TERMINAL_SESSION_ID, { cols, rows }).catch(() => {});
+        void tauriGitBackend.resizeTerminal(sessionId, { cols, rows }).catch(() => {});
       } catch {
         // Ignore dimensions while the panel is hidden or detached.
       }
@@ -52,34 +69,56 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({ repoPath
 
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
+    let command = '';
+    let disposed = false;
     const inputSubscription = terminal.onData(data => {
-      void tauriGitBackend.writeTerminal(TERMINAL_SESSION_ID, data).catch(error => {
+      if (data === '\r') {
+        if (command.trim() === 'exit') {
+          void tauriGitBackend.stopTerminal(sessionId).finally(() => onExitRef.current());
+          return;
+        }
+        command = '';
+      } else if (data === '\u007f' || data === '\b') {
+        command = command.slice(0, -1);
+      } else if (data === '\u0003' || data === '\u000c') {
+        command = '';
+      } else if (!data.includes('\u001b')) {
+        command += data;
+      }
+
+      void tauriGitBackend.writeTerminal(sessionId, data).catch(error => {
         terminal.writeln(`\r\nTerminal input failed: ${String(error)}`);
       });
     });
     const unlisten = listen<TerminalOutput>('terminal-output', event => {
-      if (event.payload.sessionId === TERMINAL_SESSION_ID) {
+      if (event.payload.sessionId === sessionId) {
         terminal.write(event.payload.data);
       }
     });
 
     void tauriGitBackend
-      .startTerminal(TERMINAL_SESSION_ID, repoPath, { cols: terminal.cols, rows: terminal.rows })
+      .startTerminal(sessionId, repoPath, { cols: terminal.cols, rows: terminal.rows })
       .then(() => {
+        if (disposed) {
+          void tauriGitBackend.stopTerminal(sessionId).catch(() => {});
+          return;
+        }
         resize();
         terminal.focus();
       })
       .catch(error => {
-        terminal.writeln(`Terminal could not start: ${String(error)}`);
+        if (!disposed) terminal.writeln(`Terminal could not start: ${String(error)}`);
       });
 
     return () => {
+      disposed = true;
       resizeObserver.disconnect();
       inputSubscription.dispose();
       void unlisten.then(stopListening => stopListening());
+      void tauriGitBackend.stopTerminal(sessionId).catch(() => {});
       terminal.dispose();
     };
-  }, [repoPath]);
+  }, [repoPath, sessionId]);
 
   if (!repoPath) {
     return (
@@ -95,7 +134,16 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({ repoPath
     <div
       ref={hostRef}
       aria-label="Integrated terminal"
-      style={{ flex: 1, minHeight: 0, padding: 'var(--space-2) var(--space-3)' }}
+      onContextMenu={event => {
+        event.preventDefault();
+        openMenu(event, 'Terminal', [
+          { label: 'Clear All', run: onClearAll },
+          { label: 'Split Terminal', run: onSplit },
+          { sep: true },
+          { label: 'Kill Terminal', danger: true, run: onKill }
+        ]);
+      }}
+      style={{ flex: 1, minWidth: 0, minHeight: 0, padding: 'var(--space-2) var(--space-3)' }}
     />
   );
 };
