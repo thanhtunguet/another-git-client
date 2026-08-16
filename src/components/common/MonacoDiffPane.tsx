@@ -113,7 +113,7 @@ export const MonacoDiffPane: React.FC<MonacoDiffPaneProps> = ({
         fontSize: 11.8,
         lineHeight: 18,
         lineNumbers: showGutterMarkers ? 'on' : 'off',
-        renderOverviewRuler: false,
+        renderOverviewRuler: true,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
         scrollbar: { useShadows: false },
