@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-08-16
+- Made the Branches view recent-commits list interactive with Git Graph-equivalent commit actions,
+  keyboard support, and Commit Details navigation for loaded graph commits. See
+  `docs/changelogs/2026-08-16_keyboard_shortcuts.md`.
 - Added VS Code-style terminal shortcuts (`Ctrl+Shift+\`` new terminal, `` Ctrl+` `` toggle terminal, literal Ctrl on every platform) and a rebindable keybinding registry that also implements the ten Command Palette shortcuts that were previously advertised but never bound. Terminals now survive hiding the bottom panel instead of having their PTY stopped. Added a Settings → Keyboard shortcuts tab with search, chord recording, conflict detection, and reset. See `docs/changelogs/2026-08-16_keyboard_shortcuts.md`.
 
 ## 2026-08-15

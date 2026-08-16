@@ -243,6 +243,9 @@ export const BranchesView: React.FC = () => {
     repoPath,
     currentBranch,
     checkoutBranch,
+    createTag,
+    cherryPickCommit,
+    revertCommit,
     renameBranch,
     deleteBranch,
     setUpstream,
@@ -257,7 +260,12 @@ export const BranchesView: React.FC = () => {
     toastRun,
     openAddRemoteDialog,
     openEditRemoteDialog,
-    setCompareSeedRef
+    setCompareSeedRef,
+    setDiffTargetSha,
+    setDiffTab,
+    findCommitIndexBySha,
+    toggleSelCommit,
+    createPatch
   } = useGitClient();
 
   const [branches, setBranches] = useState<BranchNode[]>([]);
@@ -270,6 +278,112 @@ export const BranchesView: React.FC = () => {
   const [revisionCommitsError, setRevisionCommitsError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resetReference, setResetReference] = useState<string | null>(null);
+
+  const openCommitDetails = (commit: GraphCommitRow) => {
+    const commitIndex = findCommitIndexBySha(commit.sha);
+    if (commitIndex >= 0) {
+      toggleSelCommit(commitIndex, false);
+      setView('details');
+      return;
+    }
+
+    toastRun('Commit not loaded in Git Graph', 'Load more commits in Git Graph to open its details');
+  };
+
+  const handleRecentCommitMenu = (event: React.MouseEvent, commit: GraphCommitRow) => {
+    const hash = commit.shortSha;
+    openMenu(event, `${hash}  ${commit.subject.slice(0, 32)}`, [
+      { label: 'Open in Commit Details', hint: 'Enter', run: () => openCommitDetails(commit) },
+      {
+        label: 'Diff vs parent',
+        run: () => {
+          setDiffTargetSha(commit.sha);
+          setDiffTab('parent');
+          setView('diff');
+        }
+      },
+      { sep: true },
+      { label: 'Checkout (detached)', run: () => void checkoutBranch(commit.sha) },
+      {
+        label: 'Create branch here…',
+        run: () => {
+          prompt(
+            'Create branch',
+            `Create branch at commit ${hash}.`,
+            'Create branch',
+            `branch-${hash}`,
+            (name?: string) => {
+              if (name?.trim()) {
+                void tauriGitBackend.createBranch(repoPath, name.trim(), commit.sha).then(() => {
+                  void checkoutBranch(name.trim());
+                });
+              }
+            }
+          );
+        }
+      },
+      {
+        label: 'Create tag here…',
+        run: () => {
+          prompt(
+            'Create tag',
+            `Tag name for commit ${hash}.`,
+            'Create tag',
+            'v1.0.0',
+            (tagName?: string) => {
+              if (tagName?.trim()) {
+                void createTag(tagName.trim(), commit.sha);
+              }
+            }
+          );
+        }
+      },
+      { sep: true },
+      { label: 'Cherry-pick', run: () => void cherryPickCommit(commit.sha) },
+      {
+        label: 'Revert commit',
+        run: () => {
+          const subject = commit.subject ? ` (\"${commit.subject}\")` : '';
+          confirm(
+            'Revert Commit?',
+            `Revert commit ${hash}${subject}? A new commit will be created to invert the changes.`,
+            `git revert --no-edit ${commit.sha}`,
+            'Revert',
+            () => void revertCommit(commit.sha)
+          );
+        }
+      },
+      { sep: true },
+      { label: 'Reset current branch to here…', run: () => setResetReference(commit.sha) },
+      { sep: true },
+      {
+        label: 'Compare with current',
+        run: () => {
+          setCompareSeedRef(commit.sha);
+          setView('compare');
+        }
+      },
+      {
+        label: 'Create patch…',
+        run: () => {
+          void createPatch(commit.sha).then(patch => {
+            if (patch) {
+              void navigator.clipboard.writeText(patch);
+              toastRun('Patch copied to clipboard', hash);
+            }
+          });
+        }
+      },
+      {
+        label: 'Copy hash',
+        hint: '⌘C',
+        run: () => {
+          void navigator.clipboard.writeText(commit.sha);
+          toastRun('Copied hash', hash);
+        }
+      }
+    ]);
+  };
 
   useEffect(() => {
     if (!repoPath) {
@@ -1071,14 +1185,28 @@ export const BranchesView: React.FC = () => {
             return (
               <div
                 key={commit.sha}
+                role="button"
+                tabIndex={0}
+                data-gc-context-menu="commit"
+                title={`${commit.author} · ${commit.date} · ${commit.shortSha}`}
+                onClick={() => openCommitDetails(commit)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openCommitDetails(commit);
+                  }
+                }}
+                onContextMenu={event => handleRecentCommitMenu(event, commit)}
                 style={{
                   display: 'flex',
                   gap: '12px',
                   alignItems: 'baseline',
                   padding: '7px 8px',
                   borderBottom: '1px solid var(--line)',
-                  borderRadius: 'var(--radius-sm)'
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer'
                 }}
+                className="gc-hover-bg"
               >
                 <span
                   style={{

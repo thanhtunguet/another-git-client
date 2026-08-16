@@ -78,6 +78,14 @@ the registry, so they cannot drift from the real bindings again.
 - Promoted the key-cap style (duplicated inline in `TopBar` and as `.gc-welcome-action-key`) into a
   shared `.gc-kbd` class in `_components.scss`.
 
+### Branch revision commits
+
+- Made the recent commits list in the Branches view interactive. Rows now open loaded commits in
+  Commit Details, support keyboard activation, and expose the same commit context actions as Git
+  Graph: parent diff, detached checkout, branch/tag creation, cherry-pick, confirmed revert,
+  reset, compare, patch creation, and copying the full SHA. Commits outside the current Graph page
+  identify the needed Git Graph pagination instead of opening incorrect details.
+
 ## Verification
 
 - `pnpm typecheck`
