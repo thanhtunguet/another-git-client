@@ -8,6 +8,8 @@ import { SegmentedControl } from '../common/SegmentedControl';
 import { FileTree } from '../common/FileTree';
 import { ResetDialog } from '../common/ResetDialog';
 import { DiffViewer } from '../common/DiffViewer';
+import { isEditableTarget } from '../../hooks/useKeybindings';
+import { useDiffContent, DiffContentSource } from '../../hooks/useDiffContent';
 import { DiffFile, GraphRowData } from '../../types/git-client';
 
 interface GraphFilterOption {
@@ -452,17 +454,31 @@ export const GraphView: React.FC = () => {
     };
   }, [inlineDiff, repoPath]);
 
+  const inlineDiffSource: DiffContentSource | null = useMemo(
+    () => (inlineDiff ? { kind: 'commit', path: inlineDiff.path, sha: inlineDiff.sha } : null),
+    [inlineDiff]
+  );
+
+  const {
+    originalText: inlineOriginalText,
+    modifiedText: inlineModifiedText,
+    contentUnavailable: inlineContentUnavailable,
+    loading: inlineContentLoading
+  } = useDiffContent(repoPath, inlineDiffSource);
+
   useEffect(() => {
     if (!inlineDiff) {
       return;
     }
 
     const closeInlineDiff = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        setInlineDiff(null);
-      }
+      if (event.key !== 'Escape') return;
+      // The diff pane hosts a real editor; there Escape belongs to it (closing
+      // the find widget, clearing multi-cursor) rather than to this panel.
+      if (isEditableTarget(event.target)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setInlineDiff(null);
     };
 
     window.addEventListener('keydown', closeInlineDiff, true);
@@ -1070,9 +1086,13 @@ export const GraphView: React.FC = () => {
               <DiffViewer
                 filePath={inlineDiff.path}
                 rawDiffText={inlineDiffText}
-                loading={inlineDiffLoading}
+                loading={inlineDiffLoading || inlineContentLoading}
                 emptyMessage="No diff output found for this file in the selected commit."
                 onClose={() => setInlineDiff(null)}
+                originalText={inlineOriginalText}
+                modifiedText={inlineModifiedText}
+                contentUnavailable={inlineContentUnavailable}
+                editable={false}
               />
             </div>
           </div>

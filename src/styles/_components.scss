@@ -4,6 +4,20 @@
   box-sizing: border-box;
 }
 
+/*
+ * Monaco measures glyph and line boxes assuming the browser default of
+ * content-box, opting into border-box only on the specific selectors it
+ * styles itself. Leaving the reset above to apply throughout misaligns the
+ * caret and the line widths. Monaco's own rules are emitted after this file,
+ * so the selectors that do want border-box still win.
+ */
+.monaco-editor,
+.monaco-editor *,
+.monaco-editor *::before,
+.monaco-editor *::after {
+  box-sizing: content-box;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

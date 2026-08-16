@@ -103,7 +103,7 @@ fn canonical_repo_path(repo_path: &str) -> Result<PathBuf, String> {
   Ok(path.canonicalize().unwrap_or(path))
 }
 
-fn run_git_allow_failure(repo: &Path, args: &[String]) -> Result<GitCommandResult, String> {
+fn build_git_command(repo: &Path, args: &[String]) -> Command {
   let mut cmd = Command::new("git");
   cmd.args(args).current_dir(repo);
 
@@ -129,7 +129,28 @@ fn run_git_allow_failure(repo: &Path, args: &[String]) -> Result<GitCommandResul
     }
   }
 
-  let output = cmd
+  cmd
+}
+
+/// Runs git and returns stdout as raw bytes.
+///
+/// Callers that hand blob contents to the editor must use this rather than
+/// `run_git_allow_failure`: the latter decodes with `from_utf8_lossy`, which
+/// silently replaces invalid bytes and would corrupt the file on write-back.
+fn run_git_bytes(repo: &Path, args: &[String]) -> Result<(Vec<u8>, String, i32), String> {
+  let output = build_git_command(repo, args)
+    .output()
+    .map_err(|e| format!("Failed to spawn git: {e}"))?;
+
+  Ok((
+    output.stdout,
+    String::from_utf8_lossy(&output.stderr).to_string(),
+    output.status.code().unwrap_or(-1),
+  ))
+}
+
+fn run_git_allow_failure(repo: &Path, args: &[String]) -> Result<GitCommandResult, String> {
+  let output = build_git_command(repo, args)
     .output()
     .map_err(|e| format!("Failed to spawn git: {e}"))?;
 
@@ -1336,6 +1357,221 @@ pub fn git_show_file_diff(
   args.push(path);
   let result = run_git(&repo, &args)?;
   Ok(result.stdout)
+}
+
+/// Upper bound on what the diff editor will load. Beyond this the UI falls back
+/// to the read-only patch renderer instead of trying to host a live editor.
+const MAX_EDITABLE_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceFile {
+  /// `None` whenever the content is not editable text: missing, binary, or
+  /// past the size limit. The discriminating flags below say which.
+  pub text: Option<String>,
+  pub exists: bool,
+  pub is_binary: bool,
+  pub too_large: bool,
+}
+
+fn decode_workspace_text(bytes: Vec<u8>, exists: bool) -> WorkspaceFile {
+  if bytes.contains(&0) {
+    return WorkspaceFile {
+      text: None,
+      exists,
+      is_binary: true,
+      too_large: false,
+    };
+  }
+
+  match String::from_utf8(bytes) {
+    Ok(text) => WorkspaceFile {
+      text: Some(text),
+      exists,
+      is_binary: false,
+      too_large: false,
+    },
+    Err(_) => WorkspaceFile {
+      text: None,
+      exists,
+      is_binary: true,
+      too_large: false,
+    },
+  }
+}
+
+/// Resolves a repo-relative path to an absolute one, refusing anything that
+/// escapes the repository.
+///
+/// `canonical_repo_path` only canonicalizes the root, which is enough for
+/// read-only git subcommands but not for a raw `fs::write`. We reject `..`
+/// and absolute inputs up front, then canonicalize the nearest *existing*
+/// ancestor so a symlinked directory cannot redirect the write outside the
+/// repo even when the file itself does not exist yet.
+fn resolve_workspace_path(repo: &Path, relative: &str) -> Result<PathBuf, String> {
+  let relative_path = Path::new(relative);
+  if relative_path.is_absolute() {
+    return Err(format!("Path must be relative to the repository: {relative}"));
+  }
+
+  for component in relative_path.components() {
+    match component {
+      std::path::Component::Normal(_) | std::path::Component::CurDir => {}
+      _ => return Err(format!("Unsupported path component in: {relative}")),
+    }
+  }
+
+  let joined = repo.join(relative_path);
+
+  let mut existing = joined.as_path();
+  while !existing.exists() {
+    existing = existing
+      .parent()
+      .ok_or_else(|| format!("Path does not resolve inside the repository: {relative}"))?;
+  }
+
+  let resolved = existing
+    .canonicalize()
+    .map_err(|e| format!("Failed to resolve {relative}: {e}"))?;
+
+  if !resolved.starts_with(repo) {
+    return Err(format!("Path escapes the repository: {relative}"));
+  }
+
+  Ok(joined)
+}
+
+#[tauri::command]
+pub fn git_read_workspace_file(repo_path: String, path: String) -> Result<WorkspaceFile, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let target = resolve_workspace_path(&repo, &path)?;
+
+  let metadata = match std::fs::metadata(&target) {
+    Ok(metadata) => metadata,
+    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+      return Ok(WorkspaceFile {
+        text: None,
+        exists: false,
+        is_binary: false,
+        too_large: false,
+      });
+    }
+    Err(e) => return Err(format!("Failed to stat {path}: {e}")),
+  };
+
+  if !metadata.is_file() {
+    return Err(format!("Not a regular file: {path}"));
+  }
+
+  if metadata.len() > MAX_EDITABLE_FILE_BYTES {
+    return Ok(WorkspaceFile {
+      text: None,
+      exists: true,
+      is_binary: false,
+      too_large: true,
+    });
+  }
+
+  let bytes = std::fs::read(&target).map_err(|e| format!("Failed to read {path}: {e}"))?;
+  Ok(decode_workspace_text(bytes, true))
+}
+
+#[tauri::command]
+pub fn git_write_workspace_file(
+  repo_path: String,
+  path: String,
+  content: String,
+) -> Result<(), String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let target = resolve_workspace_path(&repo, &path)?;
+
+  if content.len() as u64 > MAX_EDITABLE_FILE_BYTES {
+    return Err(format!(
+      "Refusing to write {path}: content exceeds the editable size limit"
+    ));
+  }
+
+  if target.exists() && !target.is_file() {
+    return Err(format!("Not a regular file: {path}"));
+  }
+
+  let parent = target
+    .parent()
+    .ok_or_else(|| format!("Cannot resolve a parent directory for {path}"))?;
+  if !parent.is_dir() {
+    return Err(format!("Parent directory does not exist for {path}"));
+  }
+
+  let file_name = target
+    .file_name()
+    .and_then(|name| name.to_str())
+    .ok_or_else(|| format!("Invalid file name: {path}"))?;
+
+  // Write beside the target and rename, so an interrupted write can never
+  // leave the user's file truncated.
+  let temp = parent.join(format!(
+    ".{file_name}.another-git-{}.tmp",
+    std::process::id()
+  ));
+
+  if let Err(e) = std::fs::write(&temp, content.as_bytes()) {
+    let _ = std::fs::remove_file(&temp);
+    return Err(format!("Failed to write {path}: {e}"));
+  }
+
+  #[cfg(unix)]
+  {
+    use std::os::unix::fs::PermissionsExt;
+    if let Ok(metadata) = std::fs::metadata(&target) {
+      let mode = metadata.permissions().mode();
+      let _ = std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(mode));
+    }
+  }
+
+  if let Err(e) = std::fs::rename(&temp, &target) {
+    let _ = std::fs::remove_file(&temp);
+    return Err(format!("Failed to replace {path}: {e}"));
+  }
+
+  Ok(())
+}
+
+/// Reads a blob at `<rev>:<path>`.
+///
+/// `rev` may be empty (`:path` — the index), a merge stage (`:2`), or any
+/// committish. A missing object is not an error: a file added in the selected
+/// commit, or any path under a root commit, legitimately has no left-hand
+/// side, and the caller renders that as an empty pane.
+#[tauri::command]
+pub fn git_show_blob(
+  repo_path: String,
+  rev: String,
+  path: String,
+) -> Result<WorkspaceFile, String> {
+  let repo = canonical_repo_path(&repo_path)?;
+  let spec = format!("{rev}:{path}");
+  let args = vec!["cat-file".to_string(), "blob".to_string(), spec];
+  let (stdout, _stderr, exit_code) = run_git_bytes(&repo, &args)?;
+
+  if exit_code != 0 {
+    return Ok(WorkspaceFile {
+      text: Some(String::new()),
+      exists: false,
+      is_binary: false,
+      too_large: false,
+    });
+  }
+
+  if stdout.len() as u64 > MAX_EDITABLE_FILE_BYTES {
+    return Ok(WorkspaceFile {
+      text: None,
+      exists: true,
+      is_binary: false,
+      too_large: true,
+    });
+  }
+
+  Ok(decode_workspace_text(stdout, true))
 }
 
 

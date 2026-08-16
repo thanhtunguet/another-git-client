@@ -38,6 +38,7 @@ import {
   type KeybindingMap
 } from '../services/keybindings';
 import {
+  isEditableTarget,
   isKeybindingCaptureActive,
   useKeybinding,
   useKeybindingRoot
@@ -401,6 +402,8 @@ interface GitClientContextType {
   submodules: SubmoduleEntry[];
   refreshWorktrees: (targetPath?: string) => Promise<void>;
   refreshSubmodules: (targetPath?: string) => Promise<void>;
+  /** Re-reads the working-tree status immediately, without waiting for the poller. */
+  refreshStatus: () => Promise<void>;
   addWorktree: (path: string, options?: { reference?: string; newBranch?: string; detach?: boolean }) => Promise<void>;
   removeWorktree: (path: string, force?: boolean) => Promise<void>;
   lockWorktree: (path: string, reason?: string) => Promise<void>;
@@ -1862,6 +1865,9 @@ export const GitClientProvider: React.FC<{
     const handleKey = (e: KeyboardEvent) => {
       // While a chord is being recorded, Escape belongs to the recorder.
       if (e.key !== 'Escape' || isKeybindingCaptureActive()) return;
+      // Inside an editor Escape is the editor's (dismiss find/suggest widgets);
+      // stealing it would also reset the commit selection behind the user.
+      if (isEditableTarget(e.target)) return;
       const hadOverlayOpen = paletteOpen || menu !== null || dialog !== null;
       setPaletteOpen(false);
       setMenu(null);
@@ -2327,6 +2333,15 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
 
+
+  const refreshStatus = useCallback(async () => {
+    if (!repoPath) return;
+    try {
+      applyChangedFiles(await tauriGitBackend.getChangedFiles(repoPath));
+    } catch {
+      // The 2s poller will pick the change up on its next tick.
+    }
+  }, [repoPath, applyChangedFiles]);
 
   const refreshWorktrees = useCallback(
     async (pathValue?: string) => {
@@ -2951,6 +2966,7 @@ export const GitClientProvider: React.FC<{
         submodules,
         refreshWorktrees,
         refreshSubmodules,
+        refreshStatus,
         addWorktree,
         removeWorktree,
         lockWorktree,

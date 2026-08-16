@@ -105,6 +105,17 @@ export interface GitCompareResult {
   changedFiles: ChangedFile[];
 }
 
+export interface WorkspaceFile {
+  /**
+   * `null` whenever the content is not editable text. Check the flags below to
+   * tell missing from binary from oversized.
+   */
+  text: string | null;
+  exists: boolean;
+  isBinary: boolean;
+  tooLarge: boolean;
+}
+
 export interface CommitFileChange {
   path: string;
   status: string;
@@ -304,6 +315,22 @@ export const tauriGitBackend = {
 
   showFileDiff(repoPath: string, path: string, staged = false, untracked = false) {
     return invoke<string>("git_show_file_diff", { repoPath, path, staged, untracked });
+  },
+
+  readWorkspaceFile(repoPath: string, path: string) {
+    return invoke<WorkspaceFile>("git_read_workspace_file", { repoPath, path });
+  },
+
+  writeWorkspaceFile(repoPath: string, path: string, content: string) {
+    return invoke<void>("git_write_workspace_file", { repoPath, path, content });
+  },
+
+  /**
+   * Reads the blob at `<rev>:<path>`. Pass an empty `rev` for the index, or a
+   * merge stage such as ":2" (ours) / ":3" (theirs).
+   */
+  showBlob(repoPath: string, rev: string, path: string) {
+    return invoke<WorkspaceFile>("git_show_blob", { repoPath, rev, path });
   },
 
   addWorktree(

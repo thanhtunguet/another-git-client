@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from './Button';
 import { SegmentedControl } from './SegmentedControl';
 import { useGitClient } from '../../context/GitClientContext';
+import { isEditableTarget } from '../../hooks/useKeybindings';
+import { MonacoDiffPane, monacoDiffPaneAvailable } from './MonacoDiffPane';
 
 export interface DiffLine {
   text: string;
@@ -154,6 +156,22 @@ export interface DiffViewerProps {
   onClose?: () => void;
   isStaged?: boolean;
   isUnstaged?: boolean;
+  /**
+   * Full text of the left-hand side. When both this and `modifiedText` are
+   * supplied, the "2 Sides" view renders through Monaco instead of the
+   * hunk-based renderer, showing the whole file rather than just the hunks.
+   */
+  originalText?: string | null;
+  /** Full text of the right-hand ("current state") side. */
+  modifiedText?: string | null;
+  /**
+   * Allows typing in the right-hand pane. Only meaningful when that side is a
+   * real file on disk — never for index or historical content.
+   */
+  editable?: boolean;
+  /** Set when the content is binary or too large to load as text. */
+  contentUnavailable?: boolean;
+  onSaveFile?: (filePath: string, content: string) => Promise<void> | void;
 }
 
 export const DiffViewer: React.FC<DiffViewerProps> = ({
@@ -166,9 +184,16 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   onCopyPatch,
   onClose,
   isStaged,
-  isUnstaged
+  isUnstaged,
+  originalText,
+  modifiedText,
+  editable = false,
+  contentUnavailable = false,
+  onSaveFile
 }) => {
-  const { preferences, updatePreference, toastRun } = useGitClient();
+  const { preferences, updatePreference, toastRun, theme } = useGitClient();
+  const [dirty, setDirty] = useState(false);
+  const [monacoFailed, setMonacoFailed] = useState(false);
 
   const showGutterMarkers = preferences.gutterMarkers !== false;
   // Default to 'split' (2 sides) unless explicitly set to 'inline'
@@ -184,6 +209,19 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     fontSize: '11.8px',
     lineHeight: '18px'
   };
+
+  /**
+   * Monaco needs whole-file text on both sides. Where the caller could not
+   * supply it — binary or oversized content, or a Monaco that failed to
+   * start — we keep rendering the hunk-based patch view.
+   */
+  const useMonacoSplit =
+    diffMode === 'split' &&
+    monacoDiffPaneAvailable &&
+    !monacoFailed &&
+    !contentUnavailable &&
+    typeof originalText === 'string' &&
+    typeof modifiedText === 'string';
 
   const handleCopyPatch = () => {
     if (onCopyPatch) {
@@ -222,6 +260,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
   useEffect(() => {
     const handleWindowKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'a') return;
+      // Never hijack select-all from a real editing surface (Monaco's input is
+      // a textarea, the commit box, filter inputs, …).
+      if (isEditableTarget(event.target)) return;
 
       const activeSide = activeSplitSideRef.current;
       const content = splitContentRef.current;
@@ -278,6 +319,34 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
       >
         {filePath || 'Repository diff'}
       </span>
+
+      {useMonacoSplit && editable && (
+        <span
+          title={
+            dirty
+              ? 'Unsaved edits — saved automatically'
+              : 'Editing the working tree file; changes save automatically'
+          }
+          style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            fontSize: '11px',
+            color: dirty ? 'var(--warn)' : 'var(--fg3)'
+          }}
+        >
+          <span
+            style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: dirty ? 'var(--warn)' : 'var(--add)'
+            }}
+          />
+          {dirty ? 'Saving…' : 'Editable'}
+        </span>
+      )}
 
       <SegmentedControl
         options={[
@@ -341,6 +410,29 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
     );
   }
 
+  // Monaco renders whole files, so an unmodified working-tree file is still
+  // worth opening — the empty state below would otherwise hide an editable file.
+  if (useMonacoSplit) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {renderHeaderBar()}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', background: 'var(--color-bg)' }}>
+          <MonacoDiffPane
+            filePath={filePath || ''}
+            originalText={originalText as string}
+            modifiedText={modifiedText as string}
+            editable={Boolean(editable && onSaveFile)}
+            theme={theme === 'light' ? 'light' : 'dark'}
+            showGutterMarkers={showGutterMarkers}
+            onSave={onSaveFile}
+            onDirtyChange={setDirty}
+            onInitError={() => setMonacoFailed(true)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (!parsedLines.length) {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
@@ -354,7 +446,9 @@ export const DiffViewer: React.FC<DiffViewerProps> = ({
             fontFamily: 'var(--font-mono)'
           }}
         >
-          {emptyMessage}
+          {contentUnavailable && editable
+            ? 'This file cannot be edited here — it is binary or too large.'
+            : emptyMessage}
         </div>
       </div>
     );

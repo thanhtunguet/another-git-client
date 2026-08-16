@@ -7,6 +7,7 @@ import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
 import { FileTree } from '../common/FileTree';
+import { useDiffContent, DiffContentSource } from '../../hooks/useDiffContent';
 
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
@@ -90,6 +91,15 @@ export const CommitDetailsView: React.FC = () => {
     return () => { active = false; };
   }, [detailIdx, currentFilePath, getCommitFullSha, repoPath]);
 
+  const diffContentSource: DiffContentSource | null = useMemo(() => {
+    const sha = getCommitFullSha(detailIdx);
+    if (!sha || !currentFilePath) return null;
+    return { kind: 'commit', path: currentFilePath, sha };
+  }, [detailIdx, currentFilePath, getCommitFullSha]);
+
+  const { originalText, modifiedText, contentUnavailable, loading: contentLoading } =
+    useDiffContent(repoPath, diffContentSource);
+
   const detailKicker = isMulti ? `Merged range — ${sel.length} commits, net changes` : 'Commit';
   const detailSubject = isMulti
     ? `${commits[sel[sel.length - 1]][0]}  …  ${commits[sel[0]][0]}`
@@ -143,7 +153,7 @@ export const CommitDetailsView: React.FC = () => {
       <DiffViewer
         filePath={currentFilePath}
         rawDiffText={rawDiffText}
-        loading={loadingDiff}
+        loading={loadingDiff || contentLoading}
         emptyMessage={
           currentFilePath
             ? `No diff details for ${currentFilePath}`
@@ -154,6 +164,10 @@ export const CommitDetailsView: React.FC = () => {
             if (p) void navigator.clipboard.writeText(p);
           });
         }}
+        originalText={originalText}
+        modifiedText={modifiedText}
+        contentUnavailable={contentUnavailable}
+        editable={false}
       />
     );
   };

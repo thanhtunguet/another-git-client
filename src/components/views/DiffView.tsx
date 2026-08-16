@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
 import { FileTree } from '../common/FileTree';
+import { useDiffContent, DiffContentSource } from '../../hooks/useDiffContent';
 import { DiffFile } from '../../types/git-client';
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
@@ -27,6 +28,7 @@ export const DiffView: React.FC = () => {
     fetchCommitFiles,
     stageFile,
     unstageFile,
+    refreshStatus,
     setView,
     setDock,
     toastRun,
@@ -153,6 +155,48 @@ export const DiffView: React.FC = () => {
       active = false;
     };
   }, [repoPath, targetPath, diffTab, activeSha, currentFileStatus]);
+
+  const diffContentSource: DiffContentSource | null = useMemo(() => {
+    if (!targetPath) return null;
+    if (diffTab === 'work') return { kind: 'worktree', path: targetPath, status: currentFileStatus };
+    if (diffTab === 'merge') return { kind: 'merge', path: targetPath };
+    if (diffTab === 'index') return { kind: 'index', path: targetPath };
+    if (activeSha) return { kind: 'commit', path: targetPath, sha: activeSha };
+    return null;
+  }, [diffTab, targetPath, currentFileStatus, activeSha]);
+
+  const { originalText, modifiedText, contentUnavailable, loading: contentLoading } =
+    useDiffContent(repoPath, diffContentSource);
+
+  /**
+   * Only the working tree and merge tabs show a file that actually exists on
+   * disk. A deleted file has no right-hand side to type into, and the index
+   * tab's right side is the staged blob rather than the file.
+   */
+  const canEditCurrentFile =
+    (diffTab === 'work' || diffTab === 'merge') && currentFileStatus !== 'D' && Boolean(targetPath);
+
+  const handleSaveFile = useCallback(
+    async (path: string, content: string) => {
+      if (!repoPath) return;
+      try {
+        await tauriGitBackend.writeWorkspaceFile(repoPath, path, content);
+        await refreshStatus();
+      } catch (error) {
+        log([
+          {
+            text: `Save failed for ${path}: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+        toastRun('Save failed', path);
+        // Rethrow so the editor keeps the buffer dirty and retries on blur,
+        // rather than reporting the edit as persisted.
+        throw error;
+      }
+    },
+    [repoPath, refreshStatus, log, toastRun]
+  );
 
   const handleCheckoutSide = async (side: 'ours' | 'theirs') => {
     if (!targetPath || !repoPath) return;
@@ -329,7 +373,7 @@ export const DiffView: React.FC = () => {
         <DiffViewer
           filePath={targetPath}
           rawDiffText={rawDiffText}
-          loading={loading || commitLoading}
+          loading={loading || commitLoading || contentLoading}
           emptyMessage={targetPath ? `No diff output found for ${targetPath}` : 'No file selected.'}
           onStageFile={() => void stageFile(targetPath)}
           onUnstageFile={() => void unstageFile(targetPath)}
@@ -339,6 +383,11 @@ export const DiffView: React.FC = () => {
           }}
           isStaged={targetPath ? diffTab === 'index' : false}
           isUnstaged={targetPath ? diffTab === 'work' : false}
+          originalText={originalText}
+          modifiedText={modifiedText}
+          contentUnavailable={contentUnavailable}
+          editable={canEditCurrentFile}
+          onSaveFile={canEditCurrentFile ? handleSaveFile : undefined}
         />
       </div>
     );
