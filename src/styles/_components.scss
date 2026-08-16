@@ -86,6 +86,16 @@ img {
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
 
+.gc-kbd {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg3);
+  border: 1px solid var(--line2);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
 :focus {
   outline: none;
 }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
+import { useKeybinding } from '../../hooks/useKeybindings';
 import { ResizeHandle } from '../common/ResizeHandle';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 import { IntegratedTerminal } from './IntegratedTerminal';
@@ -51,14 +52,18 @@ function loadBottomPanelState(): BottomPanelState {
 }
 
 export const ConsoleDrawer: React.FC = () => {
-  const { consoleOpen, consoleLines, clearConsole, toggleConsole, repoPath, confirm } = useGitClient();
+  const { consoleOpen, setConsoleOpen, consoleLines, clearConsole, toggleConsole, repoPath, confirm } =
+    useGitClient();
   const [panelState, setPanelState] = useState<BottomPanelState>(loadBottomPanelState);
+  const [focusSignal, setFocusSignal] = useState(0);
   const [terminalActivated, setTerminalActivated] = useState(
     () => loadBottomPanelState().activeTab === 'terminal'
   );
-  const [terminalSessionIds, setTerminalSessionIds] = useState<string[]>(() => [
-    createTerminalSessionId()
-  ]);
+  // Created lazily: an id minted before the Terminal tab is ever shown would become a stray second
+  // pane the first time "new terminal" appends to the list.
+  const [terminalSessionIds, setTerminalSessionIds] = useState<string[]>(() =>
+    loadBottomPanelState().activeTab === 'terminal' ? [createTerminalSessionId()] : []
+  );
   const [draggedTab, setDraggedTab] = useState<BottomPanelTab | null>(null);
   const { activeTab, tabOrder } = panelState;
 
@@ -79,12 +84,8 @@ export const ConsoleDrawer: React.FC = () => {
     }
   }, [activeTab, consoleOpen, terminalActivated]);
 
-  useEffect(() => {
-    if (!consoleOpen && terminalActivated) {
-      setTerminalActivated(false);
-      setTerminalSessionIds([]);
-    }
-  }, [consoleOpen, terminalActivated]);
+  // Terminals deliberately survive hiding the panel: Ctrl+` is a toggle, and tearing the panes down
+  // would unmount IntegratedTerminal and stop the PTY, killing whatever is running in it.
 
   const consolePanel = useResizablePanel({
     storageKey: 'ag_panel_console_height',
@@ -118,6 +119,26 @@ export const ConsoleDrawer: React.FC = () => {
     }
   };
 
+  // Ctrl+` — VS Code parity: close when the Terminal tab is already showing, otherwise reveal it.
+  useKeybinding('terminal.toggle', () => {
+    if (consoleOpen && activeTab === 'terminal') {
+      setConsoleOpen(false);
+      return;
+    }
+    setPanelState(previous => ({ ...previous, activeTab: 'terminal' }));
+    activateTerminal();
+    setConsoleOpen(true);
+    setFocusSignal(previous => previous + 1);
+  });
+
+  // Ctrl+Shift+` — always adds a pane, matching the header's Split action.
+  useKeybinding('terminal.new', () => {
+    setPanelState(previous => ({ ...previous, activeTab: 'terminal' }));
+    setTerminalActivated(true);
+    setTerminalSessionIds(previous => [...previous, createTerminalSessionId()]);
+    setConsoleOpen(true);
+  });
+
   const killTerminal = () => {
     const targetSessionId = terminalSessionIds[terminalSessionIds.length - 1];
     if (!targetSessionId) return;
@@ -135,8 +156,6 @@ export const ConsoleDrawer: React.FC = () => {
       }
     );
   };
-
-  if (!consoleOpen) return null;
 
   const lastLine = consoleLines[consoleLines.length - 1];
   const lastStatus = lastLine
@@ -164,20 +183,22 @@ export const ConsoleDrawer: React.FC = () => {
 
   return (
     <>
-      <ResizeHandle
-        direction="vertical"
-        isDragging={consolePanel.isDragging}
-        onMouseDown={consolePanel.handleMouseDown}
-        onDoubleClick={consolePanel.resetSize}
-        title="Drag to resize console drawer (Double-click to reset)"
-      />
+      {consoleOpen && (
+        <ResizeHandle
+          direction="vertical"
+          isDragging={consolePanel.isDragging}
+          onMouseDown={consolePanel.handleMouseDown}
+          onDoubleClick={consolePanel.resetSize}
+          title="Drag to resize console drawer (Double-click to reset)"
+        />
+      )}
       <div
         style={{
           flex: '0 0 auto',
           height: `${consolePanel.size}px`,
           borderTop: '1px solid var(--line)',
           background: 'var(--panel)',
-          display: 'flex',
+          display: consoleOpen ? 'flex' : 'none',
           flexDirection: 'column'
         }}
       >
@@ -358,6 +379,7 @@ export const ConsoleDrawer: React.FC = () => {
                 <IntegratedTerminal
                   repoPath={repoPath}
                   sessionId={sessionId}
+                  focusSignal={index === terminalSessionIds.length - 1 ? focusSignal : 0}
                   onClear={() => clearTerminal(sessionId)}
                   onSplit={splitTerminal}
                   onExit={() => removeTerminal(sessionId)}

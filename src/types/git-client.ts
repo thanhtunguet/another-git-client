@@ -123,6 +123,8 @@ export interface SettingsSection {
   id: string;
   title: string;
   rows: SettingRow[];
+  /** Renders a purpose-built panel instead of `rows`. */
+  component?: 'keybindings';
 }
 
 export type LogLineType = 'cmd' | 'out' | 'ok' | 'err' | 'warn';

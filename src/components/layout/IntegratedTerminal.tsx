@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useGitClient } from '../../context/GitClientContext';
+import { isAppKeybindingEvent } from '../../hooks/useKeybindings';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 
 interface TerminalOutput {
@@ -14,6 +15,8 @@ interface TerminalOutput {
 interface IntegratedTerminalProps {
   repoPath: string;
   sessionId: string;
+  /** Any change to this counter (other than the initial 0) pulls focus into this pane. */
+  focusSignal?: number;
   onClear: () => void;
   onSplit: () => void;
   onExit: () => void;
@@ -23,6 +26,7 @@ interface IntegratedTerminalProps {
 export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
   repoPath,
   sessionId,
+  focusSignal = 0,
   onClear,
   onSplit,
   onExit,
@@ -30,6 +34,7 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const onExitRef = useRef(onExit);
+  const terminalRef = useRef<Terminal | null>(null);
   const lifecycleVersionRef = useRef(0);
   const { openMenu } = useGitClient();
 
@@ -59,9 +64,16 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
         selectionBackground: '#69b7ff44'
       }
     });
+    // Let app chords (Ctrl+Shift+`, ⌘K, …) reach the window handler instead of the PTY.
+    terminal.attachCustomKeyEventHandler(event => {
+      if (event.type !== 'keydown') return true;
+      return !isAppKeybindingEvent(event);
+    });
+
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(host);
+    terminalRef.current = terminal;
 
     const resize = () => {
       try {
@@ -127,9 +139,17 @@ export const IntegratedTerminal: React.FC<IntegratedTerminalProps> = ({
       void Promise.resolve().then(() => {
         if (ownsLifecycle()) return tauriGitBackend.stopTerminal(sessionId).catch(() => {});
       });
+      if (terminalRef.current === terminal) terminalRef.current = null;
       terminal.dispose();
     };
   }, [repoPath, sessionId]);
+
+  useEffect(() => {
+    if (!focusSignal) return;
+    // The panel may still be laying out when the shortcut fires.
+    const frame = requestAnimationFrame(() => terminalRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [focusSignal]);
 
   if (!repoPath) {
     return (

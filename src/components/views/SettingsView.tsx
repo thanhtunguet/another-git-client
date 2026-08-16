@@ -2,11 +2,13 @@ import React from 'react';
 import { Input, Select, Checkbox, Textarea } from '../common/FormControls';
 import { SettingsSection, SettingControlType } from '../../types/git-client';
 import { useGitClient } from '../../context/GitClientContext';
+import { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
 
 export const SettingsView: React.FC = () => {
   const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout, aiConfig, updateAIConfig } = useGitClient();
 
   const settingsNav = [
+    { id: 'keys', href: '#keys', label: 'Keyboard shortcuts' },
     { id: 'graph', href: '#graph', label: 'Graph & history' },
     { id: 'perf', href: '#perf', label: 'Performance' },
     { id: 'compare', href: '#compare', label: 'Compare & export' },
@@ -127,6 +129,12 @@ export const SettingsView: React.FC = () => {
   };
 
   const sections: SettingsSection[] = [
+    {
+      id: 'keys',
+      title: 'Keyboard shortcuts',
+      component: 'keybindings',
+      rows: []
+    },
     {
       id: 'graph',
       title: 'Graph & history',
@@ -305,6 +313,7 @@ export const SettingsView: React.FC = () => {
               >
                 {sec.title}
               </h6>
+              {sec.component === 'keybindings' && <KeyboardShortcutsSettings />}
               {sec.rows.map((r, i) => (
                 <div
                   key={i}

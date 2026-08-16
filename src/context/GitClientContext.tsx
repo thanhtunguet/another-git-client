@@ -31,6 +31,17 @@ import {
   type SubmoduleEntry
 } from '../services/tauriGitBackend';
 import { generateAICommitMessage } from '../services/aiCommitMessage';
+import {
+  formatBinding,
+  normalizeBinding,
+  resolveBindings,
+  type KeybindingMap
+} from '../services/keybindings';
+import {
+  isKeybindingCaptureActive,
+  useKeybinding,
+  useKeybindingRoot
+} from '../hooks/useKeybindings';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -469,6 +480,11 @@ interface GitClientContextType {
   openEditRemoteDialog: (name: string, currentUrl: string) => void;
   preferences: Record<string, any>;
   updatePreference: (key: string, value: any) => void;
+  keybindings: KeybindingMap;
+  canCommitNow: () => boolean;
+  setKeybinding: (commandId: string, binding: string) => void;
+  resetKeybinding: (commandId: string) => void;
+  resetAllKeybindings: () => void;
 }
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
@@ -603,6 +619,33 @@ export const GitClientProvider: React.FC<{
     saveAIConfig(config);
   }, []);
 
+  const keybindings = useMemo(
+    () => resolveBindings(preferences.keybindings as KeybindingMap | undefined),
+    [preferences.keybindings]
+  );
+
+  useKeybindingRoot(keybindings);
+
+  const setKeybinding = useCallback((commandId: string, binding: string) => {
+    setPreferences(prev => ({
+      ...prev,
+      keybindings: { ...(prev.keybindings || {}), [commandId]: normalizeBinding(binding) }
+    }));
+  }, []);
+
+  // Dropping the override restores the command's shipped default.
+  const resetKeybinding = useCallback((commandId: string) => {
+    setPreferences(prev => {
+      const overrides = { ...(prev.keybindings || {}) };
+      delete overrides[commandId];
+      return { ...prev, keybindings: overrides };
+    });
+  }, []);
+
+  const resetAllKeybindings = useCallback(() => {
+    setPreferences(prev => ({ ...prev, keybindings: {} }));
+  }, []);
+
   const graphPageSizePref = useMemo(() => {
     const raw = parseInt(String(preferences.graphPageSize ?? '100'), 10);
     return Number.isFinite(raw) && raw > 0 ? raw : 100;
@@ -668,7 +711,10 @@ export const GitClientProvider: React.FC<{
         filterOpen,
         scTab,
         diffTab,
-        preferences
+        preferences,
+        // saveAppStore replaces the whole record, so omitting this drops the key that
+        // saveAIConfig persisted. Rebinding shortcuts writes preferences constantly.
+        ai: aiConfig
       },
       repositories: {
         selectedRepoPath,
@@ -689,6 +735,7 @@ export const GitClientProvider: React.FC<{
     scTab,
     diffTab,
     preferences,
+    aiConfig,
     selectedRepoPath,
     repoPath,
     repoName,
@@ -1810,36 +1857,22 @@ export const GitClientProvider: React.FC<{
     [commits, cf]
   );
 
-  // Keyboard navigation hotkeys
+  // Escape stays hardcoded: dismissing overlays is not a rebindable command.
   useEffect(() => {
-    const isEditableTarget = (target: EventTarget | null) => {
-      const el = target as HTMLElement | null;
-      if (!el) return false;
-      const tag = el.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
-    };
     const handleKey = (e: KeyboardEvent) => {
-      const k = (e.key || '').toLowerCase();
-      if ((e.metaKey || e.ctrlKey) && k === 'k') {
-        e.preventDefault();
-        setPaletteOpen(true);
-        setPaletteQ('');
-      } else if (e.key === 'Escape') {
-        const hadOverlayOpen = paletteOpen || menu !== null || dialog !== null;
-        setPaletteOpen(false);
-        setMenu(null);
-        setDialog(null);
-        if (!hadOverlayOpen) {
-          setSel([0]);
-        }
-      } else if ((e.metaKey || e.ctrlKey) && k === 'a' && view === 'compare' && !isEditableTarget(e.target)) {
-        e.preventDefault();
-        setSel(commits.map((_, i) => i));
+      // While a chord is being recorded, Escape belongs to the recorder.
+      if (e.key !== 'Escape' || isKeybindingCaptureActive()) return;
+      const hadOverlayOpen = paletteOpen || menu !== null || dialog !== null;
+      setPaletteOpen(false);
+      setMenu(null);
+      setDialog(null);
+      if (!hadOverlayOpen) {
+        setSel([0]);
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [view, commits, paletteOpen, menu, dialog]);
+  }, [paletteOpen, menu, dialog]);
 
   const fetchCommitFiles = useCallback(
     async (sha: string): Promise<DiffFile[]> => {
@@ -2675,27 +2708,94 @@ export const GitClientProvider: React.FC<{
     );
   }, [prompt, addWorktree]);
 
+  /**
+   * Mirrors the Commit button's disabled state, and additionally refuses while an overlay is up —
+   * ⌘↵ typed into the palette, a dialog field, or a settings input must never commit.
+   */
+  const canCommitNow = useCallback(
+    () =>
+      !!repoPath &&
+      !paletteOpen &&
+      dialog === null &&
+      menu === null &&
+      !actionBusy &&
+      !!commitMsg.trim() &&
+      stagedFiles.length > 0,
+    [repoPath, paletteOpen, dialog, menu, actionBusy, commitMsg, stagedFiles]
+  );
+
+  // Global command bindings. Registered after every action callback above is defined.
+  // Terminal commands live in ConsoleDrawer, which owns the panel's tab and session state.
+  useKeybinding('palette.open', () => {
+    setPaletteOpen(true);
+    setPaletteQ('');
+  });
+  // Views and git actions are meaningless without a repository; declining leaves defaults intact.
+  const navTo = useCallback(
+    (target: GitClientView) => () => {
+      if (!repoPath) return false;
+      setView(target);
+    },
+    [repoPath]
+  );
+  const gitAction = useCallback(
+    (action: () => void) => () => {
+      if (!repoPath) return false;
+      action();
+    },
+    [repoPath]
+  );
+
+  useKeybinding('settings.open', navTo('settings'));
+  useKeybinding('panel.toggleOutput', () => setConsoleOpen(prev => !prev));
+  useKeybinding('view.branches', navTo('branches'));
+  useKeybinding('view.graph', navTo('graph'));
+  useKeybinding('view.compare', navTo('compare'));
+  useKeybinding('view.worktrees', navTo('worktrees'));
+  useKeybinding('view.submodules', navTo('submodules'));
+  useKeybinding('branch.checkout', gitAction(paletteCheckoutBranch));
+  useKeybinding('git.fetch', gitAction(doFetch));
+  useKeybinding('git.pull', gitAction(doPull));
+  useKeybinding('git.push', gitAction(doPush));
+  // Fallback for when the Source Control dock is hidden. The dock registers the same command later,
+  // so its amend-aware handler wins whenever it is mounted.
+  useKeybinding('commit.staged', () => {
+    if (!canCommitNow()) return false;
+    void commitChanges();
+  });
+  useKeybinding('repo.open', () => openRepository());
+  useKeybinding('compare.selectAll', () => {
+    // Decline outside Compare so the browser's own select-all still works everywhere else.
+    if (view !== 'compare') return false;
+    setSel(commits.map((_, i) => i));
+  });
+
+  const bindingHint = useCallback(
+    (commandId: string) => formatBinding(keybindings[commandId] || '') || undefined,
+    [keybindings]
+  );
+
   const paletteAll = useCallback((): PaletteItem[] => {
     const nav = (v: GitClientView) => () => {
       setView(v);
       setPaletteOpen(false);
     };
     return [
-      { group: 'Go to', label: 'Git Graph', hint: '⌘2', run: nav('graph') },
-      { group: 'Go to', label: 'Branches', hint: '⌘1', run: nav('branches') },
-      { group: 'Go to', label: 'Compare Branches', hint: '⌘4', run: nav('compare') },
-      { group: 'Go to', label: 'Worktrees', hint: '⌘6', run: nav('worktrees') },
-      { group: 'Go to', label: 'Submodules', hint: '⌘7', run: nav('submodules') },
-      { group: 'Go to', label: 'Settings', hint: '⌘,', run: nav('settings') },
-      { group: 'Branch', label: 'Checkout branch…', hint: '⌘B', run: paletteCheckoutBranch },
+      { group: 'Go to', label: 'Git Graph', hint: bindingHint('view.graph'), run: nav('graph') },
+      { group: 'Go to', label: 'Branches', hint: bindingHint('view.branches'), run: nav('branches') },
+      { group: 'Go to', label: 'Compare Branches', hint: bindingHint('view.compare'), run: nav('compare') },
+      { group: 'Go to', label: 'Worktrees', hint: bindingHint('view.worktrees'), run: nav('worktrees') },
+      { group: 'Go to', label: 'Submodules', hint: bindingHint('view.submodules'), run: nav('submodules') },
+      { group: 'Go to', label: 'Settings', hint: bindingHint('settings.open'), run: nav('settings') },
+      { group: 'Branch', label: 'Checkout branch…', hint: bindingHint('branch.checkout'), run: paletteCheckoutBranch },
       { group: 'Branch', label: 'Create branch from HEAD…', run: () => createBranch() },
       { group: 'Branch', label: 'Rebase current onto…', run: paletteRebase },
       { group: 'Branch', label: 'Delete branch…', run: paletteDeleteBranch },
-      { group: 'Remote', label: 'Fetch all with prune', hint: '⌘⇧F', run: () => doFetch() },
-      { group: 'Remote', label: 'Pull', run: () => doPull() },
-      { group: 'Remote', label: 'Push', run: () => doPush() },
+      { group: 'Remote', label: 'Fetch all with prune', hint: bindingHint('git.fetch'), run: () => doFetch() },
+      { group: 'Remote', label: 'Pull', hint: bindingHint('git.pull'), run: () => doPull() },
+      { group: 'Remote', label: 'Push', hint: bindingHint('git.push'), run: () => doPush() },
       { group: 'Remote', label: 'Add remote…', run: () => openAddRemoteDialog() },
-      { group: 'Commit', label: 'Commit staged changes', hint: '⌘↵', run: () => { setPaletteOpen(false); void commitChanges(); } },
+      { group: 'Commit', label: 'Commit staged changes', hint: bindingHint('commit.staged'), run: () => { setPaletteOpen(false); void commitChanges(); } },
       { group: 'Commit', label: 'Amend last commit', run: () => { setPaletteOpen(false); void commitChanges(undefined, true); } },
       { group: 'Commit', label: 'Generate commit message from staged changes', run: () => aiMessage() },
       { group: 'Stash', label: 'Stash all changes…', run: paletteStashPush },
@@ -2712,7 +2812,7 @@ export const GitClientProvider: React.FC<{
           setPaletteOpen(false);
         }
       },
-      { group: 'Repo', label: 'Open repository…', hint: '⌘O', run: () => openRepository() },
+      { group: 'Repo', label: 'Open repository…', hint: bindingHint('repo.open'), run: () => openRepository() },
       { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
       ...(repoPath
         ? [{ group: 'Repo', label: 'Close repository', run: () => { setPaletteOpen(false); closeRepository(); } }]
@@ -2721,6 +2821,7 @@ export const GitClientProvider: React.FC<{
       {
         group: 'View',
         label: 'Toggle output console',
+        hint: bindingHint('panel.toggleOutput'),
         run: () => {
           setConsoleOpen(prev => !prev);
           setPaletteOpen(false);
@@ -2728,6 +2829,7 @@ export const GitClientProvider: React.FC<{
       }
     ];
   }, [
+    bindingHint,
     paletteCheckoutBranch,
     paletteRebase,
     paletteDeleteBranch,
@@ -2927,7 +3029,12 @@ export const GitClientProvider: React.FC<{
         openAddRemoteDialog,
         openEditRemoteDialog,
         preferences,
-        updatePreference
+        updatePreference,
+        keybindings,
+        canCommitNow,
+        setKeybinding,
+        resetKeybinding,
+        resetAllKeybindings
       }}
     >
       {children}

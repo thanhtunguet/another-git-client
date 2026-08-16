@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGitClient } from '../../context/GitClientContext';
+import { useKeybinding } from '../../hooks/useKeybindings';
 import { Button } from '../common/Button';
 import { Textarea, Checkbox } from '../common/FormControls';
 import { Card } from '../common/Card';
@@ -39,10 +40,22 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     confirm,
     prompt,
     preferences,
-    currentBranch
+    currentBranch,
+    canCommitNow
   } = useGitClient();
 
   const [amend, setAmend] = useState(false);
+
+  // Mounted after the provider, so this amend-aware handler takes precedence over its fallback.
+  // Disabled with the dock, otherwise a hidden (and therefore unverifiable) Amend tick would apply.
+  useKeybinding(
+    'commit.staged',
+    () => {
+      if (!canCommitNow()) return false;
+      void commitChanges(commitMsg, amend);
+    },
+    dock
+  );
 
   const openFileDiff = (file: DiffFile, isStaged: boolean) => {
     setDiffTab(file.status === 'U' ? 'merge' : isStaged ? 'index' : 'work');
