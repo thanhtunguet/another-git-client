@@ -1,12 +1,18 @@
 # Changelog
 
+## 2026-08-17
+
+- Replaced the Ubuntu-only GitHub Actions build with tag/manual semantic-version release builds for Ubuntu 22.04 amd64, Windows amd64, macOS Intel, and macOS Apple silicon. See `docs/changelogs/2026-08-17_cross_platform_release_builds.md`.
+
 ## 2026-08-16
+
 - Made the Branches view recent-commits list interactive with Git Graph-equivalent commit actions,
   keyboard support, and focused commit-to-parent diffs that hide Source Control. See
   `docs/changelogs/2026-08-16_keyboard_shortcuts.md`.
 - Added VS Code-style terminal shortcuts (`Ctrl+Shift+\`` new terminal, `` Ctrl+` `` toggle terminal, literal Ctrl on every platform) and a rebindable keybinding registry that also implements the ten Command Palette shortcuts that were previously advertised but never bound. Terminals now survive hiding the bottom panel instead of having their PTY stopped. Added a Settings → Keyboard shortcuts tab with search, chord recording, conflict detection, and reset. See `docs/changelogs/2026-08-16_keyboard_shortcuts.md`.
 
 ## 2026-08-15
+
 - Fixed integrated terminal font rendering and letter spacing (`letterSpacing: 0`), and added `Split` and `Kill` (with confirmation modal) icon buttons to the bottom panel header bar when the Terminal tab is open. See `docs/changelogs/2026-08-15_terminal_font_spacing.md`.
 - Added searchable multi-select Branch/Tag and Author pickers plus day-bounded From/To date pickers to Git Graph filtering. Branch/tag selections use OR matching, while filter categories combine with AND semantics. See `docs/changelogs/2026-08-15_git_graph_filter_multi_select.md`.
 - Added the Git Graph commit context menu actions backed by the existing Git commands, including patch creation copied to the clipboard; a normal commit click now opens only that commit's changed-file list and keeps a single active selection. Selecting a changed file opens an inline diff alongside a compact graph list and hides Source Control. See `docs/changelogs/2026-08-15_git_graph_commit_actions.md`.
@@ -23,6 +29,7 @@
 - Made tag clicks inspect the tag revision and show its recent commits instead of checking it out; added shared revision actions to the tag context menu. See `docs/changelogs/2026-08-15_branches_recent_commits.md`.
 
 ## 2026-08-14
+
 - Added a VS Code-style bottom panel with reorderable, persistent `Output` and interactive integrated `Terminal` tabs (with default letter spacing). The terminal uses a Tauri PTY and starts in the active repository. See `docs/changelogs/2026-08-14_integrated_terminal_tabs.md`.
 - Improved Git action responsiveness: progress now renders before shared Git actions start, and submodule commands run on Tauri blocking workers instead of the command thread. See `docs/changelogs/2026-08-14_git_command_responsiveness.md`.
 - Fixed left navigation menubar to a fixed non-resizable width (82px) and removed "Components" item from navigation sidebar and view router. See `docs/changelogs/2026-08-14_nav_sidebar_fixed_width_remove_components.md`.
@@ -30,6 +37,7 @@
 - Fixed branch names displaying with `^{}` suffix in the branches view. The `git_get_branches` Rust command used `%(*refname:short)` which dereferences tags and appends `^{}`. Stripped the suffix during parsing in `src-tauri/src/git_backend.rs`. See `docs/changelogs/2026-08-14_branch_name_suffix_fix.md`.
 
 ## 2026-08-05
+
 - Fixed empty view issues in Diff/Merge tab (DiffView.tsx) when opening clean repositories or inspecting commit diffs.
 - Added live commit file hydration via fetchCommitFiles when viewing commit diffs ("parent" and "refs" modes).
 - Added Merge Conflicts resolution tab ("merge") with conflict badge counters and interactive resolution controls (Keep Ours / Keep Theirs / Mark Resolved).
@@ -38,11 +46,11 @@
 - Extended DiffFileStatus and porcelain status parser in GitClientContext.tsx to handle unmerged conflict status ("U").
 - Documented session changes in docs/changelogs/2026-08-05_diff_merge_empty_page_fix.md.
 - Fixed empty view issues in Diff/Merge tab () when opening clean repositories or inspecting commit diffs.
-- Added live commit file hydration via  when viewing commit diffs ( and  modes).
+- Added live commit file hydration via when viewing commit diffs ( and modes).
 - Added Merge Conflicts resolution tab () with conflict badge counters and interactive resolution controls (Keep Ours / Keep Theirs / Mark Resolved).
 - Added structured empty state cards with contextual icons, explanations, and quick action buttons when working tree or staged list is clean.
-- Preserved  file boundary headers in  for multi-file commit diff readability.
-- Extended  and porcelain status parser in  to handle unmerged conflict status ().
+- Preserved file boundary headers in for multi-file commit diff readability.
+- Extended and porcelain status parser in to handle unmerged conflict status ().
 - Documented session changes in .
 - Audited all destructive git operations across the codebase and replaced all unconfirmed actions with the app standard custom modal dialog (`<Dialog />`).
 - Routed commit reverting ("Revert selected" button in `CommitDetailsView` & "Revert commit" in `GraphView` context menu) through custom confirmation modals.
@@ -53,6 +61,7 @@
 - Documented session changes in `docs/changelogs/2026-08-05_destructive_actions_confirmation_dialogs.md`.
 
 ## 2026-08-04
+
 - Fixed Linux branch loading failures caused by Git < 2.38 `%(symref)` format atom incompatibility in `src-tauri/src/git_backend.rs`, added PATH discovery for Linux GUI desktop launchers, made path canonicalization non-breaking across mount boundaries, and added explicit error state UI feedback and retry control in `BranchesView.tsx`.
 - Implemented 2-sided (two columns / side-by-side) diff viewer component (`<DiffViewer />`) with block-pairing algorithm (`parseSideBySideDiff`), dual line-number gutters, column header indicators, toolbar layout switcher (`2 Sides` / `1 Side`), and settings configuration.
 - Integrated `<DiffViewer />` across `DiffView.tsx` and `CommitDetailsView.tsx`.
@@ -62,6 +71,7 @@
 - Documented session changes in `docs/changelogs/2026-08-04_app_rename_resizable_panels.md`.
 
 ## 2026-08-01
+
 - Added Rust backend commands `git_get_compare`, `git_create_patch`, and `git_apply_patch`.
 - Wired `CompareView.tsx` to live backend comparison, dynamic branch selection, side-by-side commit comparison, and export summary/patch.
 - Wired `CommitDetailsView.tsx` and `DiffView.tsx` to real git diff parsing and line rendering for working tree, index, and commit files.
