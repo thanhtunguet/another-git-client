@@ -261,6 +261,7 @@ export const BranchesView: React.FC = () => {
     openAddRemoteDialog,
     openEditRemoteDialog,
     setCompareSeedRef,
+    setDock,
     setDiffTargetSha,
     setDiffTab,
     findCommitIndexBySha,
@@ -290,17 +291,20 @@ export const BranchesView: React.FC = () => {
     toastRun('Commit not loaded in Git Graph', 'Load more commits in Git Graph to open its details');
   };
 
+  const openCommitDiff = (commit: GraphCommitRow) => {
+    setDock(false);
+    setDiffTargetSha(commit.sha);
+    setDiffTab('parent');
+    setView('diff');
+  };
+
   const handleRecentCommitMenu = (event: React.MouseEvent, commit: GraphCommitRow) => {
     const hash = commit.shortSha;
     openMenu(event, `${hash}  ${commit.subject.slice(0, 32)}`, [
       { label: 'Open in Commit Details', hint: 'Enter', run: () => openCommitDetails(commit) },
       {
         label: 'Diff vs parent',
-        run: () => {
-          setDiffTargetSha(commit.sha);
-          setDiffTab('parent');
-          setView('diff');
-        }
+        run: () => openCommitDiff(commit)
       },
       { sep: true },
       { label: 'Checkout (detached)', run: () => void checkoutBranch(commit.sha) },
@@ -1189,11 +1193,11 @@ export const BranchesView: React.FC = () => {
                 tabIndex={0}
                 data-gc-context-menu="commit"
                 title={`${commit.author} · ${commit.date} · ${commit.shortSha}`}
-                onClick={() => openCommitDetails(commit)}
+                onClick={() => openCommitDiff(commit)}
                 onKeyDown={event => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    openCommitDetails(commit);
+                    openCommitDiff(commit);
                   }
                 }}
                 onContextMenu={event => handleRecentCommitMenu(event, commit)}

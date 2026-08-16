@@ -80,11 +80,12 @@ the registry, so they cannot drift from the real bindings again.
 
 ### Branch revision commits
 
-- Made the recent commits list in the Branches view interactive. Rows now open loaded commits in
-  Commit Details, support keyboard activation, and expose the same commit context actions as Git
-  Graph: parent diff, detached checkout, branch/tag creation, cherry-pick, confirmed revert,
-  reset, compare, patch creation, and copying the full SHA. Commits outside the current Graph page
-  identify the needed Git Graph pagination instead of opening incorrect details.
+- Made the recent commits list in the Branches view interactive. Clicking a row or activating it
+  with the keyboard hides Source Control and opens its `Commit ↔ parent` diff, matching Git Graph's
+  focused diff workflow. The context menu exposes the same commit actions as Git Graph: parent
+  diff, detached checkout, branch/tag creation, cherry-pick, confirmed revert, reset, compare,
+  patch creation, and copying the full SHA. Commit Details remains available as an explicit menu
+  action for commits already loaded in Git Graph.
 
 ## Verification
 
