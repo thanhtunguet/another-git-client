@@ -126,7 +126,7 @@ jobs:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           TARGET: ${{ matrix.target }}
         run: |
-          pnpm run tauri:build -- --target "$TARGET" --config "{\"version\":\"$RELEASE_VERSION\"}"
+          pnpm exec tauri build --target "$TARGET" --config "{\"version\":\"$RELEASE_VERSION\"}"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
