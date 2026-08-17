@@ -49,6 +49,8 @@ export interface ChangedFile {
   untracked: boolean;
   oldPath?: string;
   path: string;
+  additions: number;
+  deletions: number;
 }
 
 export interface WorktreeEntry {
@@ -103,6 +105,16 @@ export interface GitCompareResult {
   commitsOnlyLeft: GraphCommitRow[];
   commitsOnlyRight: GraphCommitRow[];
   changedFiles: ChangedFile[];
+}
+
+export interface GitOperationState {
+  kind: "merge" | "rebase" | "cherry-pick" | "revert" | string;
+  detail: string;
+  step?: number;
+  total?: number;
+  canContinue: boolean;
+  canSkip: boolean;
+  canAbort: boolean;
 }
 
 export interface WorkspaceFile {
@@ -178,6 +190,14 @@ export const tauriGitBackend = {
 
   checkoutBranch(repoPath: string, branch: string) {
     return invoke<GitCommandResult>("git_checkout_branch", { repoPath, branch });
+  },
+
+  checkoutTrackingBranch(repoPath: string, remoteBranch: string) {
+    return invoke<GitCommandResult>("git_checkout_tracking_branch", { repoPath, remoteBranch });
+  },
+
+  resolveConflictSide(repoPath: string, path: string, side: "ours" | "theirs") {
+    return invoke<GitCommandResult>("git_resolve_conflict_side", { repoPath, path, side });
   },
 
   createBranch(repoPath: string, branch: string, base?: string) {
@@ -438,6 +458,10 @@ export const tauriGitBackend = {
     return invoke<GitCompareResult>("git_get_compare", { repoPath, leftRef, rightRef });
   },
 
+  createComparePatch(repoPath: string, leftRef: string, rightRef: string) {
+    return invoke<string>("git_create_compare_patch", { repoPath, leftRef, rightRef });
+  },
+
   createPatch(repoPath: string, reference: string, filePath?: string) {
     return invoke<string>("git_create_patch", { repoPath, reference, filePath });
   },  applyPatch(repoPath: string, patchContent: string) {
@@ -462,5 +486,25 @@ export const tauriGitBackend = {
 
   getStagedDiff(repoPath: string, maxBytes?: number) {
     return invoke<string>("git_get_staged_diff", { repoPath, maxBytes });
+  },
+
+  getOperationState(repoPath: string) {
+    return invoke<GitOperationState | null>("git_get_operation_state", { repoPath });
+  },
+
+  continueOperation(repoPath: string, kind: string) {
+    return invoke<GitCommandResult>("git_continue_operation", { repoPath, kind });
+  },
+
+  skipOperation(repoPath: string, kind: string) {
+    return invoke<GitCommandResult>("git_skip_operation", { repoPath, kind });
+  },
+
+  abortOperation(repoPath: string, kind: string) {
+    return invoke<GitCommandResult>("git_abort_operation", { repoPath, kind });
+  },
+
+  watchRepository(repoPath: string) {
+    return invoke<void>("git_watch_repository", { repoPath });
   },
 };

@@ -18,7 +18,6 @@ export const CommitDetailsView: React.FC = () => {
     commits,
     getCommitHash,
     getCommitFullSha,
-    getFileList,
     fetchCommitFiles,
     cherryPickCommit,
     revertCommit,
@@ -40,6 +39,7 @@ export const CommitDetailsView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [rawDiffText, setRawDiffText] = useState<string>('');
   const [loadingDiff, setLoadingDiff] = useState<boolean>(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -48,24 +48,26 @@ export const CommitDetailsView: React.FC = () => {
       setRealFiles([]);
       return;
     }
-    void fetchCommitFiles(sha).then(files => {
-      if (active) {
-        setRealFiles(files);
-        if (files.length > 0) {
-          setSelectedFile(files[0].path);
+    setDetailError(null);
+    void fetchCommitFiles(sha)
+      .then(files => {
+        if (active) {
+          setRealFiles(files);
+          if (files.length > 0) {
+            setSelectedFile(files[0].path);
+          }
         }
-      }
-    });
+      })
+      .catch(error => {
+        if (active) {
+          setRealFiles([]);
+          setDetailError(error instanceof Error ? error.message : String(error));
+        }
+      });
     return () => { active = false; };
   }, [detailIdx, getCommitFullSha, fetchCommitFiles]);
 
-  const dfiles: DiffFile[] = useMemo(() => {
-    return realFiles.length
-      ? realFiles
-      : isMulti
-      ? sel.slice(0, 4).flatMap(i => getFileList(i))
-      : getFileList(detailIdx);
-  }, [realFiles, isMulti, sel, detailIdx, getFileList]);
+  const dfiles: DiffFile[] = realFiles;
 
   const currentFilePath = selectedFile || (dfiles[0]?.path ?? '');
 
@@ -155,7 +157,9 @@ export const CommitDetailsView: React.FC = () => {
         rawDiffText={rawDiffText}
         loading={loadingDiff || contentLoading}
         emptyMessage={
-          currentFilePath
+          detailError
+            ? `Could not load commit details: ${detailError}`
+            : currentFilePath
             ? `No diff details for ${currentFilePath}`
             : 'Select a file to view diff details.'
         }

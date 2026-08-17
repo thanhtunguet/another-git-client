@@ -169,11 +169,11 @@ export const SettingsView: React.FC = () => {
       title: 'Performance',
       rows: [
         {
-          label: 'Status poll interval',
-          hint: 'Milliseconds between automatic working-tree status refreshes',
+          label: 'Repository refresh debounce',
+          hint: 'Milliseconds to wait after a repository filesystem event before refreshing Git state',
           control: 'input',
-          settingKey: 'statusPollInterval',
-          defaultValue: '2000',
+          settingKey: 'repositoryRefreshDebounce',
+          defaultValue: '250',
           width: 90
         }
       ]
@@ -192,11 +192,11 @@ export const SettingsView: React.FC = () => {
         },
         {
           label: 'Compare-with-revision direction',
-          hint: 'Which side a picked branch/commit lands on when comparing with current',
+          hint: 'Which side a picked branch, tag, or commit lands on when comparing with the current branch',
           control: 'select',
           settingKey: 'compareDirection',
-          defaultValue: 'Revision → working tree',
-          options: ['Revision → working tree', 'Working tree → revision']
+          defaultValue: 'Revision → current branch',
+          options: ['Revision → current branch', 'Current branch → revision']
         }
       ]
     },

@@ -3,7 +3,7 @@ import { useGitClient, COLORS } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { Input, Select } from '../common/FormControls';
 import { SegmentedControl } from '../common/SegmentedControl';
-import { tauriGitBackend, type BranchRef, type GitCompareResult, type GraphCommitRow } from '../../services/tauriGitBackend';
+import { tauriGitBackend, type GitCompareResult, type GraphCommitRow } from '../../services/tauriGitBackend';
 import { useResizablePanel } from '../../hooks/useResizablePanel';
 import { ResizeHandle } from '../common/ResizeHandle';
 
@@ -20,6 +20,7 @@ export const CompareView: React.FC = () => {
     setView,
     getCompare,
     createPatch,
+    createComparePatch,
     toastRun,
     checkoutBranch,
     cherryPickCommit,
@@ -33,25 +34,30 @@ export const CompareView: React.FC = () => {
     preferences
   } = useGitClient();
 
-  const [branches, setBranches] = useState<BranchRef[]>([]);
+  const [referenceOptions, setReferenceOptions] = useState<string[]>([]);
   const [leftRef, setLeftRef] = useState<string>('');
   const [rightRef, setRightRef] = useState<string>('');
   const [compareResult, setCompareResult] = useState<GitCompareResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [compareError, setCompareError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!repoPath) {
-      setBranches([]);
+      setReferenceOptions([]);
       return;
     }
     let active = true;
-    void tauriGitBackend.getBranches(repoPath).then(bList => {
+    void Promise.all([tauriGitBackend.getBranches(repoPath), tauriGitBackend.getTags(repoPath)]).then(([bList, tags]) => {
       if (!active) return;
-      setBranches(bList);
+      setReferenceOptions([
+        'WORKTREE',
+        ...bList.map(branch => branch.name),
+        ...tags.map(tag => tag.name)
+      ]);
       if (bList.length) {
         const curName = bList.find(b => b.current)?.name || bList[0].name;
         if (compareSeedRef) {
-          const revisionOnLeft = (preferences.compareDirection || 'Revision → working tree') === 'Revision → working tree';
+          const revisionOnLeft = (preferences.compareDirection || 'Revision → current branch') === 'Revision → current branch';
           setLeftRef(revisionOnLeft ? compareSeedRef : curName);
           setRightRef(revisionOnLeft ? curName : compareSeedRef);
           setCompareSeedRef(null);
@@ -62,7 +68,7 @@ export const CompareView: React.FC = () => {
         }
       }
     }).catch(() => {
-      if (active) setBranches([]);
+      if (active) setReferenceOptions([]);
     });
     return () => { active = false; };
   }, [repoPath, compareSeedRef, setCompareSeedRef, preferences.compareDirection]);
@@ -71,20 +77,28 @@ export const CompareView: React.FC = () => {
     if (!repoPath || !leftRef || !rightRef) return;
     let active = true;
     setIsLoading(true);
-    void getCompare(leftRef, rightRef).then(res => {
-      if (!active) return;
-      setCompareResult(res);
-      setIsLoading(false);
-    });
+    setCompareError(null);
+    void getCompare(leftRef, rightRef)
+      .then(res => {
+        if (!active) return;
+        setCompareResult(res);
+        setIsLoading(false);
+      })
+      .catch(error => {
+        if (!active) return;
+        setCompareResult(null);
+        setCompareError(error instanceof Error ? error.message : String(error));
+        setIsLoading(false);
+      });
     return () => { active = false; };
   }, [repoPath, leftRef, rightRef, getCompare]);
 
   const branchOptions = useMemo(() => {
-    if (!branches.length) return [leftRef || 'main', rightRef || 'HEAD'].filter(Boolean);
-    const names = branches.map(b => b.name);
+    if (!referenceOptions.length) return [leftRef || 'HEAD', rightRef || 'WORKTREE'].filter(Boolean);
+    const names = referenceOptions;
     const extras = [leftRef, rightRef].filter(ref => ref && !names.includes(ref));
     return [...names, ...extras];
-  }, [branches, leftRef, rightRef]);
+  }, [referenceOptions, leftRef, rightRef]);
 
   const openCommitDetails = (commit: GraphCommitRow) => {
     const idx = findCommitIndexBySha(commit.sha);
@@ -157,7 +171,7 @@ export const CompareView: React.FC = () => {
       {
         label: 'Copy diff patch to clipboard',
         run: () => {
-          void createPatch(`${leftRef}...${rightRef}`).then(p => {
+          void createComparePatch(leftRef, rightRef).then(p => {
             if (p) {
               void navigator.clipboard.writeText(p);
               toastRun('Copied patch to clipboard', `${leftRef}...${rightRef}`);
@@ -359,7 +373,6 @@ export const CompareView: React.FC = () => {
         <Select
           value={leftRef}
           onChange={e => setLeftRef(e.target.value)}
-          options={branchOptions}
           style={{
             width: 'auto',
             height: '26px',
@@ -367,7 +380,11 @@ export const CompareView: React.FC = () => {
             fontSize: '12px',
             fontFamily: 'var(--font-mono)'
           }}
-        />
+        >
+          {branchOptions.map(ref => (
+            <option key={ref} value={ref}>{ref === 'WORKTREE' ? 'Working tree (uncommitted)' : ref}</option>
+          ))}
+        </Select>
         <Button
           variant="secondary"
           title="Swap direction"
@@ -379,7 +396,6 @@ export const CompareView: React.FC = () => {
         <Select
           value={rightRef}
           onChange={e => setRightRef(e.target.value)}
-          options={branchOptions}
           style={{
             width: 'auto',
             height: '26px',
@@ -387,7 +403,11 @@ export const CompareView: React.FC = () => {
             fontSize: '12px',
             fontFamily: 'var(--font-mono)'
           }}
-        />
+        >
+          {branchOptions.map(ref => (
+            <option key={ref} value={ref}>{ref === 'WORKTREE' ? 'Working tree (uncommitted)' : ref}</option>
+          ))}
+        </Select>
         <span style={{ fontSize: '11px', color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>
           merge-base {compareResult?.mergeBase ? compareResult.mergeBase.slice(0, 7) : '—'}
         </span>
@@ -467,6 +487,41 @@ export const CompareView: React.FC = () => {
         <div style={{ flex: 1 }} />
         {isLoading && <span style={{ fontSize: '11px', color: 'var(--fg3)' }}>Comparing…</span>}
       </div>
+
+      {compareError && (
+        <div
+          role="alert"
+          style={{ padding: 'var(--space-3)', color: 'var(--del)', background: 'var(--delbg)', fontSize: '12px' }}
+        >
+          Compare failed: {compareError}
+        </div>
+      )}
+
+      {compareResult && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            minHeight: '30px',
+            padding: '4px var(--space-3)',
+            borderBottom: '1px solid var(--line)',
+            overflowX: 'auto',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            color: 'var(--fg2)'
+          }}
+        >
+          <strong style={{ color: 'var(--fg)' }}>{compareResult.changedFiles.length} changed files</strong>
+          {compareResult.changedFiles.slice(0, 12).map(file => (
+            <span key={file.path} title={file.path} style={{ whiteSpace: 'nowrap' }}>
+              <span style={{ color: file.status === 'D' ? 'var(--del)' : 'var(--add)' }}>{file.status}</span>{' '}
+              {file.path}
+            </span>
+          ))}
+          {compareResult.changedFiles.length > 12 ? <span>…</span> : null}
+        </div>
+      )}
 
       {compareMode === 'list' ? (
         <div

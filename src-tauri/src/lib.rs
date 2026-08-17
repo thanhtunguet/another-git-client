@@ -5,6 +5,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .manage(git_backend::RepositoryWatchState::default())
     .invoke_handler(tauri::generate_handler![
       git_backend::git_is_repo,
       git_backend::git_get_branches,
@@ -17,6 +18,8 @@ pub fn run() {
       git_backend::git_get_worktrees,
       git_backend::git_get_submodules,
       git_backend::git_checkout_branch,
+      git_backend::git_checkout_tracking_branch,
+      git_backend::git_resolve_conflict_side,
       git_backend::git_create_branch,
       git_backend::git_rename_branch,
       git_backend::git_delete_branch,
@@ -76,6 +79,12 @@ pub fn run() {
       git_backend::git_get_remotes,
       git_backend::git_set_remote_url,
       git_backend::git_get_staged_diff,
+      git_backend::git_get_operation_state,
+      git_backend::git_continue_operation,
+      git_backend::git_skip_operation,
+      git_backend::git_abort_operation,
+      git_backend::git_watch_repository,
+      git_backend::git_create_compare_patch,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

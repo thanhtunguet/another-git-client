@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGitClient } from '../../context/GitClientContext';
 import { Button } from './Button';
-import { Checkbox, Input } from './FormControls';
+import { Checkbox, Input, Textarea } from './FormControls';
 
 export const Dialog: React.FC = () => {
   const {
@@ -17,7 +17,9 @@ export const Dialog: React.FC = () => {
     remoteDialogUrl,
     setRemoteDialogUrl,
     promptDialogValue,
-    setPromptDialogValue
+    setPromptDialogValue,
+    patchDialogContent,
+    setPatchDialogContent
   } = useGitClient();
 
   if (!dialog) return null;
@@ -25,6 +27,7 @@ export const Dialog: React.FC = () => {
   const isCloneDialog = dialog.kind === 'clone';
   const isRemoteDialog = dialog.kind === 'add-remote' || dialog.kind === 'edit-remote';
   const isPromptDialog = dialog.kind === 'prompt';
+  const isApplyPatchDialog = dialog.kind === 'apply-patch';
   const isEditing = dialog.kind === 'edit-remote';
 
   const canConfirm = isCloneDialog
@@ -33,6 +36,8 @@ export const Dialog: React.FC = () => {
     ? !!remoteDialogName.trim() && !!remoteDialogUrl.trim()
     : isPromptDialog && dialog.inputRequired !== false
     ? !!promptDialogValue.trim()
+    : isApplyPatchDialog
+    ? !!patchDialogContent.trim()
     : true;
 
   return (
@@ -111,6 +116,17 @@ export const Dialog: React.FC = () => {
               autoFocus
             />
           </div>
+        )}
+        {isApplyPatchDialog && (
+          <Textarea
+            label="Unified patch"
+            value={patchDialogContent}
+            onChange={event => setPatchDialogContent(event.target.value)}
+            placeholder="diff --git a/file b/file\n..."
+            rows={12}
+            autoFocus
+            style={{ minHeight: '220px', fontFamily: 'var(--font-mono)', fontSize: '11.5px' }}
+          />
         )}
         {dialog.cmd && (
           <div

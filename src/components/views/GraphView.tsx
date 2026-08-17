@@ -321,6 +321,8 @@ export const GraphView: React.FC = () => {
     graphLoading,
     graphLoadingMore,
     loadMoreGraph,
+    repositoryError,
+    refreshRepository,
     sel,
     toggleSelCommit,
     setDock,
@@ -751,6 +753,27 @@ export const GraphView: React.FC = () => {
               fontFamily: 'var(--font-mono)'
             }}
           />
+        </div>
+      )}
+
+      {repositoryError && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-3)',
+            padding: 'var(--space-3)',
+            color: 'var(--del)',
+            background: 'var(--delbg)',
+            borderBottom: '1px solid var(--line)',
+            fontSize: '12px'
+          }}
+        >
+          <span style={{ flex: 1 }}>Could not load repository state: {repositoryError}</span>
+          <Button variant="secondary" style={{ height: '24px' }} onClick={() => void refreshRepository()}>
+            Retry
+          </Button>
         </div>
       )}
 

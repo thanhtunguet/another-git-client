@@ -38,6 +38,7 @@ export interface BranchMenuActions {
   repoPath: string;
   currentBranch: string;
   checkoutBranch: (branchName: string) => void | Promise<void>;
+  checkoutTrackingBranch: (branchName: string) => void | Promise<void>;
   renameBranch: (oldName: string, newName: string) => void | Promise<void>;
   mergeBranch: (reference: string) => void | Promise<void>;
   rebaseBranch: (reference: string) => void | Promise<void>;
@@ -64,7 +65,9 @@ export function buildBranchMenuItems(branch: BranchNode, ctx: BranchMenuActions)
   const remoteShort = branch.shortName;
 
   return [
-    { label: 'Checkout', hint: '↵', run: () => ctx.checkoutBranch(name) },
+    branch.kind === 'remote'
+      ? { label: 'Checkout as local tracking branch', hint: '↵', run: () => ctx.checkoutTrackingBranch(name) }
+      : { label: 'Checkout', hint: '↵', run: () => ctx.checkoutBranch(name) },
     {
       label: `New branch from '${name}'…`,
       run: () => {

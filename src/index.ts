@@ -8,13 +8,9 @@ export {
   GitClientProvider,
   useGitClient,
   COLORS,
-  RAW_COMMITS,
-  getHash,
   statusColor,
   refBadge,
-  buildGraphData,
-  buildFiles,
-  seedLog
+  buildGraphData
 } from './context/GitClientContext';
 
 // Export common UI components
@@ -59,7 +55,6 @@ export { DiffView } from './components/views/DiffView';
 export { WorktreesView } from './components/views/WorktreesView';
 export { SubmodulesView } from './components/views/SubmodulesView';
 export { SettingsView } from './components/views/SettingsView';
-export { ComponentsView } from './components/views/ComponentsView';
 
 // Export types
 export * from './types/git-client';

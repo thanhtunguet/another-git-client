@@ -28,6 +28,7 @@ export const DiffView: React.FC = () => {
     fetchCommitFiles,
     stageFile,
     unstageFile,
+    resolveConflictSide,
     refreshStatus,
     setView,
     setDock,
@@ -37,6 +38,7 @@ export const DiffView: React.FC = () => {
 
   const [rawDiffText, setRawDiffText] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
   const [fileQuery, setFileQuery] = useState<string>('');
 
   const [commitFiles, setCommitFiles] = useState<DiffFile[]>([]);
@@ -109,6 +111,7 @@ export const DiffView: React.FC = () => {
     }
     let active = true;
     setLoading(true);
+    setDiffError(null);
 
     void (async () => {
       try {
@@ -143,9 +146,10 @@ export const DiffView: React.FC = () => {
           setRawDiffText(text || '');
           setLoading(false);
         }
-      } catch {
+      } catch (error) {
         if (active) {
           setRawDiffText('');
+          setDiffError(error instanceof Error ? error.message : String(error));
           setLoading(false);
         }
       }
@@ -200,15 +204,9 @@ export const DiffView: React.FC = () => {
 
   const handleCheckoutSide = async (side: 'ours' | 'theirs') => {
     if (!targetPath || !repoPath) return;
-    try {
-      log([{ text: `$ git checkout --${side} -- ${targetPath}`, type: 'cmd' }]);
-      const res = await tauriGitBackend.checkoutBranch(repoPath, `--${side} -- ${targetPath}`);
-      if (res.exitCode === 0) {
-        toastRun(`Checked out ${side} version`, targetPath);
-        await stageFile(targetPath);
-      }
-    } catch (e) {
-      log([{ text: `Checkout ${side} failed: ${String(e)}`, type: 'err' }]);
+    const resolved = await resolveConflictSide(targetPath, side);
+    if (resolved) {
+      await stageFile(targetPath);
     }
   };
 
@@ -374,7 +372,13 @@ export const DiffView: React.FC = () => {
           filePath={targetPath}
           rawDiffText={rawDiffText}
           loading={loading || commitLoading || contentLoading}
-          emptyMessage={targetPath ? `No diff output found for ${targetPath}` : 'No file selected.'}
+          emptyMessage={
+            diffError
+              ? `Could not load diff: ${diffError}`
+              : targetPath
+                ? `No diff output found for ${targetPath}`
+                : 'No file selected.'
+          }
           onStageFile={() => void stageFile(targetPath)}
           onUnstageFile={() => void unstageFile(targetPath)}
           onCopyPatch={() => {

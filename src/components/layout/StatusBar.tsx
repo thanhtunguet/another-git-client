@@ -47,12 +47,15 @@ export const StatusBar: React.FC = () => {
           >
             {op.name}
           </Tag>
-          <span style={{ color: 'var(--fg2)' }}>{`Step ${op.step} of ${op.total}`}</span>
+          {op.step && op.total ? (
+            <span style={{ color: 'var(--fg2)' }}>{`Step ${op.step} of ${op.total}`}</span>
+          ) : null}
           <span style={{ color: 'var(--fg3)', fontFamily: 'var(--font-mono)' }}>{op.detail}</span>
           <Button
             variant="primary"
             style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }}
             onClick={opContinue}
+            disabled={!op.canContinue || actionBusy}
           >
             Continue
           </Button>
@@ -60,6 +63,7 @@ export const StatusBar: React.FC = () => {
             variant="secondary"
             style={{ height: '18px', fontSize: '10.5px', padding: '0 8px' }}
             onClick={opSkip}
+            disabled={!op.canSkip || actionBusy}
           >
             Skip
           </Button>
@@ -73,6 +77,7 @@ export const StatusBar: React.FC = () => {
               borderColor: 'var(--del)'
             }}
             onClick={opAbort}
+            disabled={!op.canAbort || actionBusy}
           >
             Abort
           </Button>

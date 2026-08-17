@@ -135,10 +135,14 @@ export interface LogEntry {
 }
 
 export interface OperationState {
+  kind: string;
   name: string;
-  step: number;
-  total: number;
+  step?: number;
+  total?: number;
   detail: string;
+  canContinue: boolean;
+  canSkip: boolean;
+  canAbort: boolean;
 }
 
 export interface MenuItem {
@@ -161,7 +165,7 @@ export interface DialogState {
   body: string;
   cmd: string;
   action: string;
-  kind?: 'confirm' | 'clone' | 'add-remote' | 'edit-remote' | 'prompt';
+  kind?: 'confirm' | 'clone' | 'add-remote' | 'edit-remote' | 'prompt' | 'apply-patch';
   run?: (value?: string) => void;
   inputLabel?: string;
   inputRequired?: boolean;
@@ -295,7 +299,6 @@ export interface GitClientContextType {
   graphLoading: boolean;
   graphLoadingMore: boolean;
   loadMoreGraph: () => void;
-  getFileList: (i: number) => DiffFile[];
   stagedFiles: DiffFile[];
   unstagedFiles: DiffFile[];
   untrackedFiles: DiffFile[];

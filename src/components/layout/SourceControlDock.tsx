@@ -33,6 +33,7 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     unstageFile,
     unstageAll,
     discardChanges,
+    discardAll,
     commitChanges,
     createStash,
     applyStash,
@@ -41,7 +42,9 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
     prompt,
     preferences,
     currentBranch,
-    canCommitNow
+    canCommitNow,
+    copyStagedPatch,
+    openApplyPatchDialog
   } = useGitClient();
 
   const [amend, setAmend] = useState(false);
@@ -144,20 +147,19 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
 
     openMenu(e, 'Message Templates', [
       {
-        label: 'Signed-off-by template',
-        hint: 'kernel-style',
-        run: () =>
-          setCommitMsg('core: update implementation\n\nSigned-off-by: Developer <dev@example.com>')
+        label: '{scope}: {cursor} + ticket',
+        hint: 'branch-aware',
+        run: () => setCommitMsg(applyTemplate('{scope}: {cursor}\n\nRefs: {ticket}'))
       },
       {
         label: 'fix({scope}): {cursor} — Refs {ticket}',
         hint: 'conventional',
-        run: () => setCommitMsg('fix(ui): resolve layout issue\n\nRefs: TASK-101')
+        run: () => setCommitMsg(applyTemplate('fix({scope}): {cursor}\n\nRefs: {ticket}'))
       },
       {
         label: '[{branch}] {cursor}',
         hint: 'branch-tagged',
-        run: () => setCommitMsg(`[${currentBranch}] work in progress`)
+        run: () => setCommitMsg(applyTemplate('[{branch}] {cursor}'))
       },
       {
         label: 'Custom template',
@@ -253,6 +255,50 @@ export const SourceControlDock: React.FC<{ style?: React.CSSProperties; classNam
 
       {scTab === 'changes' ? (
         <>
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              padding: 'var(--space-2) var(--space-3)',
+              borderTop: '1px solid var(--line)',
+              borderBottom: '1px solid var(--line)',
+              background: 'var(--panel)'
+            }}
+          >
+            <Button
+              variant="secondary"
+              style={{ flex: 1, height: '22px', fontSize: '11px' }}
+              onClick={() => void copyStagedPatch()}
+              disabled={!stagedFiles.length}
+              title="Copy the full staged patch"
+            >
+              Copy staged patch
+            </Button>
+            <Button
+              variant="secondary"
+              style={{ flex: 1, height: '22px', fontSize: '11px' }}
+              onClick={openApplyPatchDialog}
+              title="Paste and apply a unified patch"
+            >
+              Apply patch…
+            </Button>
+            <Button
+              variant="secondary"
+              style={{ height: '22px', fontSize: '11px', color: 'var(--del)' }}
+              disabled={stagedFiles.length + unstagedFiles.length + untrackedFiles.length === 0}
+              onClick={() =>
+                confirm(
+                  'Discard all changes?',
+                  'All staged, unstaged, and untracked changes will be permanently deleted.',
+                  'git restore . && git clean -fd',
+                  'Discard all',
+                  () => void discardAll()
+                )
+              }
+            >
+              Discard all
+            </Button>
+          </div>
           <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
             <div
               style={{

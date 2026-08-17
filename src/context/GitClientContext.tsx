@@ -20,6 +20,7 @@ import {
   MenuItem
 } from '../types/git-client';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 import { loadAppStore, saveAppStore, loadAIConfig, saveAIConfig, AIConfig } from '../services/appStore';
 import {
   tauriGitBackend,
@@ -54,143 +55,6 @@ export const COLORS = [
   'oklch(.70 .10 255)'
 ];
 
-
-export const RAW_COMMITS: CommitRaw[] = [
-  [
-    "Merge branch 'mlx5-next' into net-next",
-    'Jakub Kicinski',
-    '2026-07-30 14:22',
-    [1, 6],
-    ['main', 'origin/main']
-  ],
-  [
-    'mm/slub: fix kmalloc_nolock() vs kfree() race on cpu_slab',
-    'Vlastimil Babka',
-    '2026-07-30 11:04',
-    [2],
-    []
-  ],
-  [
-    'sched/fair: prevent stale util_est after task migration',
-    'Peter Zijlstra',
-    '2026-07-29 18:47',
-    [3],
-    []
-  ],
-  [
-    "Merge tag 'v6.19-rc4' into for-next",
-    'Linus Torvalds',
-    '2026-07-29 09:31',
-    [4, 9],
-    ['tag: v6.19-rc4']
-  ],
-  [
-    'kbuild: drop -Wmaybe-uninitialized for clang builds',
-    'Nathan Chancellor',
-    '2026-07-28 21:15',
-    [5],
-    []
-  ],
-  ['io_uring: fix ring buffer accounting on resize', 'Jens Axboe', '2026-07-28 16:02', [11], []],
-  [
-    'net/mlx5e: add TX steering for tunneled traffic',
-    'Saeed Mahameed',
-    '2026-07-28 13:40',
-    [7],
-    ['feature/mlx5-next', 'origin/feature/mlx5-next']
-  ],
-  ['net/mlx5: split ESW offload init into helpers', 'Roi Dayan', '2026-07-27 19:58', [8], []],
-  ['net/mlx5: introduce per-vport packet counters', 'Saeed Mahameed', '2026-07-27 10:12', [12], []],
-  [
-    'arm64: dts: qcom: enable UFS on sm8750',
-    'Bjorn Andersson',
-    '2026-07-27 08:44',
-    [10],
-    ['fix/kbuild-clang']
-  ],
-  [
-    'arm64: errata: workaround for Cortex-A725 erratum 3699571',
-    'Mark Rutland',
-    '2026-07-26 15:20',
-    [12],
-    []
-  ],
-  ['block: fix nr_requests underflow on queue resize', 'Ming Lei', '2026-07-26 12:07', [12], []],
-  ["Merge tag 'v6.19-rc3'", 'Linus Torvalds', '2026-07-25 17:33', [13], ['tag: v6.19-rc3']],
-  ["Merge branch 'sched/core' into for-linus", 'Ingo Molnar', '2026-07-25 09:18', [14, 17], []],
-  ['ext4: avoid inode reuse race in orphan cleanup', "Theodore Ts'o", '2026-07-24 22:41', [15], []],
-  ['btrfs: zoned: reclaim unusable space earlier', 'David Sterba', '2026-07-24 14:09', [16], []],
-  [
-    'fs: rename lookup_one_len() callers to lookup_noperm()',
-    'Al Viro',
-    '2026-07-23 20:26',
-    [20],
-    []
-  ],
-  [
-    'sched_ext: allow BPF schedulers to opt out of core sched',
-    'Tejun Heo',
-    '2026-07-23 11:55',
-    [18],
-    ['release/6.18.y', 'origin/release/6.18.y']
-  ],
-  [
-    'sched_ext: document dispatch queue lifetime rules',
-    'David Vernet',
-    '2026-07-22 16:31',
-    [19],
-    []
-  ],
-  ['sched/core: tidy up nohz balance entry points', 'Peter Zijlstra', '2026-07-22 09:47', [20], []],
-  ["Merge tag 'v6.19-rc2'", 'Linus Torvalds', '2026-07-21 18:12', [21], ['tag: v6.19-rc2']],
-  [
-    'drm/amdgpu: bump VCN firmware version for VCN 5.0',
-    'Alex Deucher',
-    '2026-07-21 13:26',
-    [22],
-    []
-  ],
-  ["Merge branch 'rust-next'", 'Miguel Ojeda', '2026-07-20 15:39', [23, 25], []],
-  [
-    'rust: alloc: implement Vec::try_with_capacity',
-    'Danilo Krummrich',
-    '2026-07-20 10:03',
-    [24],
-    []
-  ],
-  ['rust: kernel: add Pin<KBox<T>> conversions', 'Benno Lossin', '2026-07-19 19:48', [27], []],
-  [
-    'perf tools: fix build against libbpf 1.6',
-    'Arnaldo Carvalho de Melo',
-    '2026-07-19 12:22',
-    [26],
-    ['feature/perf-tui']
-  ],
-  ['perf report: add TUI column for cgroup id', 'Namhyung Kim', '2026-07-18 17:05', [27], []],
-  ["Merge tag 'v6.19-rc1'", 'Linus Torvalds', '2026-07-18 08:50', [28], ['tag: v6.19-rc1']],
-  [
-    'cgroup: fix memcg stat flush deadlock under memory pressure',
-    'Michal Hocko',
-    '2026-07-17 21:14',
-    [29],
-    []
-  ],
-  [
-    'x86/mm: relax LAM enablement check for 5-level paging',
-    'Dave Hansen',
-    '2026-07-17 11:38',
-    [30],
-    []
-  ],
-  ['Linux 6.19-rc1', 'Linus Torvalds', '2026-07-16 19:00', [], []]
-];
-
-export function getHash(i: number): string {
-  const s = 'f3a9c218be1c042d77a19b0c4e8391ff2d64a7c0b15e93d17cc2a80e4b6d59f2';
-  let h = '';
-  for (let k = 0; k < 7; k++) h += s[(i * 7 + k * 3 + 11) % s.length];
-  return h;
-}
 
 export function statusColor(s: string): string {
   return s === 'A'
@@ -264,38 +128,6 @@ export function buildGraphData(commits: CommitRaw[]): GraphData {
   return { rows, width: max * 15 + 18 };
 }
 
-export function buildFiles(i: number, commits: CommitRaw[]): DiffFile[] {
-  const subj = commits[i][0];
-  const dir = (subj.split(':')[0] || 'kernel').replace(/[^a-z0-9/_-]/gi, '').toLowerCase();
-  const base = dir.indexOf('/') > 0 ? dir : dir + '/core';
-  const names = ['main.c', 'core.c', 'Makefile', 'internal.h', 'params.c', 'debugfs.c', 'Kconfig'];
-  const n = 2 + (i % 4);
-  const out: DiffFile[] = [];
-
-  for (let k = 0; k < n; k++) {
-    out.push({
-      path: base + '/' + names[(i + k) % names.length],
-      status: k === 0 && i % 5 === 0 ? 'A' : i % 7 === 3 && k === n - 1 ? 'D' : 'M',
-      add: 3 + ((i * 13 + k * 7) % 90),
-      del: 1 + ((i * 5 + k * 3) % 40)
-    });
-  }
-  return out;
-}
-
-export function seedLog(): LogEntry[] {
-  return [
-    { text: '$ git fetch --all --prune', type: 'cmd' },
-    { text: 'Fetching origin', type: 'out' },
-    { text: 'From github.com:torvalds/linux', type: 'out' },
-    { text: '   4c1f9ab..f3a9c21  master     -> origin/master', type: 'out' },
-    { text: ' * [new tag]         v6.19-rc4  -> v6.19-rc4', type: 'out' },
-    { text: '$ git submodule update --init --recursive tools/lib/bpf', type: 'cmd' },
-    { text: "Submodule path 'tools/lib/bpf': checked out '9b41ac2'", type: 'out' },
-    { text: 'done in 4.2s', type: 'ok' }
-  ];
-}
-
 interface GitClientContextType {
   view: GitClientView;
   setView: (v: GitClientView) => void;
@@ -332,6 +164,8 @@ interface GitClientContextType {
   confirmDialog: () => void;
   promptDialogValue: string;
   setPromptDialogValue: (value: string) => void;
+  patchDialogContent: string;
+  setPatchDialogContent: (value: string) => void;
   cloneDialogUrl: string;
   setCloneDialogUrl: (value: string) => void;
   cloneDialogUseGit: boolean;
@@ -393,7 +227,8 @@ interface GitClientContextType {
   graphLoading: boolean;
   graphLoadingMore: boolean;
   loadMoreGraph: () => void;
-  getFileList: (i: number) => DiffFile[];
+  repositoryError: string | null;
+  refreshRepository: () => Promise<void>;
   stagedFiles: DiffFile[];
   unstagedFiles: DiffFile[];
   untrackedFiles: DiffFile[];
@@ -420,6 +255,8 @@ interface GitClientContextType {
   getSubmodulePointerDiff: (path: string) => Promise<string>;
   stageSubmodulePointer: (path: string) => Promise<void>;
   checkoutBranch: (branch: string) => Promise<void>;
+  checkoutTrackingBranch: (branch: string) => Promise<void>;
+  resolveConflictSide: (path: string, side: "ours" | "theirs") => Promise<boolean>;
   renameBranch: (oldName: string, newName: string) => Promise<void>;
   deleteBranch: (branch: string, isRemote?: boolean, force?: boolean) => Promise<void>;
   setUpstream: (branch?: string, upstream?: string) => Promise<void>;
@@ -475,6 +312,9 @@ interface GitClientContextType {
   getCompare: (leftRef: string, rightRef: string) => Promise<import("../services/tauriGitBackend").GitCompareResult>;
   createPatch: (reference: string, filePath?: string) => Promise<string>;
   applyPatchText: (patchContent: string) => Promise<void>;
+  createComparePatch: (leftRef: string, rightRef: string) => Promise<string>;
+  copyStagedPatch: () => Promise<void>;
+  openApplyPatchDialog: () => void;
   addRemote: (name: string, url: string) => Promise<void>;
   setRemoteUrl: (name: string, url: string) => Promise<void>;
   deleteRemote: (name: string) => Promise<void>;
@@ -521,6 +361,8 @@ export const GitClientProvider: React.FC<{
   const [remoteDialogName, setRemoteDialogName] = useState<string>('');
   const [remoteDialogUrl, setRemoteDialogUrl] = useState<string>('');
   const [promptDialogValue, setPromptDialogValue] = useState<string>('');
+  const [patchDialogContent, setPatchDialogContent] = useState<string>('');
+  const applyPatchTextRef = useRef<(patchContent: string) => Promise<void>>(async () => {});
   const [op, setOp] = useState<OperationState | null>(null);
   const [sel, setSel] = useState<number[]>([0]);
   const [diffTargetSha, setDiffTargetSha] = useState<string | null>(null);
@@ -558,14 +400,13 @@ export const GitClientProvider: React.FC<{
       ? 'work'
       : persistedStore?.settings.diffTab || 'work'
   );
-  const [consoleLines, setConsoleLines] = useState<LogEntry[]>(seedLog());
-  const [commitMsg, setCommitMsg] = useState<string>(
-    'net/mlx5e: add TX steering for tunneled traffic\n\nSteer tunneled TX traffic to the dedicated SQ set so encapsulated\nflows keep their hardware offload.\n\nSigned-off-by: '
-  );
+  const [consoleLines, setConsoleLines] = useState<LogEntry[]>([]);
+  const [commitMsg, setCommitMsg] = useState<string>('');
   const [graphRows, setGraphRows] = useState<BackendGraphCommitRow[]>([]);
   const [graphHasMore, setGraphHasMore] = useState<boolean>(false);
   const [graphLoading, setGraphLoading] = useState<boolean>(false);
   const [graphLoadingMore, setGraphLoadingMore] = useState<boolean>(false);
+  const [repositoryError, setRepositoryError] = useState<string | null>(null);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [unstagedFiles, setUnstagedFiles] = useState<DiffFile[]>([]);
   const [untrackedFiles, setUntrackedFiles] = useState<DiffFile[]>([]);
@@ -655,10 +496,6 @@ export const GitClientProvider: React.FC<{
   }, [preferences.graphPageSize]);
 
   const commits = useMemo<CommitRaw[]>(() => {
-    if (!graphRows.length) {
-      return RAW_COMMITS;
-    }
-
     const indexBySha = new Map<string, number>();
     graphRows.forEach((row, index) => {
       indexBySha.set(row.sha, index);
@@ -675,12 +512,12 @@ export const GitClientProvider: React.FC<{
 
   const graphData = useMemo(() => buildGraphData(commits), [commits]);
   const getCommitHash = useCallback(
-    (i: number): string => graphRows[i]?.shortSha || getHash(i),
+    (i: number): string => graphRows[i]?.shortSha || '',
     [graphRows]
   );
 
   const getCommitFullSha = useCallback(
-    (i: number): string => graphRows[i]?.sha || getHash(i),
+    (i: number): string => graphRows[i]?.sha || '',
     [graphRows]
   );
 
@@ -906,8 +743,8 @@ export const GitClientProvider: React.FC<{
     const toDiffFile = (entry: BackendChangedFile): DiffFile => ({
       path: entry.path,
       status: mapStatus(entry),
-      add: 0,
-      del: 0
+      add: entry.additions,
+      del: entry.deletions
     });
 
     const nextStaged = entries.filter(entry => entry.staged).map(toDiffFile);
@@ -926,19 +763,24 @@ export const GitClientProvider: React.FC<{
         setGraphHasMore(false);
         applyChangedFiles([]);
         setStashes([]);
+        setWorktrees([]);
+        setSubmodules([]);
+        setOp(null);
         setTotalCommitCount(0);
+        setRepositoryError(null);
         return;
       }
 
       setGraphLoading(true);
       try {
-        const [rows, changed, stashList, wtList, subList, commitCount] = await Promise.all([
+        const [rows, changed, stashList, wtList, subList, commitCount, operation] = await Promise.all([
           tauriGitBackend.getGraph(pathValue, { maxCount: graphPageSizePref, skip: 0, allRefs: true }),
           tauriGitBackend.getChangedFiles(pathValue),
-          tauriGitBackend.getStashes(pathValue).catch(() => []),
-          tauriGitBackend.getWorktrees(pathValue).catch(() => []),
-          tauriGitBackend.getSubmodules(pathValue, true).catch(() => []),
-          tauriGitBackend.getCommitCount(pathValue, { allRefs: true }).catch(() => 0)
+          tauriGitBackend.getStashes(pathValue),
+          tauriGitBackend.getWorktrees(pathValue),
+          tauriGitBackend.getSubmodules(pathValue, true),
+          tauriGitBackend.getCommitCount(pathValue, { allRefs: true }),
+          tauriGitBackend.getOperationState(pathValue)
         ]);
         setGraphRows(rows);
         setGraphHasMore(rows.length === graphPageSizePref);
@@ -947,30 +789,33 @@ export const GitClientProvider: React.FC<{
         setWorktrees(wtList);
         setSubmodules(subList);
         setTotalCommitCount(commitCount);
-      } catch {
+        setOp(operation ? {
+          kind: operation.kind,
+          name: operation.kind.toUpperCase(),
+          detail: operation.detail,
+          step: operation.step,
+          total: operation.total,
+          canContinue: operation.canContinue,
+          canSkip: operation.canSkip,
+          canAbort: operation.canAbort
+        } : null);
+        setRepositoryError(null);
+      } catch (error) {
         setGraphRows([]);
         setGraphHasMore(false);
         applyChangedFiles([]);
         setStashes([]);
         setWorktrees([]);
         setSubmodules([]);
+        setOp(null);
         setTotalCommitCount(0);
+        setRepositoryError(error instanceof Error ? error.message : String(error));
       } finally {
         setGraphLoading(false);
       }
     },
     [applyChangedFiles, graphPageSizePref]
   );
-
-  useEffect(() => {
-    if (!repoPath) return;
-    const raw = parseInt(String(preferences.statusPollInterval ?? '2000'), 10);
-    const intervalMs = Number.isFinite(raw) && raw >= 500 ? raw : 2000;
-    const id = setInterval(() => {
-      void tauriGitBackend.getChangedFiles(repoPath).then(applyChangedFiles).catch(() => {});
-    }, intervalMs);
-    return () => clearInterval(id);
-  }, [repoPath, preferences.statusPollInterval, applyChangedFiles]);
 
   const loadMoreGraph = useCallback(() => {
     if (!repoPath || graphLoading || graphLoadingMore || !graphHasMore) {
@@ -1034,6 +879,64 @@ export const GitClientProvider: React.FC<{
       setCurrentBranch(currentBranchName);
     }
   }, [log]);
+
+  const refreshRepository = useCallback(async () => {
+    if (!repoPath) {
+      return;
+    }
+    await Promise.all([refreshBranchSummary(repoPath), refreshRepositorySnapshot(repoPath)]);
+  }, [repoPath, refreshBranchSummary, refreshRepositorySnapshot]);
+
+  useEffect(() => {
+    if (!repoPath) {
+      return;
+    }
+
+    let disposed = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const rawDebounce = Number.parseInt(String(preferences.repositoryRefreshDebounce ?? '250'), 10);
+    const debounceMs = Number.isFinite(rawDebounce) && rawDebounce >= 100 ? rawDebounce : 250;
+    const scheduleRefresh = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        if (!disposed) {
+          void refreshRepository();
+        }
+      }, debounceMs);
+    };
+
+    let unlisten: (() => void) | undefined;
+    void listen<{ repoPath: string }>('git:repository-changed', event => {
+      // The backend retains one watcher for the active repository. Avoid relying
+      // on exact path spelling because the native layer canonicalizes it first.
+      if (event.payload.repoPath) {
+        scheduleRefresh();
+      }
+    }).then(stopListening => {
+      if (disposed) {
+        stopListening();
+      } else {
+        unlisten = stopListening;
+      }
+    });
+
+    void tauriGitBackend.watchRepository(repoPath).catch(error => {
+      if (!disposed) {
+        log([{ text: `Repository watcher unavailable: ${error instanceof Error ? error.message : String(error)}`, type: 'warn' }]);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      unlisten?.();
+    };
+  }, [repoPath, refreshRepository, log, preferences.repositoryRefreshDebounce]);
 
   const recentBranches = useMemo(
     () => recentBranchesByRepo[repoPath] || [],
@@ -1174,6 +1077,7 @@ export const GitClientProvider: React.FC<{
     setRemoteDialogName('');
     setRemoteDialogUrl('');
     setPromptDialogValue('');
+    setPatchDialogContent('');
   }, []);
 
   const runCloneFromDialog = useCallback(() => {
@@ -1264,7 +1168,11 @@ export const GitClientProvider: React.FC<{
       return;
     }
     setDialog(null);
-    if (d.kind === 'prompt') {
+    if (d.kind === 'apply-patch') {
+      const patch = patchDialogContent.trim();
+      setPatchDialogContent('');
+      if (patch) void applyPatchTextRef.current(patch);
+    } else if (d.kind === 'prompt') {
       if (d.run) d.run(promptDialogValue);
     } else if (d.kind === 'add-remote') {
       if (d.run) d.run();
@@ -1273,7 +1181,7 @@ export const GitClientProvider: React.FC<{
     } else if (d.run) {
       d.run();
     }
-  }, [dialog, runCloneFromDialog, promptDialogValue]);
+  }, [dialog, runCloneFromDialog, promptDialogValue, patchDialogContent]);
 
   const openMenu = useCallback(
     (e: React.MouseEvent | MouseEvent, title: string, items: MenuItem[]) => {
@@ -1600,20 +1508,9 @@ export const GitClientProvider: React.FC<{
 
   const getCompare = useCallback(
     async (leftRef: string, rightRef: string) => {
-      try {
-        return await tauriGitBackend.getCompare(repoPath, leftRef, rightRef);
-      } catch (error) {
-        log([{ text: `Compare failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
-        return {
-          leftRef,
-          rightRef,
-          commitsOnlyLeft: [],
-          commitsOnlyRight: [],
-          changedFiles: []
-        };
-      }
+      return tauriGitBackend.getCompare(repoPath, leftRef, rightRef);
     },
-    [repoPath, log]
+    [repoPath]
   );
 
   const createPatch = useCallback(
@@ -1740,6 +1637,44 @@ export const GitClientProvider: React.FC<{
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
+  applyPatchTextRef.current = applyPatchText;
+
+  const openApplyPatchDialog = useCallback(() => {
+    setPatchDialogContent('');
+    setDialog({
+      title: 'Apply Patch',
+      body: 'Paste a unified Git patch to apply it to the current working tree.',
+      cmd: 'git apply -',
+      action: 'Apply patch',
+      kind: 'apply-patch'
+    });
+  }, []);
+
+  const copyStagedPatch = useCallback(async () => {
+    if (!repoPath) return;
+    try {
+      const patch = await tauriGitBackend.getStagedDiff(repoPath);
+      if (!patch.trim()) {
+        toastRun('No staged patch', 'Stage changes before copying a patch');
+        return;
+      }
+      await navigator.clipboard.writeText(patch);
+      toastRun('Copied staged patch', `${patch.length.toLocaleString()} bytes`);
+    } catch (error) {
+      log([{ text: `Read staged patch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+    }
+  }, [repoPath, toastRun, log]);
+
+  const createComparePatch = useCallback(async (leftRef: string, rightRef: string) => {
+    try {
+      const patch = await tauriGitBackend.createComparePatch(repoPath, leftRef, rightRef);
+      toastRun('Comparison patch created', `${leftRef} ↔ ${rightRef}`);
+      return patch;
+    } catch (error) {
+      log([{ text: `Create comparison patch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      return '';
+    }
+  }, [repoPath, log, toastRun]);
 
   const aiMessage = useCallback(async () => {
     setPaletteOpen(false);
@@ -1794,35 +1729,58 @@ export const GitClientProvider: React.FC<{
   }, [repoPath, stagedFiles, log, toastRun, aiConfig]);
 
   const opContinue = useCallback(() => {
-    if (!op) return;
-    const n = op.step + 1;
-    if (n > op.total) {
-      setOp(null);
-      toastRun('Rebase complete', '5 commits replayed onto main');
-    } else {
-      setOp({ ...op, step: n });
-    }
-  }, [op, toastRun]);
+    if (!op || !repoPath) return;
+    void runWithActionLock(async () => {
+      try {
+        const result = await tauriGitBackend.continueOperation(repoPath, op.kind);
+        appendCommandResult(result);
+        await refreshRepository();
+        toastRun(`${op.name} continued`, 'Git operation advanced');
+      } catch (error) {
+        log([{ text: `Continue ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        await refreshRepository();
+      }
+    });
+  }, [op, repoPath, runWithActionLock, appendCommandResult, refreshRepository, toastRun, log]);
 
   const opSkip = useCallback(() => {
-    if (op) setOp({ ...op, step: Math.min(op.step + 1, op.total) });
-  }, [op]);
+    if (!op || !repoPath || !op.canSkip) return;
+    void runWithActionLock(async () => {
+      try {
+        const result = await tauriGitBackend.skipOperation(repoPath, op.kind);
+        appendCommandResult(result);
+        await refreshRepository();
+        toastRun(`${op.name} skipped`, 'Git operation advanced');
+      } catch (error) {
+        log([{ text: `Skip ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        await refreshRepository();
+      }
+    });
+  }, [op, repoPath, runWithActionLock, appendCommandResult, refreshRepository, toastRun, log]);
 
   const opAbort = useCallback(() => {
     confirm(
-      'Abort rebase?',
-      'The rebase is aborted and the branch reset to its pre-rebase state. Conflict resolutions made so far are discarded.',
-      'git rebase --abort',
-      'Abort rebase',
+      `Abort ${op?.kind || 'Git operation'}?`,
+      `The ${op?.kind || 'current Git operation'} is aborted and conflict resolutions made so far are discarded.`,
+      `git ${op?.kind || 'operation'} --abort`,
+      'Abort operation',
       () => {
-        setOp(null);
-        setDialog(null);
-        toastRun('Rebase aborted', 'HEAD restored to its pre-rebase state');
+        if (!op || !repoPath) return;
+        void runWithActionLock(async () => {
+          try {
+            const result = await tauriGitBackend.abortOperation(repoPath, op.kind);
+            appendCommandResult(result);
+            await refreshRepository();
+            toastRun(`${op.name} aborted`, 'Repository restored to its pre-operation state');
+          } catch (error) {
+            log([{ text: `Abort ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            await refreshRepository();
+          }
+        });
       }
     );
-  }, [confirm, toastRun]);
+  }, [confirm, op, repoPath, runWithActionLock, appendCommandResult, refreshRepository, toastRun, log]);
 
-  const getFileList = useCallback((i: number) => buildFiles(i, commits), [commits]);
 
   const matchesFilter = useCallback(
     (i: number) => {
@@ -1883,17 +1841,13 @@ export const GitClientProvider: React.FC<{
   const fetchCommitFiles = useCallback(
     async (sha: string): Promise<DiffFile[]> => {
       if (!repoPath || !sha) return [];
-      try {
-        const files = await tauriGitBackend.getCommitFiles(repoPath, sha);
-        return files.map(f => ({
-          path: f.path,
-          status: (f.status === "A" || f.status === "D" || f.status === "M" || f.status === "R" ? f.status : "M") as DiffFile["status"],
-          add: f.additions,
-          del: f.deletions
-        }));
-      } catch {
-        return [];
-      }
+      const files = await tauriGitBackend.getCommitFiles(repoPath, sha);
+      return files.map(f => ({
+        path: f.path,
+        status: (f.status === "A" || f.status === "D" || f.status === "M" || f.status === "R" ? f.status : "M") as DiffFile["status"],
+        add: f.additions,
+        del: f.deletions
+      }));
     },
     [repoPath]
   );
@@ -1917,6 +1871,43 @@ export const GitClientProvider: React.FC<{
     [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, recordRecentBranch]
   );
 
+  const checkoutTrackingBranch = useCallback(
+    async (remoteBranch: string) => {
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git checkout --track ${remoteBranch}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.checkoutTrackingBranch(repoPath, remoteBranch);
+          appendCommandResult(result);
+          await refreshRepository();
+          toastRun('Tracking branch checked out', remoteBranch);
+        } catch (error) {
+          log([{ text: `Checkout tracking branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepository, toastRun]
+  );
+
+  const resolveConflictSide = useCallback(
+    async (path: string, side: 'ours' | 'theirs'): Promise<boolean> => {
+      let resolved = false;
+      await runWithActionLock(async () => {
+        try {
+          log([{ text: `$ git checkout --${side} -- ${path}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.resolveConflictSide(repoPath, path, side);
+          appendCommandResult(result);
+          await refreshRepository();
+          toastRun(`Checked out ${side} version`, path);
+          resolved = true;
+        } catch (error) {
+          log([{ text: `Checkout ${side} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        }
+      });
+      return resolved;
+    },
+    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepository, toastRun]
+  );
+
   const runPaletteQuery = useCallback(
     async (query: string): Promise<boolean> => {
       const reference = query.trim();
@@ -1932,7 +1923,11 @@ export const GitClientProvider: React.FC<{
         const branch = branches.find(candidate => candidate.name === reference);
         if (branch) {
           setPaletteOpen(false);
-          await checkoutBranch(branch.name);
+          if (branch.kind === 'remote') {
+            await checkoutTrackingBranch(branch.name);
+          } else {
+            await checkoutBranch(branch.name);
+          }
           return true;
         }
 
@@ -1972,7 +1967,7 @@ export const GitClientProvider: React.FC<{
         return false;
       }
     },
-    [repoPath, checkoutBranch, graphRows, log]
+    [repoPath, checkoutBranch, checkoutTrackingBranch, graphRows, log]
   );
 
   const renameBranch = useCallback(
@@ -2045,6 +2040,7 @@ export const GitClientProvider: React.FC<{
           toastRun("Merged branch", reference);
         } catch (error) {
           log([{ text: `Merge failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          await refreshRepositorySnapshot(repoPath);
         }
       });
     },
@@ -2063,6 +2059,7 @@ export const GitClientProvider: React.FC<{
           toastRun("Rebased onto", reference);
         } catch (error) {
           log([{ text: `Rebase failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          await refreshRepositorySnapshot(repoPath);
         }
       });
     },
@@ -2099,6 +2096,7 @@ export const GitClientProvider: React.FC<{
           toastRun("Cherry-picked commit", sha.slice(0, 7));
         } catch (error) {
           log([{ text: `Cherry-pick failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          await refreshRepositorySnapshot(repoPath);
         }
       });
     },
@@ -2117,6 +2115,7 @@ export const GitClientProvider: React.FC<{
           toastRun("Reverted commit", sha.slice(0, 7));
         } catch (error) {
           log([{ text: `Revert failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          await refreshRepositorySnapshot(repoPath);
         }
       });
     },
@@ -2896,6 +2895,8 @@ export const GitClientProvider: React.FC<{
         confirmDialog,
         promptDialogValue,
         setPromptDialogValue,
+        patchDialogContent,
+        setPatchDialogContent,
         cloneDialogUrl,
         setCloneDialogUrl,
         cloneDialogUseGit,
@@ -2957,7 +2958,8 @@ export const GitClientProvider: React.FC<{
         graphLoading,
         graphLoadingMore,
         loadMoreGraph,
-        getFileList,
+        repositoryError,
+        refreshRepository,
         stagedFiles,
         unstagedFiles,
         untrackedFiles,
@@ -2983,6 +2985,8 @@ export const GitClientProvider: React.FC<{
         getSubmodulePointerDiff,
         stageSubmodulePointer,
         checkoutBranch,
+        checkoutTrackingBranch,
+        resolveConflictSide,
         renameBranch,
         deleteBranch,
         setUpstream,
@@ -3038,6 +3042,9 @@ export const GitClientProvider: React.FC<{
         getCompare,
         createPatch,
         applyPatchText,
+        createComparePatch,
+        copyStagedPatch,
+        openApplyPatchDialog,
         addRemote,
         setRemoteUrl,
         deleteRemote,

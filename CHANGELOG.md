@@ -2,6 +2,7 @@
 
 ## 2026-08-17
 
+- Audited and remediated frontend/backend Git workflow gaps: removed active demo fallbacks, added safe conflict resolution and operation controls, watcher-driven refresh, working-tree/tag comparison, patch workflows, remote tracking checkout, and real changed-file statistics. See `docs/changelogs/2026-08-17_frontend_ui_audit.md`.
 - Replaced the Ubuntu-only GitHub Actions build with tag/manual semantic-version release builds for Ubuntu 22.04 amd64, Windows amd64, macOS Intel, and macOS Apple silicon. See `docs/changelogs/2026-08-17_cross_platform_release_builds.md`.
 
 ## 2026-08-16
