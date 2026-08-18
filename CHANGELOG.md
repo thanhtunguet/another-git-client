@@ -4,7 +4,9 @@
 
 - Investigated and reduced recurring frontend flicker: passive repository watcher refreshes are
   now throttled to a configurable 10-second interval, unchanged snapshot DTOs preserve their state
-  references, and graph filter rendering is memoized. See
+  references, and graph filter rendering is memoized. Added a phased state-composition refactor
+  plan and Redux provider/typed graph-slice infrastructure for replacing the `GitClientProvider`
+  god component with focused providers. See
   `docs/changelogs/2026-08-18_frontend_refresh_flicker_investigation.md`.
 
 ## 2026-08-17

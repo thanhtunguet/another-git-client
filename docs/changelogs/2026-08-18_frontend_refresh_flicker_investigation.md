@@ -59,3 +59,14 @@
 - `npm run typecheck` passed.
 - `npm run lint` passed with 14 pre-existing warnings and no errors.
 - `git diff --check` passed.
+
+## Follow-up plan
+
+- Added `docs/plans/2026-08-18_git_client_state_composition_refactor.md` for a phased Redux
+  selector migration and decomposition of the current `GitClientProvider` god component.
+
+## Composition refactor progress
+
+- Installed Redux Toolkit and React-Redux with pnpm. Added the Redux provider, typed store hooks,
+  and isolated repository graph slice; it is not yet hydrated by the legacy refresh pipeline, so
+  no parallel backend reader has been introduced.

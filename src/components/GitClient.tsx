@@ -1,6 +1,7 @@
 import React from 'react';
 import { GitClientProps } from '../types/git-client';
 import { GitClientProvider, useGitClient } from '../context/GitClientContext';
+import { AppProviders } from './AppProviders';
 import { TopBar } from './layout/TopBar';
 import { NavSidebar } from './layout/NavSidebar';
 import { StatusBar } from './layout/StatusBar';
@@ -109,8 +110,10 @@ const GitClientInner: React.FC<{ className?: string; style?: React.CSSProperties
 
 export const GitClient: React.FC<GitClientProps> = props => {
   return (
-    <GitClientProvider props={props}>
-      <GitClientInner className={props.className} style={props.style} />
-    </GitClientProvider>
+    <AppProviders>
+      <GitClientProvider props={props}>
+        <GitClientInner className={props.className} style={props.style} />
+      </GitClientProvider>
+    </AppProviders>
   );
 };
