@@ -467,17 +467,22 @@ pub fn git_get_ref_graph(
   repo_path: String,
   reference: String,
   max_count: Option<usize>,
+  skip: Option<usize>,
 ) -> Result<Vec<GraphCommitRow>, String> {
   let repo = canonical_repo_path(&repo_path)?;
   let count = max_count.unwrap_or(3);
-  let args = vec![
+  let offset = skip.unwrap_or(0);
+  let mut args = vec![
     "log".to_string(),
     "--date=iso-strict".to_string(),
     "--decorate=full".to_string(),
     format!("--max-count={count}"),
     "--format=%m%x1f%H%x1f%h%x1f%P%x1f%D%x1f%an%x1f%aI%x1f%s%x1e".to_string(),
-    reference,
   ];
+  if offset > 0 {
+    args.push(format!("--skip={offset}"));
+  }
+  args.push(reference);
 
   let output = run_git(&repo, &args)?.stdout;
   Ok(parse_graph_rows(&output))
@@ -2581,6 +2586,39 @@ mod tests {
     assert_eq!(operation.kind, "cherry-pick");
     assert!(operation.can_continue);
     assert!(operation.can_skip);
+    std::fs::remove_dir_all(repo).expect("remove test repo");
+  }
+
+  #[test]
+  fn ref_graph_pages_the_full_history_of_a_branch() {
+    let repo = test_repo();
+    for subject in ["second", "third", "fourth"] {
+      std::fs::write(repo.join("README.md"), format!("{subject}\n")).expect("update file");
+      let result = Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(&repo)
+        .output()
+        .expect("stage commit");
+      assert!(result.status.success());
+      let result = Command::new("git")
+        .args(["commit", "-m", subject])
+        .current_dir(&repo)
+        .output()
+        .expect("create commit");
+      assert!(result.status.success());
+    }
+
+    let repo_path = repo.to_string_lossy().to_string();
+    let first_page = git_get_ref_graph(repo_path.clone(), "HEAD".to_string(), Some(2), Some(0))
+      .expect("load first page");
+    let second_page = git_get_ref_graph(repo_path, "HEAD".to_string(), Some(2), Some(2))
+      .expect("load second page");
+
+    assert_eq!(first_page.len(), 2);
+    assert_eq!(second_page.len(), 2);
+    assert!(first_page
+      .iter()
+      .all(|first| second_page.iter().all(|second| first.sha != second.sha)));
     std::fs::remove_dir_all(repo).expect("remove test repo");
   }
 }

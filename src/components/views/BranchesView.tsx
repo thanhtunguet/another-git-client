@@ -24,6 +24,8 @@ type SelectedRevision =
   | { kind: 'branch'; name: string; fullRef: string; branch: BranchNode }
   | { kind: 'tag'; name: string; fullRef: string; tag: TagNode };
 
+const REF_HISTORY_PAGE_SIZE = 100;
+
 type TreeRow =
   | { type: 'group'; id: string; label: string; count: number }
   | { type: 'folder'; id: string; label: string; depth: number }
@@ -546,25 +548,40 @@ export const BranchesView: React.FC = () => {
     let disposed = false;
     setRevisionCommitsLoading(true);
     setRevisionCommitsError(null);
+    setSelectedRevisionCommits([]);
 
-    void tauriGitBackend
-      .getRefGraph(repoPath, selectedRevision.fullRef, { maxCount: 3 })
-      .then(rows => {
-        if (!disposed) {
-          setSelectedRevisionCommits(rows);
+    void (async () => {
+      try {
+        const commits: GraphCommitRow[] = [];
+        let skip = 0;
+
+        while (!disposed) {
+          const page = await tauriGitBackend.getRefGraph(repoPath, selectedRevision.fullRef, {
+            maxCount: REF_HISTORY_PAGE_SIZE,
+            skip
+          });
+          if (disposed) {
+            return;
+          }
+
+          commits.push(...page);
+          setSelectedRevisionCommits([...commits]);
+
+          if (page.length < REF_HISTORY_PAGE_SIZE) {
+            return;
+          }
+          skip += page.length;
         }
-      })
-      .catch(error => {
+      } catch (error) {
         if (!disposed) {
-          setSelectedRevisionCommits([]);
           setRevisionCommitsError(error instanceof Error ? error.message : String(error));
         }
-      })
-      .finally(() => {
+      } finally {
         if (!disposed) {
           setRevisionCommitsLoading(false);
         }
-      });
+      }
+    })();
 
     return () => {
       disposed = true;
@@ -1165,11 +1182,13 @@ export const BranchesView: React.FC = () => {
           }}
         >
           <h6 style={{ margin: '0 0 var(--space-3)', color: 'var(--fg3)' }}>
-            Recent commits on this revision
+            {selectedRevision?.kind === 'tag' ? 'Commits at this tag' : 'Commits on this branch'}
           </h6>
           {revisionCommitsLoading && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              Loading recent commits…
+              {selectedRevisionCommits.length
+                ? `Loading commit history… ${selectedRevisionCommits.length} commits loaded`
+                : 'Loading commit history…'}
             </div>
           )}
           {!revisionCommitsLoading && revisionCommitsError && (
@@ -1184,7 +1203,7 @@ export const BranchesView: React.FC = () => {
           )}
           {!revisionCommitsLoading && !revisionCommitsError && !selectedRevision && (
             <div style={{ color: 'var(--fg3)', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-              Select a branch or tag to see its recent commits.
+              Select a branch or tag to see its commit history.
             </div>
           )}
           {selectedRevisionCommits.map(commit => {

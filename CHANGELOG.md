@@ -2,6 +2,9 @@
 
 ## 2026-08-18
 
+- Updated the Branches view to display the full commit history of the selected branch in
+  paged backend reads, replacing the three-commit preview. See
+  `docs/changelogs/2026-08-18_branches_full_commit_history.md`.
 - Investigated and reduced recurring frontend flicker: passive repository watcher refreshes are
   now throttled to a configurable 10-second interval, unchanged snapshot DTOs preserve their state
   references, and graph filter rendering is memoized. Added a phased state-composition refactor

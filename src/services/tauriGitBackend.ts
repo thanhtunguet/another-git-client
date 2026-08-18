@@ -168,11 +168,12 @@ export const tauriGitBackend = {
     });
   },
 
-  getRefGraph(repoPath: string, reference: string, options?: { maxCount?: number }) {
+  getRefGraph(repoPath: string, reference: string, options?: { maxCount?: number; skip?: number }) {
     return invoke<GraphCommitRow[]>("git_get_ref_graph", {
       repoPath,
       reference,
-      maxCount: options?.maxCount
+      maxCount: options?.maxCount,
+      skip: options?.skip
     });
   },
 
