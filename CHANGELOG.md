@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-18
+
+- Investigated and reduced recurring frontend flicker: passive repository watcher refreshes are
+  now throttled to a configurable 10-second interval, unchanged snapshot DTOs preserve their state
+  references, and graph filter rendering is memoized. See
+  `docs/changelogs/2026-08-18_frontend_refresh_flicker_investigation.md`.
+
 ## 2026-08-17
 
 - Audited and remediated frontend/backend Git workflow gaps: removed active demo fallbacks, added safe conflict resolution and operation controls, watcher-driven refresh, working-tree/tag comparison, patch workflows, remote tracking checkout, and real changed-file statistics. See `docs/changelogs/2026-08-17_frontend_ui_audit.md`.

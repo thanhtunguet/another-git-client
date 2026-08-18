@@ -5,12 +5,20 @@ import { useGitClient } from '../../context/GitClientContext';
 import { KeyboardShortcutsSettings } from './KeyboardShortcutsSettings';
 
 export const SettingsView: React.FC = () => {
-  const { preferences, updatePreference, graphLayout, setGraphLayout, compareLayout, setCompareLayout, aiConfig, updateAIConfig } = useGitClient();
+  const {
+    preferences,
+    updatePreference,
+    graphLayout,
+    setGraphLayout,
+    compareLayout,
+    setCompareLayout,
+    aiConfig,
+    updateAIConfig
+  } = useGitClient();
 
   const settingsNav = [
     { id: 'keys', href: '#keys', label: 'Keyboard shortcuts' },
     { id: 'graph', href: '#graph', label: 'Graph & history' },
-    { id: 'perf', href: '#perf', label: 'Performance' },
     { id: 'compare', href: '#compare', label: 'Compare & export' },
     { id: 'commit', href: '#commit', label: 'Commit' },
     { id: 'diff', href: '#diff', label: 'Diff & merge' },
@@ -32,7 +40,7 @@ export const SettingsView: React.FC = () => {
       const aiKey = settingKey.replace('ai.', '');
       const value = (aiConfig as any)[aiKey] || defVal;
       const inputType = aiKey === 'apiKey' ? 'password' : 'text';
-      
+
       return (
         <Input
           id={settingKey}
@@ -59,7 +67,8 @@ export const SettingsView: React.FC = () => {
 
     // Map existing strongly-typed state
     if (settingKey === 'graphLayout') value = graphLayout === 'grouped' ? 'Grouped by day' : 'Rows';
-    if (settingKey === 'compareLayout') value = compareLayout === 'stack' ? 'Stacked' : 'Side by side';
+    if (settingKey === 'compareLayout')
+      value = compareLayout === 'stack' ? 'Stacked' : 'Side by side';
 
     const handleChange = (newVal: any) => {
       if (settingKey === 'graphLayout') {
@@ -165,20 +174,6 @@ export const SettingsView: React.FC = () => {
       ]
     },
     {
-      id: 'perf',
-      title: 'Performance',
-      rows: [
-        {
-          label: 'Repository refresh debounce',
-          hint: 'Milliseconds to wait after a repository filesystem event before refreshing Git state',
-          control: 'input',
-          settingKey: 'repositoryRefreshDebounce',
-          defaultValue: '250',
-          width: 90
-        }
-      ]
-    },
-    {
       id: 'compare',
       title: 'Compare & export',
       rows: [
@@ -220,7 +215,14 @@ export const SettingsView: React.FC = () => {
           defaultValue: '([A-Z]{2,8}-\\d+)',
           width: 220
         },
-        { label: 'Wrap message body', hint: 'Max characters per line in the commit message box', control: 'input', settingKey: 'wrapMessageBody', defaultValue: '72', width: 90 }
+        {
+          label: 'Wrap message body',
+          hint: 'Max characters per line in the commit message box',
+          control: 'input',
+          settingKey: 'wrapMessageBody',
+          defaultValue: '72',
+          width: 90
+        }
       ]
     },
     {
@@ -329,7 +331,10 @@ export const SettingsView: React.FC = () => {
                     {r.control === 'checkbox' ? (
                       <div style={{ fontSize: '12.5px' }}>{r.label}</div>
                     ) : (
-                      <label htmlFor={r.settingKey} style={{ fontSize: '12.5px', display: 'block' }}>
+                      <label
+                        htmlFor={r.settingKey}
+                        style={{ fontSize: '12.5px', display: 'block' }}
+                      >
                         {r.label}
                       </label>
                     )}
@@ -337,7 +342,16 @@ export const SettingsView: React.FC = () => {
                       {r.hint}
                     </div>
                   </div>
-                  <div>{renderControl(r.control, r.settingKey, r.defaultValue, r.options, r.width, r.label)}</div>
+                  <div>
+                    {renderControl(
+                      r.control,
+                      r.settingKey,
+                      r.defaultValue,
+                      r.options,
+                      r.width,
+                      r.label
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

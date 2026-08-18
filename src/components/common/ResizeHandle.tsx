@@ -10,7 +10,7 @@ export interface ResizeHandleProps {
   style?: React.CSSProperties;
 }
 
-export const ResizeHandle: React.FC<ResizeHandleProps> = ({
+export const ResizeHandle = React.memo<ResizeHandleProps>(({
   direction = 'horizontal',
   isDragging = false,
   onMouseDown,
@@ -75,4 +75,6 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({
       />
     </div>
   );
-};
+});
+
+ResizeHandle.displayName = 'ResizeHandle';

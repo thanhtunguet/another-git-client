@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from 'react';
 import {
   Theme,
   GitClientView,
@@ -21,7 +29,13 @@ import {
 } from '../types/git-client';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
-import { loadAppStore, saveAppStore, loadAIConfig, saveAIConfig, AIConfig } from '../services/appStore';
+import {
+  loadAppStore,
+  saveAppStore,
+  loadAIConfig,
+  saveAIConfig,
+  AIConfig
+} from '../services/appStore';
 import {
   tauriGitBackend,
   type ChangedFile as BackendChangedFile,
@@ -44,6 +58,8 @@ import {
   useKeybinding,
   useKeybindingRoot
 } from '../hooks/useKeybindings';
+import { REPOSITORY_WATCHER_REFRESH_INTERVAL_MS } from '../config/repositoryRefresh';
+import { retainEqualState } from '../utils/state';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -54,7 +70,6 @@ export const COLORS = [
   'oklch(.70 .12 330)',
   'oklch(.70 .10 255)'
 ];
-
 
 export function statusColor(s: string): string {
   return s === 'A'
@@ -239,7 +254,10 @@ interface GitClientContextType {
   refreshSubmodules: (targetPath?: string) => Promise<void>;
   /** Re-reads the working-tree status immediately, without waiting for the poller. */
   refreshStatus: () => Promise<void>;
-  addWorktree: (path: string, options?: { reference?: string; newBranch?: string; detach?: boolean }) => Promise<void>;
+  addWorktree: (
+    path: string,
+    options?: { reference?: string; newBranch?: string; detach?: boolean }
+  ) => Promise<void>;
   removeWorktree: (path: string, force?: boolean) => Promise<void>;
   lockWorktree: (path: string, reason?: string) => Promise<void>;
   unlockWorktree: (path: string) => Promise<void>;
@@ -247,7 +265,11 @@ interface GitClientContextType {
   openPathInFileManager: (path: string) => Promise<void>;
   openPathInTerminal: (path: string) => Promise<void>;
   initSubmodule: (path?: string) => Promise<void>;
-  updateSubmodule: (options?: { path?: string; init?: boolean; recursive?: boolean }) => Promise<void>;
+  updateSubmodule: (options?: {
+    path?: string;
+    init?: boolean;
+    recursive?: boolean;
+  }) => Promise<void>;
   syncSubmodule: (options?: { path?: string; recursive?: boolean }) => Promise<void>;
   deinitSubmodule: (path: string, force?: boolean) => Promise<void>;
   checkoutRecordedSubmoduleCommit: (path: string) => Promise<void>;
@@ -256,13 +278,13 @@ interface GitClientContextType {
   stageSubmodulePointer: (path: string) => Promise<void>;
   checkoutBranch: (branch: string) => Promise<void>;
   checkoutTrackingBranch: (branch: string) => Promise<void>;
-  resolveConflictSide: (path: string, side: "ours" | "theirs") => Promise<boolean>;
+  resolveConflictSide: (path: string, side: 'ours' | 'theirs') => Promise<boolean>;
   renameBranch: (oldName: string, newName: string) => Promise<void>;
   deleteBranch: (branch: string, isRemote?: boolean, force?: boolean) => Promise<void>;
   setUpstream: (branch?: string, upstream?: string) => Promise<void>;
   mergeBranch: (reference: string) => Promise<void>;
   rebaseBranch: (reference: string) => Promise<void>;
-  resetToRef: (reference: string, mode?: "soft" | "mixed" | "hard") => Promise<void>;
+  resetToRef: (reference: string, mode?: 'soft' | 'mixed' | 'hard') => Promise<void>;
   cherryPickCommit: (sha: string) => Promise<void>;
   revertCommit: (sha: string) => Promise<void>;
   createTag: (tagName: string, sha?: string) => Promise<void>;
@@ -309,7 +331,10 @@ interface GitClientContextType {
   onFetchProp?: () => void;
   onPullProp?: () => void;
   onPushProp?: () => void;
-  getCompare: (leftRef: string, rightRef: string) => Promise<import("../services/tauriGitBackend").GitCompareResult>;
+  getCompare: (
+    leftRef: string,
+    rightRef: string
+  ) => Promise<import('../services/tauriGitBackend').GitCompareResult>;
   createPatch: (reference: string, filePath?: string) => Promise<string>;
   applyPatchText: (patchContent: string) => Promise<void>;
   createComparePatch: (leftRef: string, rightRef: string) => Promise<string>;
@@ -318,7 +343,7 @@ interface GitClientContextType {
   addRemote: (name: string, url: string) => Promise<void>;
   setRemoteUrl: (name: string, url: string) => Promise<void>;
   deleteRemote: (name: string) => Promise<void>;
-  getRemotes: () => Promise<import("../services/tauriGitBackend").RemoteEntry[]>;
+  getRemotes: () => Promise<import('../services/tauriGitBackend').RemoteEntry[]>;
   openAddRemoteDialog: () => void;
   openEditRemoteDialog: (name: string, currentUrl: string) => void;
   preferences: Record<string, any>;
@@ -331,6 +356,10 @@ interface GitClientContextType {
 }
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
+
+interface SnapshotRefreshOptions {
+  background?: boolean;
+}
 
 export const GitClientProvider: React.FC<{
   props?: GitClientProps;
@@ -442,10 +471,16 @@ export const GitClientProvider: React.FC<{
     () => persistedStore?.repositories.recentBranches || {}
   );
   const [currentBranch, setCurrentBranch] = useState<string>(props.currentBranch || 'No branch');
-  const [aheadCount, setAheadCount] = useState<number>(props.aheadCount !== undefined ? props.aheadCount : 0);
-  const [behindCount, setBehindCount] = useState<number>(props.behindCount !== undefined ? props.behindCount : 0);
+  const [aheadCount, setAheadCount] = useState<number>(
+    props.aheadCount !== undefined ? props.aheadCount : 0
+  );
+  const [behindCount, setBehindCount] = useState<number>(
+    props.behindCount !== undefined ? props.behindCount : 0
+  );
   const [actionBusy, setActionBusy] = useState<boolean>(false);
-  const [activeRemoteAction, setActiveRemoteAction] = useState<'fetch' | 'pull' | 'push' | null>(null);
+  const [activeRemoteAction, setActiveRemoteAction] = useState<'fetch' | 'pull' | 'push' | null>(
+    null
+  );
 
   const [preferences, setPreferences] = useState<Record<string, any>>(
     persistedStore?.settings.preferences || {}
@@ -516,10 +551,7 @@ export const GitClientProvider: React.FC<{
     [graphRows]
   );
 
-  const getCommitFullSha = useCallback(
-    (i: number): string => graphRows[i]?.sha || '',
-    [graphRows]
-  );
+  const getCommitFullSha = useCallback((i: number): string => graphRows[i]?.sha || '', [graphRows]);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
@@ -706,23 +738,29 @@ export const GitClientProvider: React.FC<{
     [actionBusy, finishProgressToast, startProgressToast, waitForNextPaint]
   );
 
-  const appendCommandResult = useCallback((result: GitCommandResult) => {
-    const lines: LogEntry[] = [];
-    const trimmedOut = result.stdout.trim();
-    const trimmedErr = result.stderr.trim();
-    if (trimmedOut) {
-      for (const line of trimmedOut.split(/\r?\n/)) {
-        lines.push({ text: line, type: 'out' });
+  const appendCommandResult = useCallback(
+    (result: GitCommandResult) => {
+      const lines: LogEntry[] = [];
+      const trimmedOut = result.stdout.trim();
+      const trimmedErr = result.stderr.trim();
+      if (trimmedOut) {
+        for (const line of trimmedOut.split(/\r?\n/)) {
+          lines.push({ text: line, type: 'out' });
+        }
       }
-    }
-    if (trimmedErr) {
-      for (const line of trimmedErr.split(/\r?\n/)) {
-        lines.push({ text: line, type: result.exitCode === 0 ? 'warn' : 'err' });
+      if (trimmedErr) {
+        for (const line of trimmedErr.split(/\r?\n/)) {
+          lines.push({ text: line, type: result.exitCode === 0 ? 'warn' : 'err' });
+        }
       }
-    }
-    lines.push({ text: result.exitCode === 0 ? 'done' : `exit ${result.exitCode}`, type: result.exitCode === 0 ? 'ok' : 'err' });
-    log(lines);
-  }, [log]);
+      lines.push({
+        text: result.exitCode === 0 ? 'done' : `exit ${result.exitCode}`,
+        type: result.exitCode === 0 ? 'ok' : 'err'
+      });
+      log(lines);
+    },
+    [log]
+  );
 
   const applyChangedFiles = useCallback((entries: BackendChangedFile[]) => {
     const mapStatus = (entry: BackendChangedFile): DiffFile['status'] => {
@@ -734,7 +772,14 @@ export const GitClientProvider: React.FC<{
       }
       const resolved = (entry.indexStatus || entry.worktreeStatus || 'M').trim() || 'M';
       const primary = resolved[0] || 'M';
-      if (primary === 'A' || primary === 'D' || primary === 'M' || primary === 'R' || primary === '?' || primary === 'U') {
+      if (
+        primary === 'A' ||
+        primary === 'D' ||
+        primary === 'M' ||
+        primary === 'R' ||
+        primary === '?' ||
+        primary === 'U'
+      ) {
         return primary;
       }
       return 'M';
@@ -748,70 +793,85 @@ export const GitClientProvider: React.FC<{
     });
 
     const nextStaged = entries.filter(entry => entry.staged).map(toDiffFile);
-    const nextUnstaged = entries.filter(entry => entry.unstaged && !entry.untracked).map(toDiffFile);
+    const nextUnstaged = entries
+      .filter(entry => entry.unstaged && !entry.untracked)
+      .map(toDiffFile);
     const nextUntracked = entries.filter(entry => entry.untracked).map(toDiffFile);
 
-    setStagedFiles(nextStaged);
-    setUnstagedFiles(nextUnstaged);
-    setUntrackedFiles(nextUntracked);
+    setStagedFiles(previous => retainEqualState(previous, nextStaged));
+    setUnstagedFiles(previous => retainEqualState(previous, nextUnstaged));
+    setUntrackedFiles(previous => retainEqualState(previous, nextUntracked));
   }, []);
 
   const refreshRepositorySnapshot = useCallback(
-    async (pathValue: string) => {
+    async (pathValue: string, options: SnapshotRefreshOptions = {}) => {
+      const { background = false } = options;
       if (!pathValue) {
-        setGraphRows([]);
+        setGraphRows(previous => retainEqualState(previous, []));
         setGraphHasMore(false);
         applyChangedFiles([]);
-        setStashes([]);
-        setWorktrees([]);
-        setSubmodules([]);
+        setStashes(previous => retainEqualState(previous, []));
+        setWorktrees(previous => retainEqualState(previous, []));
+        setSubmodules(previous => retainEqualState(previous, []));
         setOp(null);
         setTotalCommitCount(0);
         setRepositoryError(null);
         return;
       }
 
-      setGraphLoading(true);
+      if (!background) {
+        setGraphLoading(true);
+      }
       try {
-        const [rows, changed, stashList, wtList, subList, commitCount, operation] = await Promise.all([
-          tauriGitBackend.getGraph(pathValue, { maxCount: graphPageSizePref, skip: 0, allRefs: true }),
-          tauriGitBackend.getChangedFiles(pathValue),
-          tauriGitBackend.getStashes(pathValue),
-          tauriGitBackend.getWorktrees(pathValue),
-          tauriGitBackend.getSubmodules(pathValue, true),
-          tauriGitBackend.getCommitCount(pathValue, { allRefs: true }),
-          tauriGitBackend.getOperationState(pathValue)
-        ]);
-        setGraphRows(rows);
+        const [rows, changed, stashList, wtList, subList, commitCount, operation] =
+          await Promise.all([
+            tauriGitBackend.getGraph(pathValue, {
+              maxCount: graphPageSizePref,
+              skip: 0,
+              allRefs: true
+            }),
+            tauriGitBackend.getChangedFiles(pathValue),
+            tauriGitBackend.getStashes(pathValue),
+            tauriGitBackend.getWorktrees(pathValue),
+            tauriGitBackend.getSubmodules(pathValue, true),
+            tauriGitBackend.getCommitCount(pathValue, { allRefs: true }),
+            tauriGitBackend.getOperationState(pathValue)
+          ]);
+        setGraphRows(previous => retainEqualState(previous, rows));
         setGraphHasMore(rows.length === graphPageSizePref);
         applyChangedFiles(changed);
-        setStashes(stashList);
-        setWorktrees(wtList);
-        setSubmodules(subList);
+        setStashes(previous => retainEqualState(previous, stashList));
+        setWorktrees(previous => retainEqualState(previous, wtList));
+        setSubmodules(previous => retainEqualState(previous, subList));
         setTotalCommitCount(commitCount);
-        setOp(operation ? {
-          kind: operation.kind,
-          name: operation.kind.toUpperCase(),
-          detail: operation.detail,
-          step: operation.step,
-          total: operation.total,
-          canContinue: operation.canContinue,
-          canSkip: operation.canSkip,
-          canAbort: operation.canAbort
-        } : null);
+        const nextOperation = operation
+          ? {
+              kind: operation.kind,
+              name: operation.kind.toUpperCase(),
+              detail: operation.detail,
+              step: operation.step,
+              total: operation.total,
+              canContinue: operation.canContinue,
+              canSkip: operation.canSkip,
+              canAbort: operation.canAbort
+            }
+          : null;
+        setOp(previous => retainEqualState(previous, nextOperation));
         setRepositoryError(null);
       } catch (error) {
-        setGraphRows([]);
+        setGraphRows(previous => retainEqualState(previous, []));
         setGraphHasMore(false);
         applyChangedFiles([]);
-        setStashes([]);
-        setWorktrees([]);
-        setSubmodules([]);
+        setStashes(previous => retainEqualState(previous, []));
+        setWorktrees(previous => retainEqualState(previous, []));
+        setSubmodules(previous => retainEqualState(previous, []));
         setOp(null);
         setTotalCommitCount(0);
         setRepositoryError(error instanceof Error ? error.message : String(error));
       } finally {
-        setGraphLoading(false);
+        if (!background) {
+          setGraphLoading(false);
+        }
       }
     },
     [applyChangedFiles, graphPageSizePref]
@@ -840,52 +900,61 @@ export const GitClientProvider: React.FC<{
     })();
   }, [repoPath, graphLoading, graphLoadingMore, graphHasMore, graphRows.length, graphPageSizePref]);
 
-  const refreshBranchSummary = useCallback(async (pathValue: string) => {
-    if (!pathValue) {
-      return;
-    }
-    let currentBranchName = '';
-    try {
-      const branches = await tauriGitBackend.getBranches(pathValue);
-      const current = branches.find(b => b.current) || branches.find(b => b.kind === 'local');
-      if (current) {
-        currentBranchName = current.name;
-        setAheadCount(current.ahead || 0);
-        setBehindCount(current.behind || 0);
+  const refreshBranchSummary = useCallback(
+    async (pathValue: string) => {
+      if (!pathValue) {
+        return;
       }
-    } catch (error) {
-      log([
-        {
-          text: `Failed to load branches: ${error instanceof Error ? error.message : String(error)}`,
-          type: 'warn'
-        }
-      ]);
-    }
-
-    if (!currentBranchName) {
+      let currentBranchName = '';
       try {
-        currentBranchName = (await tauriGitBackend.getCurrentBranch(pathValue)).trim();
+        const branches = await tauriGitBackend.getBranches(pathValue);
+        const current = branches.find(b => b.current) || branches.find(b => b.kind === 'local');
+        if (current) {
+          currentBranchName = current.name;
+          setAheadCount(current.ahead || 0);
+          setBehindCount(current.behind || 0);
+        }
       } catch (error) {
         log([
           {
-            text: `Failed to load current branch: ${error instanceof Error ? error.message : String(error)}`,
+            text: `Failed to load branches: ${error instanceof Error ? error.message : String(error)}`,
             type: 'warn'
           }
         ]);
       }
-    }
 
-    if (currentBranchName) {
-      setCurrentBranch(currentBranchName);
-    }
-  }, [log]);
+      if (!currentBranchName) {
+        try {
+          currentBranchName = (await tauriGitBackend.getCurrentBranch(pathValue)).trim();
+        } catch (error) {
+          log([
+            {
+              text: `Failed to load current branch: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'warn'
+            }
+          ]);
+        }
+      }
 
-  const refreshRepository = useCallback(async () => {
-    if (!repoPath) {
-      return;
-    }
-    await Promise.all([refreshBranchSummary(repoPath), refreshRepositorySnapshot(repoPath)]);
-  }, [repoPath, refreshBranchSummary, refreshRepositorySnapshot]);
+      if (currentBranchName) {
+        setCurrentBranch(currentBranchName);
+      }
+    },
+    [log]
+  );
+
+  const refreshRepository = useCallback(
+    async (options: SnapshotRefreshOptions = {}) => {
+      if (!repoPath) {
+        return;
+      }
+      await Promise.all([
+        refreshBranchSummary(repoPath),
+        refreshRepositorySnapshot(repoPath, options)
+      ]);
+    },
+    [repoPath, refreshBranchSummary, refreshRepositorySnapshot]
+  );
 
   useEffect(() => {
     if (!repoPath) {
@@ -894,18 +963,16 @@ export const GitClientProvider: React.FC<{
 
     let disposed = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const rawDebounce = Number.parseInt(String(preferences.repositoryRefreshDebounce ?? '250'), 10);
-    const debounceMs = Number.isFinite(rawDebounce) && rawDebounce >= 100 ? rawDebounce : 250;
     const scheduleRefresh = () => {
       if (timeoutId) {
-        clearTimeout(timeoutId);
+        return;
       }
       timeoutId = setTimeout(() => {
         timeoutId = null;
         if (!disposed) {
-          void refreshRepository();
+          void refreshRepository({ background: true });
         }
-      }, debounceMs);
+      }, REPOSITORY_WATCHER_REFRESH_INTERVAL_MS);
     };
 
     let unlisten: (() => void) | undefined;
@@ -925,7 +992,12 @@ export const GitClientProvider: React.FC<{
 
     void tauriGitBackend.watchRepository(repoPath).catch(error => {
       if (!disposed) {
-        log([{ text: `Repository watcher unavailable: ${error instanceof Error ? error.message : String(error)}`, type: 'warn' }]);
+        log([
+          {
+            text: `Repository watcher unavailable: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'warn'
+          }
+        ]);
       }
     });
 
@@ -936,7 +1008,7 @@ export const GitClientProvider: React.FC<{
       }
       unlisten?.();
     };
-  }, [repoPath, refreshRepository, log, preferences.repositoryRefreshDebounce]);
+  }, [repoPath, refreshRepository, log]);
 
   const recentBranches = useMemo(
     () => recentBranchesByRepo[repoPath] || [],
@@ -973,14 +1045,17 @@ export const GitClientProvider: React.FC<{
     setKnownRepositories(prev => prev.filter(item => item.path !== pathValue));
   }, []);
 
-  const setActiveRepository = useCallback(async (pathValue: string) => {
-    setRepoPath(pathValue);
-    setSelectedRepoPath(pathValue);
-    const nextName = getRepoNameFromPath(pathValue);
-    setRepoName(nextName);
-    rememberRepository(pathValue, nextName);
-    await Promise.all([refreshBranchSummary(pathValue), refreshRepositorySnapshot(pathValue)]);
-  }, [getRepoNameFromPath, refreshBranchSummary, refreshRepositorySnapshot, rememberRepository]);
+  const setActiveRepository = useCallback(
+    async (pathValue: string) => {
+      setRepoPath(pathValue);
+      setSelectedRepoPath(pathValue);
+      const nextName = getRepoNameFromPath(pathValue);
+      setRepoName(nextName);
+      rememberRepository(pathValue, nextName);
+      await Promise.all([refreshBranchSummary(pathValue), refreshRepositorySnapshot(pathValue)]);
+    },
+    [getRepoNameFromPath, refreshBranchSummary, refreshRepositorySnapshot, rememberRepository]
+  );
 
   const selectRepository = useCallback(
     (path: string) => {
@@ -1064,7 +1139,16 @@ export const GitClientProvider: React.FC<{
       inputRequired: boolean = true
     ) => {
       setPromptDialogValue(defaultValue);
-      setDialog({ title, body, cmd: '', action, kind: 'prompt', run: run as any, inputLabel, inputRequired });
+      setDialog({
+        title,
+        body,
+        cmd: '',
+        action,
+        kind: 'prompt',
+        run: run as any,
+        inputLabel,
+        inputRequired
+      });
       setMenu(null);
     },
     []
@@ -1127,7 +1211,12 @@ export const GitClientProvider: React.FC<{
                   log([{ text: `Clone failed: ${result.stderr || 'Unknown error'}`, type: 'err' }]);
                 }
               } catch (error) {
-                log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+                log([
+                  {
+                    text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`,
+                    type: 'err'
+                  }
+                ]);
               }
             })();
           },
@@ -1148,21 +1237,35 @@ export const GitClientProvider: React.FC<{
           await setActiveRepository(destinationPath);
           toastRun('Clone complete', destinationPath);
         } catch (error) {
-          log([{ text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Clone failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         } finally {
           setCloneDialogUrl('');
           setCloneDialogUseGit(false);
         }
       });
     })();
-  }, [cloneDialogUrl, cloneDialogUseGit, log, toGitSshUrl, getRepoDirNameFromUrl, joinPath, runWithActionLock, appendCommandResult, setActiveRepository, toastRun]);
-
-
+  }, [
+    cloneDialogUrl,
+    cloneDialogUseGit,
+    log,
+    toGitSshUrl,
+    getRepoDirNameFromUrl,
+    joinPath,
+    runWithActionLock,
+    appendCommandResult,
+    setActiveRepository,
+    toastRun
+  ]);
 
   const confirmDialog = useCallback(() => {
     if (!dialog) return;
     const d = dialog;
-    
+
     if (d.kind === 'clone') {
       runCloneFromDialog();
       return;
@@ -1281,7 +1384,12 @@ export const GitClientProvider: React.FC<{
           await setActiveRepository(nextPath);
           toastRun('Repository opened', nextPath);
         } catch (error) {
-          log([{ text: `Open repository failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Open repository failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     })();
@@ -1312,8 +1420,6 @@ export const GitClientProvider: React.FC<{
     log([{ text: 'Repository closed', type: 'ok' }]);
   }, [actionBusy, repoPath, log]);
 
-
-
   const createBranch = useCallback(() => {
     if (actionBusy) {
       return;
@@ -1340,7 +1446,11 @@ export const GitClientProvider: React.FC<{
               await runWithActionLock(async () => {
                 try {
                   log([{ text: `$ git branch ${nextBranch} ${currentBranch}`, type: 'cmd' }]);
-                  const createResult = await tauriGitBackend.createBranch(repoPath, nextBranch, currentBranch);
+                  const createResult = await tauriGitBackend.createBranch(
+                    repoPath,
+                    nextBranch,
+                    currentBranch
+                  );
                   appendCommandResult(createResult);
                   log([{ text: `$ git checkout ${nextBranch}`, type: 'cmd' }]);
                   const checkoutResult = await tauriGitBackend.checkoutBranch(repoPath, nextBranch);
@@ -1349,7 +1459,12 @@ export const GitClientProvider: React.FC<{
                   await refreshRepositorySnapshot(repoPath);
                   toastRun('Branch created', nextBranch);
                 } catch (error) {
-                  log([{ text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+                  log([
+                    {
+                      text: `Create branch failed: ${error instanceof Error ? error.message : String(error)}`,
+                      type: 'err'
+                    }
+                  ]);
                 }
               });
             })();
@@ -1357,7 +1472,18 @@ export const GitClientProvider: React.FC<{
         );
       }
     });
-  }, [actionBusy, confirm, currentBranch, repoPath, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, runWithActionLock]);
+  }, [
+    actionBusy,
+    confirm,
+    currentBranch,
+    repoPath,
+    log,
+    appendCommandResult,
+    refreshBranchSummary,
+    refreshRepositorySnapshot,
+    toastRun,
+    runWithActionLock
+  ]);
 
   useEffect(() => {
     void refreshBranchSummary(repoPath);
@@ -1382,13 +1508,28 @@ export const GitClientProvider: React.FC<{
         toastRun('Fetch complete', 'Fetched with prune');
         if (props.onFetch) props.onFetch();
       } catch (error) {
-        log([{ text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Fetch failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
       } finally {
         setActiveRemoteAction(null);
         setActionBusy(false);
       }
     })();
-  }, [actionBusy, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, waitForNextPaint]);
+  }, [
+    actionBusy,
+    log,
+    toastRun,
+    props,
+    repoPath,
+    appendCommandResult,
+    refreshBranchSummary,
+    refreshRepositorySnapshot,
+    waitForNextPaint
+  ]);
 
   const doPull = useCallback(() => {
     if (actionBusy) {
@@ -1414,7 +1555,12 @@ export const GitClientProvider: React.FC<{
             toastRun('Pull complete', 'Local branch updated from remote');
             if (props.onPull) props.onPull();
           } catch (error) {
-            log([{ text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            log([
+              {
+                text: `Pull failed: ${error instanceof Error ? error.message : String(error)}`,
+                type: 'err'
+              }
+            ]);
           } finally {
             setActiveRemoteAction(null);
             setActionBusy(false);
@@ -1422,7 +1568,20 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, log, toastRun, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, behindCount, currentBranch, waitForNextPaint]);
+  }, [
+    actionBusy,
+    confirm,
+    log,
+    toastRun,
+    props,
+    repoPath,
+    appendCommandResult,
+    refreshBranchSummary,
+    refreshRepositorySnapshot,
+    behindCount,
+    currentBranch,
+    waitForNextPaint
+  ]);
 
   const doPush = useCallback(() => {
     if (actionBusy) {
@@ -1448,7 +1607,12 @@ export const GitClientProvider: React.FC<{
             toastRun('Push complete', `${currentBranch} updated on remote`);
             if (props.onPush) props.onPush();
           } catch (error) {
-            log([{ text: `Push failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            log([
+              {
+                text: `Push failed: ${error instanceof Error ? error.message : String(error)}`,
+                type: 'err'
+              }
+            ]);
           } finally {
             setActiveRemoteAction(null);
             setActionBusy(false);
@@ -1456,7 +1620,21 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
+  }, [
+    actionBusy,
+    confirm,
+    props,
+    repoPath,
+    appendCommandResult,
+    refreshBranchSummary,
+    refreshRepositorySnapshot,
+    currentBranch,
+    aheadCount,
+    behindCount,
+    log,
+    toastRun,
+    waitForNextPaint
+  ]);
 
   const doSync = useCallback(() => {
     if (actionBusy) {
@@ -1495,7 +1673,12 @@ export const GitClientProvider: React.FC<{
             if (props.onPull) props.onPull();
             if (props.onPush) props.onPush();
           } catch (error) {
-            log([{ text: `Sync failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            log([
+              {
+                text: `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
+                type: 'err'
+              }
+            ]);
           } finally {
             setActiveRemoteAction(null);
             setActionBusy(false);
@@ -1503,8 +1686,21 @@ export const GitClientProvider: React.FC<{
         })();
       }
     );
-  }, [actionBusy, confirm, props, repoPath, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, currentBranch, aheadCount, behindCount, log, toastRun, waitForNextPaint]);
-
+  }, [
+    actionBusy,
+    confirm,
+    props,
+    repoPath,
+    appendCommandResult,
+    refreshBranchSummary,
+    refreshRepositorySnapshot,
+    currentBranch,
+    aheadCount,
+    behindCount,
+    log,
+    toastRun,
+    waitForNextPaint
+  ]);
 
   const getCompare = useCallback(
     async (leftRef: string, rightRef: string) => {
@@ -1516,30 +1712,44 @@ export const GitClientProvider: React.FC<{
   const createPatch = useCallback(
     async (reference: string, filePath?: string) => {
       try {
-        log([{ text: `$ git format-patch --stdout ${reference}${filePath ? ` -- ${filePath}` : ""}`, type: "cmd" }]);
+        log([
+          {
+            text: `$ git format-patch --stdout ${reference}${filePath ? ` -- ${filePath}` : ''}`,
+            type: 'cmd'
+          }
+        ]);
         const patch = await tauriGitBackend.createPatch(repoPath, reference, filePath);
-        toastRun("Patch created", reference);
+        toastRun('Patch created', reference);
         return patch;
       } catch (error) {
-        log([{ text: `Create patch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
-        return "";
+        log([
+          {
+            text: `Create patch failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+        return '';
       }
     },
     [repoPath, log, toastRun]
   );
 
-
   const addRemote = useCallback(
     async (name: string, url: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git remote add ${name} ${url}`, type: "cmd" }]);
+          log([{ text: `$ git remote add ${name} ${url}`, type: 'cmd' }]);
           const result = await tauriGitBackend.addRemote(repoPath, name, url);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Remote added", name);
+          toastRun('Remote added', name);
         } catch (error) {
-          log([{ text: `Add remote failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Add remote failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -1583,30 +1793,38 @@ export const GitClientProvider: React.FC<{
     });
   }, [runAddRemoteFromDialog]);
 
-  const openEditRemoteDialog = useCallback((name: string, currentUrl: string) => {
-    setRemoteDialogName(name);
-    setRemoteDialogUrl(currentUrl);
-    setDialog({
-      title: 'Edit Remote URL',
-      body: `Change the URL for remote '${name}'.`,
-      cmd: '',
-      action: 'Save changes',
-      kind: 'edit-remote',
-      run: runEditRemoteFromDialog
-    });
-  }, [runEditRemoteFromDialog]);
+  const openEditRemoteDialog = useCallback(
+    (name: string, currentUrl: string) => {
+      setRemoteDialogName(name);
+      setRemoteDialogUrl(currentUrl);
+      setDialog({
+        title: 'Edit Remote URL',
+        body: `Change the URL for remote '${name}'.`,
+        cmd: '',
+        action: 'Save changes',
+        kind: 'edit-remote',
+        run: runEditRemoteFromDialog
+      });
+    },
+    [runEditRemoteFromDialog]
+  );
 
   const deleteRemote = useCallback(
     async (name: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git remote remove ${name}`, type: "cmd" }]);
+          log([{ text: `$ git remote remove ${name}`, type: 'cmd' }]);
           const result = await tauriGitBackend.deleteRemote(repoPath, name);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Remote removed", name);
+          toastRun('Remote removed', name);
         } catch (error) {
-          log([{ text: `Remove remote failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Remove remote failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -1625,13 +1843,18 @@ export const GitClientProvider: React.FC<{
     async (patchContent: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: "$ git apply -", type: "cmd" }]);
+          log([{ text: '$ git apply -', type: 'cmd' }]);
           const result = await tauriGitBackend.applyPatch(repoPath, patchContent);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Applied patch", "Working tree updated");
+          toastRun('Applied patch', 'Working tree updated');
         } catch (error) {
-          log([{ text: `Apply patch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Apply patch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -1661,20 +1884,33 @@ export const GitClientProvider: React.FC<{
       await navigator.clipboard.writeText(patch);
       toastRun('Copied staged patch', `${patch.length.toLocaleString()} bytes`);
     } catch (error) {
-      log([{ text: `Read staged patch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+      log([
+        {
+          text: `Read staged patch failed: ${error instanceof Error ? error.message : String(error)}`,
+          type: 'err'
+        }
+      ]);
     }
   }, [repoPath, toastRun, log]);
 
-  const createComparePatch = useCallback(async (leftRef: string, rightRef: string) => {
-    try {
-      const patch = await tauriGitBackend.createComparePatch(repoPath, leftRef, rightRef);
-      toastRun('Comparison patch created', `${leftRef} ↔ ${rightRef}`);
-      return patch;
-    } catch (error) {
-      log([{ text: `Create comparison patch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
-      return '';
-    }
-  }, [repoPath, log, toastRun]);
+  const createComparePatch = useCallback(
+    async (leftRef: string, rightRef: string) => {
+      try {
+        const patch = await tauriGitBackend.createComparePatch(repoPath, leftRef, rightRef);
+        toastRun('Comparison patch created', `${leftRef} ↔ ${rightRef}`);
+        return patch;
+      } catch (error) {
+        log([
+          {
+            text: `Create comparison patch failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+        return '';
+      }
+    },
+    [repoPath, log, toastRun]
+  );
 
   const aiMessage = useCallback(async () => {
     setPaletteOpen(false);
@@ -1684,7 +1920,12 @@ export const GitClientProvider: React.FC<{
     }
 
     if (!aiConfig.enabled) {
-      log([{ text: 'AI commit message generation is disabled. Enable it in Settings → AI', type: 'warn' }]);
+      log([
+        {
+          text: 'AI commit message generation is disabled. Enable it in Settings → AI',
+          type: 'warn'
+        }
+      ]);
       return;
     }
 
@@ -1722,7 +1963,10 @@ export const GitClientProvider: React.FC<{
         generated = `Update ${stagedFiles.length} files: ${names.join(', ')}${suffix}`;
       }
       setCommitMsg(generated);
-      toastRun('Commit message generated', `from ${stagedFiles.length} staged file${stagedFiles.length === 1 ? '' : 's'} (fallback)`);
+      toastRun(
+        'Commit message generated',
+        `from ${stagedFiles.length} staged file${stagedFiles.length === 1 ? '' : 's'} (fallback)`
+      );
     } finally {
       setAIBusy(false);
     }
@@ -1737,7 +1981,12 @@ export const GitClientProvider: React.FC<{
         await refreshRepository();
         toastRun(`${op.name} continued`, 'Git operation advanced');
       } catch (error) {
-        log([{ text: `Continue ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Continue ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
         await refreshRepository();
       }
     });
@@ -1752,7 +2001,12 @@ export const GitClientProvider: React.FC<{
         await refreshRepository();
         toastRun(`${op.name} skipped`, 'Git operation advanced');
       } catch (error) {
-        log([{ text: `Skip ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Skip ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
         await refreshRepository();
       }
     });
@@ -1773,14 +2027,27 @@ export const GitClientProvider: React.FC<{
             await refreshRepository();
             toastRun(`${op.name} aborted`, 'Repository restored to its pre-operation state');
           } catch (error) {
-            log([{ text: `Abort ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+            log([
+              {
+                text: `Abort ${op.kind} failed: ${error instanceof Error ? error.message : String(error)}`,
+                type: 'err'
+              }
+            ]);
             await refreshRepository();
           }
         });
       }
     );
-  }, [confirm, op, repoPath, runWithActionLock, appendCommandResult, refreshRepository, toastRun, log]);
-
+  }, [
+    confirm,
+    op,
+    repoPath,
+    runWithActionLock,
+    appendCommandResult,
+    refreshRepository,
+    toastRun,
+    log
+  ]);
 
   const matchesFilter = useCallback(
     (i: number) => {
@@ -1791,7 +2058,9 @@ export const GitClientProvider: React.FC<{
       if (f.to && r[2] > `${f.to} 23:59`) return false;
       if (f.refs.length) {
         const commitRefs = r[4] || [];
-        if (!f.refs.some(reference => commitRefs.some(decoration => decoration.includes(reference)))) {
+        if (
+          !f.refs.some(reference => commitRefs.some(decoration => decoration.includes(reference)))
+        ) {
           return false;
         }
       }
@@ -1844,7 +2113,9 @@ export const GitClientProvider: React.FC<{
       const files = await tauriGitBackend.getCommitFiles(repoPath, sha);
       return files.map(f => ({
         path: f.path,
-        status: (f.status === "A" || f.status === "D" || f.status === "M" || f.status === "R" ? f.status : "M") as DiffFile["status"],
+        status: (f.status === 'A' || f.status === 'D' || f.status === 'M' || f.status === 'R'
+          ? f.status
+          : 'M') as DiffFile['status'],
         add: f.additions,
         del: f.deletions
       }));
@@ -1856,19 +2127,33 @@ export const GitClientProvider: React.FC<{
     async (branchName: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git checkout ${branchName}`, type: "cmd" }]);
+          log([{ text: `$ git checkout ${branchName}`, type: 'cmd' }]);
           const result = await tauriGitBackend.checkoutBranch(repoPath, branchName);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
           recordRecentBranch(branchName);
-          toastRun("Checked out branch", branchName);
+          toastRun('Checked out branch', branchName);
         } catch (error) {
-          log([{ text: `Checkout branch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Checkout branch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun, recordRecentBranch]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun,
+      recordRecentBranch
+    ]
   );
 
   const checkoutTrackingBranch = useCallback(
@@ -1881,7 +2166,12 @@ export const GitClientProvider: React.FC<{
           await refreshRepository();
           toastRun('Tracking branch checked out', remoteBranch);
         } catch (error) {
-          log([{ text: `Checkout tracking branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Checkout tracking branch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -1900,7 +2190,12 @@ export const GitClientProvider: React.FC<{
           toastRun(`Checked out ${side} version`, path);
           resolved = true;
         } catch (error) {
-          log([{ text: `Checkout ${side} failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Checkout ${side} failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
       return resolved;
@@ -1974,18 +2269,31 @@ export const GitClientProvider: React.FC<{
     async (oldName: string, newName: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git branch -m ${oldName} ${newName}`, type: "cmd" }]);
+          log([{ text: `$ git branch -m ${oldName} ${newName}`, type: 'cmd' }]);
           const result = await tauriGitBackend.renameBranch(repoPath, newName, oldName);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Branch renamed", `${oldName} → ${newName}`);
+          toastRun('Branch renamed', `${oldName} → ${newName}`);
         } catch (error) {
-          log([{ text: `Rename branch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Rename branch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const deleteBranch = useCallback(
@@ -1993,20 +2301,33 @@ export const GitClientProvider: React.FC<{
       await runWithActionLock(async () => {
         try {
           const cmdStr = isRemote
-            ? `git push ${branchName.split("/")[0]} --delete ${branchName.split("/").slice(1).join("/")}`
-            : `git branch ${force ? "-D" : "-d"} ${branchName}`;
-          log([{ text: `$ ${cmdStr}`, type: "cmd" }]);
+            ? `git push ${branchName.split('/')[0]} --delete ${branchName.split('/').slice(1).join('/')}`
+            : `git branch ${force ? '-D' : '-d'} ${branchName}`;
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
           const result = await tauriGitBackend.deleteBranch(repoPath, branchName, isRemote, force);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Branch deleted", branchName);
+          toastRun('Branch deleted', branchName);
         } catch (error) {
-          log([{ text: `Delete branch failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Delete branch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const setUpstream = useCallback(
@@ -2014,112 +2335,195 @@ export const GitClientProvider: React.FC<{
       await runWithActionLock(async () => {
         try {
           const target = branchName || currentBranch;
-          const cmdStr = upstreamName ? `git branch --set-upstream-to=${upstreamName} ${target}` : `git branch --unset-upstream ${target}`;
-          log([{ text: `$ ${cmdStr}`, type: "cmd" }]);
-          const result = await tauriGitBackend.setUpstream(repoPath, { branch: branchName, upstream: upstreamName });
+          const cmdStr = upstreamName
+            ? `git branch --set-upstream-to=${upstreamName} ${target}`
+            : `git branch --unset-upstream ${target}`;
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
+          const result = await tauriGitBackend.setUpstream(repoPath, {
+            branch: branchName,
+            upstream: upstreamName
+          });
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
-          toastRun("Upstream updated", upstreamName || "Unset upstream");
+          toastRun('Upstream updated', upstreamName || 'Unset upstream');
         } catch (error) {
-          log([{ text: `Set upstream failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Set upstream failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, currentBranch, runWithActionLock, log, appendCommandResult, refreshBranchSummary, toastRun]
+    [
+      repoPath,
+      currentBranch,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      toastRun
+    ]
   );
 
   const mergeBranch = useCallback(
     async (reference: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git merge ${reference}`, type: "cmd" }]);
+          log([{ text: `$ git merge ${reference}`, type: 'cmd' }]);
           const result = await tauriGitBackend.mergeBranch(repoPath, reference);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Merged branch", reference);
+          toastRun('Merged branch', reference);
         } catch (error) {
-          log([{ text: `Merge failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Merge failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
           await refreshRepositorySnapshot(repoPath);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const rebaseBranch = useCallback(
     async (reference: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git rebase ${reference}`, type: "cmd" }]);
+          log([{ text: `$ git rebase ${reference}`, type: 'cmd' }]);
           const result = await tauriGitBackend.rebaseBranch(repoPath, reference);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Rebased onto", reference);
+          toastRun('Rebased onto', reference);
         } catch (error) {
-          log([{ text: `Rebase failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Rebase failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
           await refreshRepositorySnapshot(repoPath);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const resetToRef = useCallback(
-    async (reference: string, mode: "soft" | "mixed" | "hard" = "mixed") => {
+    async (reference: string, mode: 'soft' | 'mixed' | 'hard' = 'mixed') => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git reset --${mode} ${reference}`, type: "cmd" }]);
+          log([{ text: `$ git reset --${mode} ${reference}`, type: 'cmd' }]);
           const result = await tauriGitBackend.resetHead(repoPath, reference, mode);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
           toastRun(`Reset (${mode})`, reference);
         } catch (error) {
-          log([{ text: `Reset failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Reset failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const cherryPickCommit = useCallback(
     async (sha: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git cherry-pick ${sha}`, type: "cmd" }]);
+          log([{ text: `$ git cherry-pick ${sha}`, type: 'cmd' }]);
           const result = await tauriGitBackend.cherryPick(repoPath, sha);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Cherry-picked commit", sha.slice(0, 7));
+          toastRun('Cherry-picked commit', sha.slice(0, 7));
         } catch (error) {
-          log([{ text: `Cherry-pick failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Cherry-pick failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
           await refreshRepositorySnapshot(repoPath);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const revertCommit = useCallback(
     async (sha: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git revert --no-edit ${sha}`, type: "cmd" }]);
+          log([{ text: `$ git revert --no-edit ${sha}`, type: 'cmd' }]);
           const result = await tauriGitBackend.revertCommit(repoPath, sha);
           appendCommandResult(result);
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Reverted commit", sha.slice(0, 7));
+          toastRun('Reverted commit', sha.slice(0, 7));
         } catch (error) {
-          log([{ text: `Revert failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Revert failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
           await refreshRepositorySnapshot(repoPath);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const createTag = useCallback(
@@ -2127,13 +2531,18 @@ export const GitClientProvider: React.FC<{
       await runWithActionLock(async () => {
         try {
           const cmdStr = sha ? `git tag ${tagName} ${sha}` : `git tag ${tagName}`;
-          log([{ text: `$ ${cmdStr}`, type: "cmd" }]);
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
           const result = await tauriGitBackend.createTag(repoPath, tagName, sha);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Tag created", tagName);
+          toastRun('Tag created', tagName);
         } catch (error) {
-          log([{ text: `Create tag failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Create tag failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2144,13 +2553,18 @@ export const GitClientProvider: React.FC<{
     async (tagName: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git tag -d ${tagName}`, type: "cmd" }]);
+          log([{ text: `$ git tag -d ${tagName}`, type: 'cmd' }]);
           const result = await tauriGitBackend.deleteTag(repoPath, tagName);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Tag deleted", tagName);
+          toastRun('Tag deleted', tagName);
         } catch (error) {
-          log([{ text: `Delete tag failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Delete tag failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2161,137 +2575,179 @@ export const GitClientProvider: React.FC<{
     async (path: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git add -- ${path}`, type: "cmd" }]);
+          log([{ text: `$ git add -- ${path}`, type: 'cmd' }]);
           const result = await tauriGitBackend.stageFile(repoPath, path);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
         } catch (error) {
-          log([{ text: `Stage file failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Stage file failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
   );
 
-  const stageAll = useCallback(
-    async () => {
-      await runWithActionLock(async () => {
-        try {
-          log([{ text: "$ git add -A", type: "cmd" }]);
-          const result = await tauriGitBackend.stageAll(repoPath);
-          appendCommandResult(result);
-          await refreshRepositorySnapshot(repoPath);
-        } catch (error) {
-          log([{ text: `Stage all failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
-        }
-      });
-    },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
-  );
+  const stageAll = useCallback(async () => {
+    await runWithActionLock(async () => {
+      try {
+        log([{ text: '$ git add -A', type: 'cmd' }]);
+        const result = await tauriGitBackend.stageAll(repoPath);
+        appendCommandResult(result);
+        await refreshRepositorySnapshot(repoPath);
+      } catch (error) {
+        log([
+          {
+            text: `Stage all failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+      }
+    });
+  }, [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]);
 
   const unstageFile = useCallback(
     async (path: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git restore --staged -- ${path}`, type: "cmd" }]);
+          log([{ text: `$ git restore --staged -- ${path}`, type: 'cmd' }]);
           const result = await tauriGitBackend.unstageFile(repoPath, path);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
         } catch (error) {
-          log([{ text: `Unstage file failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Unstage file failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
   );
 
-  const unstageAll = useCallback(
-    async () => {
-      await runWithActionLock(async () => {
-        try {
-          log([{ text: "$ git restore --staged .", type: "cmd" }]);
-          const result = await tauriGitBackend.unstageAll(repoPath);
-          appendCommandResult(result);
-          await refreshRepositorySnapshot(repoPath);
-        } catch (error) {
-          log([{ text: `Unstage all failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
-        }
-      });
-    },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
-  );
+  const unstageAll = useCallback(async () => {
+    await runWithActionLock(async () => {
+      try {
+        log([{ text: '$ git restore --staged .', type: 'cmd' }]);
+        const result = await tauriGitBackend.unstageAll(repoPath);
+        appendCommandResult(result);
+        await refreshRepositorySnapshot(repoPath);
+      } catch (error) {
+        log([
+          {
+            text: `Unstage all failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+      }
+    });
+  }, [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]);
 
   const discardChanges = useCallback(
     async (path: string, isUntracked = false) => {
       await runWithActionLock(async () => {
         try {
           const cmdStr = isUntracked ? `git clean -fd -- ${path}` : `git restore -- ${path}`;
-          log([{ text: `$ ${cmdStr}`, type: "cmd" }]);
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
           const result = await tauriGitBackend.discardChanges(repoPath, path, isUntracked);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
         } catch (error) {
-          log([{ text: `Discard failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Discard failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
   );
 
-  const discardAll = useCallback(
-    async () => {
-      await runWithActionLock(async () => {
-        try {
-          log([{ text: "$ git restore . && git clean -fd", type: "cmd" }]);
-          const result = await tauriGitBackend.discardAll(repoPath);
-          appendCommandResult(result);
-          await refreshRepositorySnapshot(repoPath);
-        } catch (error) {
-          log([{ text: `Discard all failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
-        }
-      });
-    },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]
-  );
+  const discardAll = useCallback(async () => {
+    await runWithActionLock(async () => {
+      try {
+        log([{ text: '$ git restore . && git clean -fd', type: 'cmd' }]);
+        const result = await tauriGitBackend.discardAll(repoPath);
+        appendCommandResult(result);
+        await refreshRepositorySnapshot(repoPath);
+      } catch (error) {
+        log([
+          {
+            text: `Discard all failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
+      }
+    });
+  }, [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot]);
 
   const commitChanges = useCallback(
     async (message?: string, amend = false) => {
       const msgToUse = message !== undefined ? message : commitMsg;
       if (!msgToUse || !msgToUse.trim()) {
-        log([{ text: "Commit message cannot be empty", type: "warn" }]);
+        log([{ text: 'Commit message cannot be empty', type: 'warn' }]);
         return;
       }
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git commit -m "${msgToUse.trim()}"${amend ? " --amend" : ""}`, type: "cmd" }]);
+          log([
+            { text: `$ git commit -m "${msgToUse.trim()}"${amend ? ' --amend' : ''}`, type: 'cmd' }
+          ]);
           const result = await tauriGitBackend.commit(repoPath, msgToUse.trim(), amend);
           appendCommandResult(result);
           if (result.exitCode === 0) {
-            setCommitMsg("");
+            setCommitMsg('');
           }
           await refreshBranchSummary(repoPath);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Committed changes", msgToUse.slice(0, 30));
+          toastRun('Committed changes', msgToUse.slice(0, 30));
         } catch (error) {
-          log([{ text: `Commit failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Commit failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, commitMsg, runWithActionLock, log, appendCommandResult, refreshBranchSummary, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      commitMsg,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshBranchSummary,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const createStash = useCallback(
     async (message?: string, includeUntracked = true) => {
       await runWithActionLock(async () => {
         try {
-          const cmdStr = message ? `git stash push -m "${message}"` : "git stash push";
-          log([{ text: `$ ${cmdStr}`, type: "cmd" }]);
+          const cmdStr = message ? `git stash push -m "${message}"` : 'git stash push';
+          log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
           const result = await tauriGitBackend.createStash(repoPath, { message, includeUntracked });
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Stash created", message || "WIP");
+          toastRun('Stash created', message || 'WIP');
         } catch (error) {
-          log([{ text: `Create stash failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Create stash failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2302,13 +2758,18 @@ export const GitClientProvider: React.FC<{
     async (stashRef: string, pop = false) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git stash ${pop ? "pop" : "apply"} ${stashRef}`, type: "cmd" }]);
+          log([{ text: `$ git stash ${pop ? 'pop' : 'apply'} ${stashRef}`, type: 'cmd' }]);
           const result = await tauriGitBackend.applyStash(repoPath, stashRef, pop);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun(`Stash ${pop ? "popped" : "applied"}`, stashRef);
+          toastRun(`Stash ${pop ? 'popped' : 'applied'}`, stashRef);
         } catch (error) {
-          log([{ text: `Apply stash failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Apply stash failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2319,19 +2780,23 @@ export const GitClientProvider: React.FC<{
     async (stashRef: string) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git stash drop ${stashRef}`, type: "cmd" }]);
+          log([{ text: `$ git stash drop ${stashRef}`, type: 'cmd' }]);
           const result = await tauriGitBackend.dropStash(repoPath, stashRef);
           appendCommandResult(result);
           await refreshRepositorySnapshot(repoPath);
-          toastRun("Stash dropped", stashRef);
+          toastRun('Stash dropped', stashRef);
         } catch (error) {
-          log([{ text: `Drop stash failed: ${error instanceof Error ? error.message : String(error)}`, type: "err" }]);
+          log([
+            {
+              text: `Drop stash failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
     [repoPath, runWithActionLock, log, appendCommandResult, refreshRepositorySnapshot, toastRun]
   );
-
 
   const refreshStatus = useCallback(async () => {
     if (!repoPath) return;
@@ -2377,7 +2842,10 @@ export const GitClientProvider: React.FC<{
   );
 
   const addWorktree = useCallback(
-    async (path: string, options?: { reference?: string; newBranch?: string; detach?: boolean }) => {
+    async (
+      path: string,
+      options?: { reference?: string; newBranch?: string; detach?: boolean }
+    ) => {
       await runWithActionLock(async () => {
         try {
           let cmdStr = `git worktree add ${path}`;
@@ -2390,11 +2858,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Worktree added', path);
         } catch (error) {
-          log([{ text: `Add worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Add worktree failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshWorktrees,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const removeWorktree = useCallback(
@@ -2408,25 +2889,45 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Worktree removed', path);
         } catch (error) {
-          log([{ text: `Remove worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Remove worktree failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshWorktrees,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const lockWorktree = useCallback(
     async (path: string, reason?: string) => {
       await runWithActionLock(async () => {
         try {
-          const cmdStr = reason ? `git worktree lock --reason "${reason}" ${path}` : `git worktree lock ${path}`;
+          const cmdStr = reason
+            ? `git worktree lock --reason "${reason}" ${path}`
+            : `git worktree lock ${path}`;
           log([{ text: `$ ${cmdStr}`, type: 'cmd' }]);
           const result = await tauriGitBackend.lockWorktree(repoPath, path, reason);
           appendCommandResult(result);
           await refreshWorktrees(repoPath);
           toastRun('Worktree locked', path);
         } catch (error) {
-          log([{ text: `Lock worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Lock worktree failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2443,7 +2944,12 @@ export const GitClientProvider: React.FC<{
           await refreshWorktrees(repoPath);
           toastRun('Worktree unlocked', path);
         } catch (error) {
-          log([{ text: `Unlock worktree failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Unlock worktree failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2461,11 +2967,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun(dryRun ? 'Prune previewed' : 'Worktrees pruned', result.stdout.trim() || 'Done');
         } catch (error) {
-          log([{ text: `Prune worktrees failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Prune worktrees failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshWorktrees, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshWorktrees,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const openPathInFileManager = useCallback(
@@ -2473,7 +2992,12 @@ export const GitClientProvider: React.FC<{
       try {
         await tauriGitBackend.openPathInFileManager(path);
       } catch (error) {
-        log([{ text: `Open file manager failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Open file manager failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
       }
     },
     [log]
@@ -2484,7 +3008,12 @@ export const GitClientProvider: React.FC<{
       try {
         await tauriGitBackend.openPathInTerminal(path);
       } catch (error) {
-        log([{ text: `Open terminal failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Open terminal failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
       }
     },
     [log]
@@ -2501,7 +3030,12 @@ export const GitClientProvider: React.FC<{
           await refreshSubmodules(repoPath);
           toastRun('Submodule initialized', path || 'All submodules');
         } catch (error) {
-          log([{ text: `Submodule init failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule init failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2521,11 +3055,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Submodules updated', options?.path || 'All submodules');
         } catch (error) {
-          log([{ text: `Submodule update failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule update failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshSubmodules,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const updateAll = useCallback(() => {
@@ -2545,7 +3092,12 @@ export const GitClientProvider: React.FC<{
           await refreshSubmodules(repoPath);
           toastRun('Submodule synced', options?.path || 'All submodules');
         } catch (error) {
-          log([{ text: `Submodule sync failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule sync failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2556,13 +3108,20 @@ export const GitClientProvider: React.FC<{
     async (path: string, force = false) => {
       await runWithActionLock(async () => {
         try {
-          log([{ text: `$ git submodule deinit${force ? ' --force' : ''} -- ${path}`, type: 'cmd' }]);
+          log([
+            { text: `$ git submodule deinit${force ? ' --force' : ''} -- ${path}`, type: 'cmd' }
+          ]);
           const result = await tauriGitBackend.deinitSubmodule(repoPath, path, force);
           appendCommandResult(result);
           await refreshSubmodules(repoPath);
           toastRun('Submodule deinitialized', path);
         } catch (error) {
-          log([{ text: `Submodule deinit failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule deinit failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
@@ -2580,11 +3139,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Submodule checked out recorded commit', path);
         } catch (error) {
-          log([{ text: `Submodule checkout recorded commit failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule checkout recorded commit failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshSubmodules,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const pullSubmoduleTrackedBranch = useCallback(
@@ -2598,11 +3170,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Submodule pulled tracked branch', path);
         } catch (error) {
-          log([{ text: `Submodule pull tracked branch failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Submodule pull tracked branch failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshSubmodules,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const getSubmodulePointerDiff = useCallback(
@@ -2613,7 +3198,12 @@ export const GitClientProvider: React.FC<{
         log([{ text: diff || 'No submodule pointer diff', type: 'out' }]);
         return diff;
       } catch (error) {
-        log([{ text: `Submodule pointer diff failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+        log([
+          {
+            text: `Submodule pointer diff failed: ${error instanceof Error ? error.message : String(error)}`,
+            type: 'err'
+          }
+        ]);
         return '';
       }
     },
@@ -2631,11 +3221,24 @@ export const GitClientProvider: React.FC<{
           await refreshRepositorySnapshot(repoPath);
           toastRun('Staged submodule pointer', path);
         } catch (error) {
-          log([{ text: `Stage submodule pointer failed: ${error instanceof Error ? error.message : String(error)}`, type: 'err' }]);
+          log([
+            {
+              text: `Stage submodule pointer failed: ${error instanceof Error ? error.message : String(error)}`,
+              type: 'err'
+            }
+          ]);
         }
       });
     },
-    [repoPath, runWithActionLock, log, appendCommandResult, refreshSubmodules, refreshRepositorySnapshot, toastRun]
+    [
+      repoPath,
+      runWithActionLock,
+      log,
+      appendCommandResult,
+      refreshSubmodules,
+      refreshRepositorySnapshot,
+      toastRun
+    ]
   );
 
   const paletteCheckoutBranch = useCallback(() => {
@@ -2796,22 +3399,76 @@ export const GitClientProvider: React.FC<{
     };
     return [
       { group: 'Go to', label: 'Git Graph', hint: bindingHint('view.graph'), run: nav('graph') },
-      { group: 'Go to', label: 'Branches', hint: bindingHint('view.branches'), run: nav('branches') },
-      { group: 'Go to', label: 'Compare Branches', hint: bindingHint('view.compare'), run: nav('compare') },
-      { group: 'Go to', label: 'Worktrees', hint: bindingHint('view.worktrees'), run: nav('worktrees') },
-      { group: 'Go to', label: 'Submodules', hint: bindingHint('view.submodules'), run: nav('submodules') },
-      { group: 'Go to', label: 'Settings', hint: bindingHint('settings.open'), run: nav('settings') },
-      { group: 'Branch', label: 'Checkout branch…', hint: bindingHint('branch.checkout'), run: paletteCheckoutBranch },
+      {
+        group: 'Go to',
+        label: 'Branches',
+        hint: bindingHint('view.branches'),
+        run: nav('branches')
+      },
+      {
+        group: 'Go to',
+        label: 'Compare Branches',
+        hint: bindingHint('view.compare'),
+        run: nav('compare')
+      },
+      {
+        group: 'Go to',
+        label: 'Worktrees',
+        hint: bindingHint('view.worktrees'),
+        run: nav('worktrees')
+      },
+      {
+        group: 'Go to',
+        label: 'Submodules',
+        hint: bindingHint('view.submodules'),
+        run: nav('submodules')
+      },
+      {
+        group: 'Go to',
+        label: 'Settings',
+        hint: bindingHint('settings.open'),
+        run: nav('settings')
+      },
+      {
+        group: 'Branch',
+        label: 'Checkout branch…',
+        hint: bindingHint('branch.checkout'),
+        run: paletteCheckoutBranch
+      },
       { group: 'Branch', label: 'Create branch from HEAD…', run: () => createBranch() },
       { group: 'Branch', label: 'Rebase current onto…', run: paletteRebase },
       { group: 'Branch', label: 'Delete branch…', run: paletteDeleteBranch },
-      { group: 'Remote', label: 'Fetch all with prune', hint: bindingHint('git.fetch'), run: () => doFetch() },
+      {
+        group: 'Remote',
+        label: 'Fetch all with prune',
+        hint: bindingHint('git.fetch'),
+        run: () => doFetch()
+      },
       { group: 'Remote', label: 'Pull', hint: bindingHint('git.pull'), run: () => doPull() },
       { group: 'Remote', label: 'Push', hint: bindingHint('git.push'), run: () => doPush() },
       { group: 'Remote', label: 'Add remote…', run: () => openAddRemoteDialog() },
-      { group: 'Commit', label: 'Commit staged changes', hint: bindingHint('commit.staged'), run: () => { setPaletteOpen(false); void commitChanges(); } },
-      { group: 'Commit', label: 'Amend last commit', run: () => { setPaletteOpen(false); void commitChanges(undefined, true); } },
-      { group: 'Commit', label: 'Generate commit message from staged changes', run: () => aiMessage() },
+      {
+        group: 'Commit',
+        label: 'Commit staged changes',
+        hint: bindingHint('commit.staged'),
+        run: () => {
+          setPaletteOpen(false);
+          void commitChanges();
+        }
+      },
+      {
+        group: 'Commit',
+        label: 'Amend last commit',
+        run: () => {
+          setPaletteOpen(false);
+          void commitChanges(undefined, true);
+        }
+      },
+      {
+        group: 'Commit',
+        label: 'Generate commit message from staged changes',
+        run: () => aiMessage()
+      },
       { group: 'Stash', label: 'Stash all changes…', run: paletteStashPush },
       { group: 'Stash', label: 'Pop latest stash', run: paletteStashPop },
       { group: 'Worktree', label: 'Add worktree…', run: paletteAddWorktree },
@@ -2826,10 +3483,24 @@ export const GitClientProvider: React.FC<{
           setPaletteOpen(false);
         }
       },
-      { group: 'Repo', label: 'Open repository…', hint: bindingHint('repo.open'), run: () => openRepository() },
+      {
+        group: 'Repo',
+        label: 'Open repository…',
+        hint: bindingHint('repo.open'),
+        run: () => openRepository()
+      },
       { group: 'Repo', label: 'Clone repository…', run: () => cloneRepository() },
       ...(repoPath
-        ? [{ group: 'Repo', label: 'Close repository', run: () => { setPaletteOpen(false); closeRepository(); } }]
+        ? [
+            {
+              group: 'Repo',
+              label: 'Close repository',
+              run: () => {
+                setPaletteOpen(false);
+                closeRepository();
+              }
+            }
+          ]
         : []),
       { group: 'View', label: 'Toggle theme', run: () => toggleTheme() },
       {
