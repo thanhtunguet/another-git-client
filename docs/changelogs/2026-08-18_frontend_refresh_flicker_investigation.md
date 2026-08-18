@@ -70,3 +70,12 @@
 - Installed Redux Toolkit and React-Redux with pnpm. Added the Redux provider, typed store hooks,
   and isolated repository graph slice; it is not yet hydrated by the legacy refresh pipeline, so
   no parallel backend reader has been introduced.
+
+## Selector consumer audit
+
+- `useGitClient` has 22 direct component consumers. React context broadcasts to every one of them
+  whenever its provider value changes, even when a consumer destructures only one field.
+- The migration priority is Graph + Commit Details, then Working Tree (Diff, Source Control, Status
+  Bar), then Worktrees, Submodules, Stashes, and Operation state.
+- `React.memo` is only useful for pure prop-driven children. It cannot prevent a component using
+  `useGitClient` from receiving a context update; those reads must move to narrow Redux selectors.
