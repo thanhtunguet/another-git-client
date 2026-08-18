@@ -89,3 +89,25 @@
   so unrelated repository snapshot changes no longer broadcast into those two graph-heavy views.
 - The graph reducer now compares retained field references instead of serializing the full graph
   state, removing a proportional JSON serialization cost from every graph-store synchronization.
+
+## Commit-list virtualization review
+
+- Reviewed the current Git Graph windowing after commits `5dce63c` and `5b4ef70`.
+- The rows layout correctly mounts only a fixed-height window with 16-row overscan, while paging
+  keeps the initial backend request bounded by the configured graph page size (100 by default).
+- Updated `GraphView` so the rows layout remains virtualized with an expanded commit. A measured
+  detail-row height adjusts the virtual spacers and preserves the single-expanded-row behavior.
+- Batched scroll metrics with `requestAnimationFrame` and skip React updates until the visible row
+  boundary changes. Added `ResizeObserver` handling for both the scroll viewport and expanded
+  detail content.
+- Grouped layout remains non-virtualized because its date headers introduce variable rows; that
+  behavior is unchanged.
+- `buildGraphData` still recalculates graph lanes and SVG edge metadata for every loaded commit
+  after each page append or graph refresh. Preserve an incremental layout checkpoint per page or
+  memoize page segments before increasing page sizes or retaining thousands of rows.
+
+## Virtualization verification
+
+- `npm run typecheck` passed.
+- `npm run lint` passed with 14 pre-existing warnings and no errors.
+- `git diff --check` passed.

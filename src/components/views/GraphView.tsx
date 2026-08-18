@@ -1,5 +1,5 @@
 import { tauriGitBackend } from '../../services/tauriGitBackend';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   useGitGraphInteractions,
   refBadge,
@@ -30,6 +30,9 @@ interface GraphFilterOption {
   label: string;
   detail?: string;
 }
+
+const GRAPH_ROW_HEIGHT = 30;
+const GRAPH_ROW_OVERSCAN = 16;
 
 interface GraphFilterMultiSelectProps {
   label: string;
@@ -388,6 +391,13 @@ export const GraphView: React.FC = () => {
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
+  const graphScrollRef = useRef<HTMLDivElement>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const pendingScrollMetricsRef = useRef<{ scrollTop: number; viewportHeight: number } | null>(
+    null
+  );
+  const expandedDetailRef = useRef<HTMLDivElement>(null);
+  const [expandedDetailHeight, setExpandedDetailHeight] = useState(0);
   const [resetReference, setResetReference] = useState<string | null>(null);
   const [inlineDiff, setInlineDiff] = useState<{ sha: string; path: string } | null>(null);
   const [inlineDiffText, setInlineDiffText] = useState('');
@@ -444,19 +454,53 @@ export const GraphView: React.FC = () => {
       .map(author => ({ value: author, label: author }));
   }, [commits]);
 
-  const hasExpandedRows = useMemo(() => Object.values(expanded).some(Boolean), [expanded]);
+  const expandedIndex = useMemo(() => {
+    const index = Object.keys(expanded).find(key => expanded[Number(key)]);
+    return index === undefined ? null : Number(index);
+  }, [expanded]);
   const virtualizeEnabled = preferences.virtualizeCommitList !== false;
-  const enableVirtualRows = graphLayout === 'rows' && !hasExpandedRows && virtualizeEnabled;
-  const rowHeight = 30;
-  const overscan = 16;
+  const enableVirtualRows = graphLayout === 'rows' && virtualizeEnabled;
+
+  const getOffsetForIndex = useCallback(
+    (index: number) => {
+      const clampedIndex = Math.max(0, Math.min(index, commits.length));
+      const detailHeight =
+        expandedIndex !== null && clampedIndex > expandedIndex ? expandedDetailHeight : 0;
+      return clampedIndex * GRAPH_ROW_HEIGHT + detailHeight;
+    },
+    [commits.length, expandedDetailHeight, expandedIndex]
+  );
+
+  const getIndexAtOffset = useCallback(
+    (offset: number) => {
+      if (!commits.length) return 0;
+      if (expandedIndex === null) {
+        return Math.max(0, Math.min(commits.length - 1, Math.floor(offset / GRAPH_ROW_HEIGHT)));
+      }
+
+      const expandedRowTop = expandedIndex * GRAPH_ROW_HEIGHT;
+      const expandedRowEnd = expandedRowTop + GRAPH_ROW_HEIGHT + expandedDetailHeight;
+      if (offset < expandedRowTop) {
+        return Math.max(0, Math.floor(offset / GRAPH_ROW_HEIGHT));
+      }
+      if (offset < expandedRowEnd) return expandedIndex;
+      return Math.min(
+        commits.length - 1,
+        Math.max(0, Math.floor((offset - expandedDetailHeight) / GRAPH_ROW_HEIGHT))
+      );
+    },
+    [commits.length, expandedDetailHeight, expandedIndex]
+  );
 
   const startIndex = enableVirtualRows
-    ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan)
+    ? Math.max(0, getIndexAtOffset(scrollTop) - GRAPH_ROW_OVERSCAN)
     : 0;
   const endIndex = enableVirtualRows
     ? Math.min(
         commits.length,
-        Math.ceil((scrollTop + Math.max(viewportHeight, rowHeight)) / rowHeight) + overscan
+        getIndexAtOffset(scrollTop + Math.max(viewportHeight, GRAPH_ROW_HEIGHT)) +
+          GRAPH_ROW_OVERSCAN +
+          1
       )
     : commits.length;
   const visibleIndexes = useMemo(() => {
@@ -464,16 +508,36 @@ export const GraphView: React.FC = () => {
     return Array.from({ length: count }, (_, index) => startIndex + index);
   }, [endIndex, startIndex]);
 
-  const topSpacerHeight = enableVirtualRows ? startIndex * rowHeight : 0;
+  const topSpacerHeight = enableVirtualRows ? getOffsetForIndex(startIndex) : 0;
   const bottomSpacerHeight = enableVirtualRows
-    ? Math.max(0, (commits.length - endIndex) * rowHeight)
+    ? Math.max(0, getOffsetForIndex(commits.length) - getOffsetForIndex(endIndex))
     : 0;
 
   const handleGraphScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       const target = event.currentTarget;
-      setScrollTop(target.scrollTop);
-      setViewportHeight(target.clientHeight);
+      pendingScrollMetricsRef.current = {
+        scrollTop: target.scrollTop,
+        viewportHeight: target.clientHeight
+      };
+
+      if (scrollFrameRef.current === null) {
+        scrollFrameRef.current = window.requestAnimationFrame(() => {
+          scrollFrameRef.current = null;
+          const next = pendingScrollMetricsRef.current;
+          if (!next) return;
+
+          setScrollTop(previous =>
+            Math.floor(previous / GRAPH_ROW_HEIGHT) ===
+            Math.floor(next.scrollTop / GRAPH_ROW_HEIGHT)
+              ? previous
+              : next.scrollTop
+          );
+          setViewportHeight(previous =>
+            previous === next.viewportHeight ? previous : next.viewportHeight
+          );
+        });
+      }
 
       const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
       if (distanceToBottom < 320 && graphHasMore && !graphLoading && !graphLoadingMore) {
@@ -484,12 +548,30 @@ export const GraphView: React.FC = () => {
   );
 
   useEffect(() => {
-    const container = document.getElementById('gc-graph-scroll');
+    const container = graphScrollRef.current;
     if (!container) {
       return;
     }
-    setViewportHeight(container.clientHeight);
-  }, [commits.length]);
+
+    const updateViewportHeight = () => {
+      setViewportHeight(previous =>
+        previous === container.clientHeight ? previous : container.clientHeight
+      );
+    };
+    updateViewportHeight();
+
+    const observer = new ResizeObserver(updateViewportHeight);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!inlineDiff || !repoPath) {
@@ -548,10 +630,28 @@ export const GraphView: React.FC = () => {
     return () => window.removeEventListener('keydown', closeInlineDiff, true);
   }, [inlineDiff]);
 
-  const expandedCommitSha = useMemo(() => {
-    const expandedIndex = Object.keys(expanded).find(index => expanded[Number(index)]);
-    return expandedIndex === undefined ? null : getCommitFullSha(Number(expandedIndex));
-  }, [expanded, getCommitFullSha]);
+  const expandedCommitSha = useMemo(
+    () => (expandedIndex === null ? null : getCommitFullSha(expandedIndex)),
+    [expandedIndex, getCommitFullSha]
+  );
+
+  useEffect(() => {
+    const detail = expandedDetailRef.current;
+    if (!detail) {
+      setExpandedDetailHeight(previous => (previous === 0 ? previous : 0));
+      return;
+    }
+
+    const updateDetailHeight = () => {
+      const nextHeight = Math.ceil(detail.getBoundingClientRect().height);
+      setExpandedDetailHeight(previous => (previous === nextHeight ? previous : nextHeight));
+    };
+    updateDetailHeight();
+
+    const observer = new ResizeObserver(updateDetailHeight);
+    observer.observe(detail);
+    return () => observer.disconnect();
+  }, [expandedCommitSha]);
 
   useEffect(() => {
     if (!expandedCommitSha || commitFilesBySha[expandedCommitSha]) {
@@ -859,6 +959,7 @@ export const GraphView: React.FC = () => {
         >
           <div
             id="gc-graph-scroll"
+            ref={graphScrollRef}
             style={{ flex: 1, minWidth: 0, minHeight: 0, overflowX: 'hidden', overflowY: 'auto' }}
             onScroll={handleGraphScroll}
           >
@@ -1048,8 +1149,9 @@ export const GraphView: React.FC = () => {
                     )}
                   </div>
 
-                  {!enableVirtualRows && isExpanded && (
+                  {isExpanded && (
                     <div
+                      ref={expandedDetailRef}
                       style={{
                         display: 'flex',
                         background: 'var(--panel)',

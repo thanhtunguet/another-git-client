@@ -10,6 +10,10 @@
   pipeline, and Graph/Commit Details use narrow graph selectors plus a memoized interaction context
   to avoid unrelated repository broadcasts. See
   `docs/changelogs/2026-08-18_frontend_refresh_flicker_investigation.md`.
+- Improved Git Graph commit-list virtualization: expanded commit details now remain windowed,
+  scroll-state updates are animation-frame batched, and viewport/detail resizing is observed.
+  Documented the remaining incremental graph-layout follow-up in
+  `docs/changelogs/2026-08-18_frontend_refresh_flicker_investigation.md`.
 
 ## 2026-08-17
 
