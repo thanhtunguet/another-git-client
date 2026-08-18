@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useGitClient, COLORS } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { Input, Select } from '../common/FormControls';
@@ -40,6 +40,20 @@ export const CompareView: React.FC = () => {
   const [compareResult, setCompareResult] = useState<GitCompareResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [compareError, setCompareError] = useState<string | null>(null);
+  const graphViewportRef = useRef<HTMLDivElement>(null);
+  const [graphViewportWidth, setGraphViewportWidth] = useState(0);
+
+  useEffect(() => {
+    const viewport = graphViewportRef.current;
+    if (!viewport) return;
+
+    const updateWidth = () => setGraphViewportWidth(viewport.clientWidth);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [compareMode]);
 
   useEffect(() => {
     if (!repoPath) {
@@ -195,11 +209,12 @@ export const CompareView: React.FC = () => {
     const A = commitsOnlyLeft.slice(0, 10);
     const B = commitsOnlyRight.slice(0, 10);
     const maxLen = Math.max(A.length, B.length, 1);
+    const graphWidth = Math.max(graphViewportWidth, 640);
     const y = (i: number) => 34 + i * 44;
-    const xA = 100;
-    const xB = 360;
+    const xA = Math.max(86, Math.round(graphWidth * 0.11));
+    const xB = Math.max(xA + 220, Math.round(graphWidth * 0.5));
 
-    const msgW = (x: number) => (x === xA ? xB - xA - 92 : 920 - xB - 34);
+    const msgW = (x: number) => (x === xA ? xB - xA - 92 : graphWidth - xB - 34);
 
     const nodes: React.ReactNode[] = [];
 
@@ -336,7 +351,7 @@ export const CompareView: React.FC = () => {
 
     return (
       <svg
-        width={920}
+        width={graphWidth}
         height={y(maxLen - 1) + 96}
         style={{ display: 'block', overflow: 'visible' }}
       >
@@ -664,6 +679,7 @@ export const CompareView: React.FC = () => {
           {/* Side B */}
           <div
             style={{
+              flex: '1 1 0',
               display: 'flex',
               flexDirection: 'column',
               minHeight: 0,
@@ -782,6 +798,7 @@ export const CompareView: React.FC = () => {
         </div>
       ) : (
         <div
+          ref={graphViewportRef}
           style={{
             flex: 1,
             minHeight: 0,

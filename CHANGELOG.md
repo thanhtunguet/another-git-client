@@ -2,6 +2,9 @@
 
 ## 2026-08-18
 
+- Optimized the Compare view to fill available horizontal space: the right commit pane now grows
+  into the remaining width, and the comparison graph resizes with its viewport. See
+  `docs/changelogs/2026-08-18_compare_full_width_layout.md`.
 - Updated the Branches view to display the full commit history of the selected branch in
   paged backend reads, replacing the three-commit preview. See
   `docs/changelogs/2026-08-18_branches_full_commit_history.md`.
