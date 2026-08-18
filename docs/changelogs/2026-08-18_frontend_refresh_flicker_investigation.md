@@ -79,3 +79,13 @@
   Bar), then Worktrees, Submodules, Stashes, and Operation state.
 - `React.memo` is only useful for pure prop-driven children. It cannot prevent a component using
   `useGitClient` from receiving a context update; those reads must move to narrow Redux selectors.
+
+## Rendering composition refactor
+
+- The legacy refresh pipeline now mirrors its already-loaded graph state into the Redux graph slice
+  before paint; it does not introduce a second backend graph reader.
+- Git Graph and Commit Details now read graph rows, paging, and loading state through Redux
+  selectors. Their remaining UI and action dependencies use a memoized graph-interaction context,
+  so unrelated repository snapshot changes no longer broadcast into those two graph-heavy views.
+- The graph reducer now compares retained field references instead of serializing the full graph
+  state, removing a proportional JSON serialization cost from every graph-store synchronization.

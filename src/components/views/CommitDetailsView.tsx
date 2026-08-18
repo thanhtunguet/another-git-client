@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useGitClient, statusColor } from '../../context/GitClientContext';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useGitGraphInteractions, statusColor } from '../../context/GitClientContext';
 import { Button } from '../common/Button';
 import { DiffFile } from '../../types/git-client';
 import { tauriGitBackend } from '../../services/tauriGitBackend';
@@ -8,6 +8,8 @@ import { ResizeHandle } from '../common/ResizeHandle';
 import { DiffViewer } from '../common/DiffViewer';
 import { FileTree } from '../common/FileTree';
 import { useDiffContent, DiffContentSource } from '../../hooks/useDiffContent';
+import { useAppSelector } from '../../store/hooks';
+import { selectGraphRows } from '../../store/selectors';
 
 export { parseDiffText } from '../common/DiffViewer';
 export type { DiffLine } from '../common/DiffViewer';
@@ -15,9 +17,6 @@ export type { DiffLine } from '../common/DiffViewer';
 export const CommitDetailsView: React.FC = () => {
   const {
     sel,
-    commits,
-    getCommitHash,
-    getCommitFullSha,
     fetchCommitFiles,
     cherryPickCommit,
     revertCommit,
@@ -30,7 +29,13 @@ export const CommitDetailsView: React.FC = () => {
     setDiffTargetSha,
     setDiffTab,
     setCompareSeedRef
-  } = useGitClient();
+  } = useGitGraphInteractions();
+  const graphRows = useAppSelector(selectGraphRows);
+  const getCommitHash = useCallback(
+    (index: number) => graphRows[index]?.shortSha || '',
+    [graphRows]
+  );
+  const getCommitFullSha = useCallback((index: number) => graphRows[index]?.sha || '', [graphRows]);
 
   const detailIdx = sel[0] !== undefined ? sel[0] : 0;
   const isMulti = sel.length > 1;
@@ -64,7 +69,9 @@ export const CommitDetailsView: React.FC = () => {
           setDetailError(error instanceof Error ? error.message : String(error));
         }
       });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [detailIdx, getCommitFullSha, fetchCommitFiles]);
 
   const dfiles: DiffFile[] = realFiles;
@@ -79,18 +86,23 @@ export const CommitDetailsView: React.FC = () => {
       return;
     }
     setLoadingDiff(true);
-    void tauriGitBackend.getCommitDiff(repoPath, sha, currentFilePath).then(diffText => {
-      if (active) {
-        setRawDiffText(diffText || '');
-        setLoadingDiff(false);
-      }
-    }).catch(() => {
+    void tauriGitBackend
+      .getCommitDiff(repoPath, sha, currentFilePath)
+      .then(diffText => {
+        if (active) {
+          setRawDiffText(diffText || '');
+          setLoadingDiff(false);
+        }
+      })
+      .catch(() => {
         if (active) {
           setRawDiffText('');
           setLoadingDiff(false);
         }
-    });
-    return () => { active = false; };
+      });
+    return () => {
+      active = false;
+    };
   }, [detailIdx, currentFilePath, getCommitFullSha, repoPath]);
 
   const diffContentSource: DiffContentSource | null = useMemo(() => {
@@ -99,17 +111,22 @@ export const CommitDetailsView: React.FC = () => {
     return { kind: 'commit', path: currentFilePath, sha };
   }, [detailIdx, currentFilePath, getCommitFullSha]);
 
-  const { originalText, modifiedText, contentUnavailable, loading: contentLoading } =
-    useDiffContent(repoPath, diffContentSource);
+  const {
+    originalText,
+    modifiedText,
+    contentUnavailable,
+    loading: contentLoading
+  } = useDiffContent(repoPath, diffContentSource);
 
   const detailKicker = isMulti ? `Merged range — ${sel.length} commits, net changes` : 'Commit';
   const detailSubject = isMulti
-    ? `${commits[sel[sel.length - 1]][0]}  …  ${commits[sel[0]][0]}`
-    : commits[detailIdx]?.[0] || 'No commit selected';
+    ? `${graphRows[sel[sel.length - 1]]?.subject || ''}  …  ${graphRows[sel[0]]?.subject || ''}`
+    : graphRows[detailIdx]?.subject || 'No commit selected';
   const detailAuthor = isMulti
-    ? `${new Set(sel.map(i => commits[i][1])).size} authors`
-    : commits[detailIdx]?.[1] || '';
-  const detailDate = commits[detailIdx]?.[2] || '';
+    ? `${new Set(sel.map(i => graphRows[i]?.author)).size} authors`
+    : graphRows[detailIdx]?.author || '';
+  const detailDate =
+    graphRows[detailIdx]?.date.replace('T', ' ').replace('Z', '').slice(0, 16) || '';
   const detailHash = isMulti
     ? `${getCommitHash(sel[sel.length - 1])}..${getCommitHash(sel[0])}`
     : getCommitHash(detailIdx);
@@ -160,8 +177,8 @@ export const CommitDetailsView: React.FC = () => {
           detailError
             ? `Could not load commit details: ${detailError}`
             : currentFilePath
-            ? `No diff details for ${currentFilePath}`
-            : 'Select a file to view diff details.'
+              ? `No diff details for ${currentFilePath}`
+              : 'Select a file to view diff details.'
         }
         onCopyPatch={() => {
           void createPatch(getCommitFullSha(detailIdx), currentFilePath).then(p => {
@@ -262,8 +279,8 @@ export const CommitDetailsView: React.FC = () => {
             onClick={() => {
               const fullSha = getCommitFullSha(detailIdx);
               const shortSha = getCommitHash(detailIdx);
-              const commit = commits[detailIdx];
-              const subject = commit?.[0] ? ` ("${commit[0]}")` : "";
+              const commit = graphRows[detailIdx];
+              const subject = commit?.subject ? ` ("${commit.subject}")` : '';
               confirm(
                 'Revert Commit?',
                 `Revert commit ${shortSha}${subject}? A new commit will be created to invert the changes.`,
@@ -295,7 +312,11 @@ export const CommitDetailsView: React.FC = () => {
               });
             }}
             disabled={isMulti}
-            title={isMulti ? 'Select a single commit to create a patch' : 'Create a patch for this commit'}
+            title={
+              isMulti
+                ? 'Select a single commit to create a patch'
+                : 'Create a patch for this commit'
+            }
           >
             Create patch…
           </Button>

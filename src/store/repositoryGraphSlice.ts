@@ -25,7 +25,14 @@ const graphSlice = createSlice({
   reducers: {
     replaceGraph: (state, action: PayloadAction<RepositoryGraphState>) => {
       const next = action.payload;
-      if (JSON.stringify(state) === JSON.stringify(next)) {
+      if (
+        state.rows === next.rows &&
+        state.hasMore === next.hasMore &&
+        state.loading === next.loading &&
+        state.loadingMore === next.loadingMore &&
+        state.totalCommitCount === next.totalCommitCount &&
+        state.error === next.error
+      ) {
         return;
       }
       return next;

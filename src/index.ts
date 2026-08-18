@@ -7,6 +7,7 @@ export { GitClient } from './components/GitClient';
 export {
   GitClientProvider,
   useGitClient,
+  useGitGraphInteractions,
   COLORS,
   statusColor,
   refBadge,

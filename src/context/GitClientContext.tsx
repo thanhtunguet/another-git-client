@@ -5,7 +5,8 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
-  useRef
+  useRef,
+  useLayoutEffect
 } from 'react';
 import {
   Theme,
@@ -60,6 +61,8 @@ import {
 } from '../hooks/useKeybindings';
 import { REPOSITORY_WATCHER_REFRESH_INTERVAL_MS } from '../config/repositoryRefresh';
 import { retainEqualState } from '../utils/state';
+import { useAppDispatch } from '../store/hooks';
+import { replaceGraph } from '../store/repositoryGraphSlice';
 
 export const COLORS = [
   'oklch(.70 .12 289)',
@@ -357,6 +360,44 @@ interface GitClientContextType {
 
 const GitClientContext = createContext<GitClientContextType | null>(null);
 
+type GitGraphInteractionContextType = Pick<
+  GitClientContextType,
+  | 'repoPath'
+  | 'filterOpen'
+  | 'setFilterOpen'
+  | 'graphLayout'
+  | 'setGraphLayout'
+  | 'f'
+  | 'setF'
+  | 'checkoutBranch'
+  | 'createTag'
+  | 'cherryPickCommit'
+  | 'revertCommit'
+  | 'resetToRef'
+  | 'createPatch'
+  | 'confirm'
+  | 'currentBranch'
+  | 'toastRun'
+  | 'loadMoreGraph'
+  | 'repositoryError'
+  | 'refreshRepository'
+  | 'sel'
+  | 'toggleSelCommit'
+  | 'setDock'
+  | 'setDiffTargetSha'
+  | 'setCompareSeedRef'
+  | 'expanded'
+  | 'toggleExpandCommit'
+  | 'fetchCommitFiles'
+  | 'openMenu'
+  | 'prompt'
+  | 'setView'
+  | 'setDiffTab'
+  | 'preferences'
+>;
+
+const GitGraphInteractionContext = createContext<GitGraphInteractionContextType | null>(null);
+
 interface SnapshotRefreshOptions {
   background?: boolean;
 }
@@ -365,6 +406,7 @@ export const GitClientProvider: React.FC<{
   props?: GitClientProps;
   children: React.ReactNode;
 }> = ({ props = {}, children }) => {
+  const graphDispatch = useAppDispatch();
   const persistedStore = useMemo(() => loadAppStore(), []);
 
   const [view, setView] = useState<GitClientView>(
@@ -552,6 +594,29 @@ export const GitClientProvider: React.FC<{
   );
 
   const getCommitFullSha = useCallback((i: number): string => graphRows[i]?.sha || '', [graphRows]);
+
+  // The legacy context remains the source of truth during the incremental migration. Mirror its
+  // already-hydrated graph state into Redux so selector consumers do not introduce parallel Git reads.
+  useLayoutEffect(() => {
+    graphDispatch(
+      replaceGraph({
+        rows: graphRows,
+        hasMore: graphHasMore,
+        loading: graphLoading,
+        loadingMore: graphLoadingMore,
+        totalCommitCount,
+        error: repositoryError
+      })
+    );
+  }, [
+    graphDispatch,
+    graphRows,
+    graphHasMore,
+    graphLoading,
+    graphLoadingMore,
+    totalCommitCount,
+    repositoryError
+  ]);
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
@@ -3536,203 +3601,268 @@ export const GitClientProvider: React.FC<{
     toggleTheme
   ]);
 
+  const graphInteractions = useMemo<GitGraphInteractionContextType>(
+    () => ({
+      repoPath,
+      filterOpen,
+      setFilterOpen,
+      graphLayout,
+      setGraphLayout,
+      f,
+      setF,
+      checkoutBranch,
+      createTag,
+      cherryPickCommit,
+      revertCommit,
+      resetToRef,
+      createPatch,
+      confirm,
+      currentBranch,
+      toastRun,
+      loadMoreGraph,
+      repositoryError,
+      refreshRepository,
+      sel,
+      toggleSelCommit,
+      setDock,
+      setDiffTargetSha,
+      setCompareSeedRef,
+      expanded,
+      toggleExpandCommit,
+      fetchCommitFiles,
+      openMenu,
+      prompt,
+      setView,
+      setDiffTab,
+      preferences
+    }),
+    [
+      repoPath,
+      filterOpen,
+      graphLayout,
+      f,
+      checkoutBranch,
+      createTag,
+      cherryPickCommit,
+      revertCommit,
+      resetToRef,
+      createPatch,
+      confirm,
+      currentBranch,
+      toastRun,
+      loadMoreGraph,
+      repositoryError,
+      refreshRepository,
+      sel,
+      toggleSelCommit,
+      expanded,
+      toggleExpandCommit,
+      fetchCommitFiles,
+      openMenu,
+      prompt,
+      preferences
+    ]
+  );
+
   return (
-    <GitClientContext.Provider
-      value={{
-        view,
-        setView,
-        theme,
-        setTheme,
-        toggleTheme,
-        dock,
-        setDock,
-        toggleDock,
-        consoleOpen,
-        setConsoleOpen,
-        toggleConsole,
-        paletteOpen,
-        setPaletteOpen,
-        paletteQ,
-        setPaletteQ,
-        openPalette,
-        closePalette,
-        menu,
-        openMenu,
-        closeMenu,
-        dialog,
-        confirm,
-        prompt,
-        closeDialog,
-        confirmDialog,
-        promptDialogValue,
-        setPromptDialogValue,
-        patchDialogContent,
-        setPatchDialogContent,
-        cloneDialogUrl,
-        setCloneDialogUrl,
-        cloneDialogUseGit,
-        setCloneDialogUseGit,
-        remoteDialogName,
-        setRemoteDialogName,
-        remoteDialogUrl,
-        setRemoteDialogUrl,
-        toast,
-        toastPct,
-        toastRun,
-        cancelToast,
-        op,
-        setOp,
-        opContinue,
-        opSkip,
-        opAbort,
-        sel,
-        setSel,
-        toggleSelCommit,
-        diffTargetSha,
-        setDiffTargetSha,
-        diffTargetPath,
-        setDiffTargetPath,
-        compareSeedRef,
-        setCompareSeedRef,
-        findCommitIndexBySha,
-        expanded,
-        toggleExpandCommit,
-        graphLayout,
-        setGraphLayout,
-        compareMode,
-        setCompareMode,
-        compareLayout,
-        setCompareLayout,
-        filterOpen,
-        setFilterOpen,
-        f,
-        setF,
-        cf,
-        setCf,
-        branchQ,
-        setBranchQ,
-        scTab,
-        setScTab,
-        diffTab,
-        setDiffTab,
-        consoleLines,
-        log,
-        clearConsole,
-        commitMsg,
-        setCommitMsg,
-        commits,
-        totalCommitCount,
-        getCommitHash,
-        getCommitFullSha,
-        graphData,
-        graphHasMore,
-        graphLoading,
-        graphLoadingMore,
-        loadMoreGraph,
-        repositoryError,
-        refreshRepository,
-        stagedFiles,
-        unstagedFiles,
-        untrackedFiles,
-        stashes,
-        worktrees,
-        submodules,
-        refreshWorktrees,
-        refreshSubmodules,
-        refreshStatus,
-        addWorktree,
-        removeWorktree,
-        lockWorktree,
-        unlockWorktree,
-        pruneWorktrees,
-        openPathInFileManager,
-        openPathInTerminal,
-        initSubmodule,
-        updateSubmodule,
-        syncSubmodule,
-        deinitSubmodule,
-        checkoutRecordedSubmoduleCommit,
-        pullSubmoduleTrackedBranch,
-        getSubmodulePointerDiff,
-        stageSubmodulePointer,
-        checkoutBranch,
-        checkoutTrackingBranch,
-        resolveConflictSide,
-        renameBranch,
-        deleteBranch,
-        setUpstream,
-        mergeBranch,
-        rebaseBranch,
-        resetToRef,
-        cherryPickCommit,
-        revertCommit,
-        createTag,
-        deleteTag,
-        stageFile,
-        stageAll,
-        unstageFile,
-        unstageAll,
-        discardChanges,
-        discardAll,
-        commitChanges,
-        createStash,
-        applyStash,
-        dropStash,
-        fetchCommitFiles,
-        matchesFilter,
-        matchesCompareFilter,
-        doFetch,
-        doPull,
-        doPush,
-        doSync,
-        createBranch,
-        openRepository,
-        cloneRepository,
-        closeRepository,
-        knownRepositories,
-        selectRepository,
-        forgetRepository,
-        recentBranches,
-        actionBusy,
-        activeRemoteAction,
-        aiMessage,
-        aiBusy,
-        aiConfig,
-        updateAIConfig,
-        updateAll,
-        paletteAll,
-        runPaletteQuery,
-        repoName,
-        repoPath,
-        currentBranch,
-        aheadCount,
-        behindCount,
-        onFetchProp: props.onFetch,
-        onPullProp: props.onPull,
-        onPushProp: props.onPush,
-        getCompare,
-        createPatch,
-        applyPatchText,
-        createComparePatch,
-        copyStagedPatch,
-        openApplyPatchDialog,
-        addRemote,
-        setRemoteUrl,
-        deleteRemote,
-        getRemotes,
-        openAddRemoteDialog,
-        openEditRemoteDialog,
-        preferences,
-        updatePreference,
-        keybindings,
-        canCommitNow,
-        setKeybinding,
-        resetKeybinding,
-        resetAllKeybindings
-      }}
-    >
-      {children}
-    </GitClientContext.Provider>
+    <GitGraphInteractionContext.Provider value={graphInteractions}>
+      <GitClientContext.Provider
+        value={{
+          view,
+          setView,
+          theme,
+          setTheme,
+          toggleTheme,
+          dock,
+          setDock,
+          toggleDock,
+          consoleOpen,
+          setConsoleOpen,
+          toggleConsole,
+          paletteOpen,
+          setPaletteOpen,
+          paletteQ,
+          setPaletteQ,
+          openPalette,
+          closePalette,
+          menu,
+          openMenu,
+          closeMenu,
+          dialog,
+          confirm,
+          prompt,
+          closeDialog,
+          confirmDialog,
+          promptDialogValue,
+          setPromptDialogValue,
+          patchDialogContent,
+          setPatchDialogContent,
+          cloneDialogUrl,
+          setCloneDialogUrl,
+          cloneDialogUseGit,
+          setCloneDialogUseGit,
+          remoteDialogName,
+          setRemoteDialogName,
+          remoteDialogUrl,
+          setRemoteDialogUrl,
+          toast,
+          toastPct,
+          toastRun,
+          cancelToast,
+          op,
+          setOp,
+          opContinue,
+          opSkip,
+          opAbort,
+          sel,
+          setSel,
+          toggleSelCommit,
+          diffTargetSha,
+          setDiffTargetSha,
+          diffTargetPath,
+          setDiffTargetPath,
+          compareSeedRef,
+          setCompareSeedRef,
+          findCommitIndexBySha,
+          expanded,
+          toggleExpandCommit,
+          graphLayout,
+          setGraphLayout,
+          compareMode,
+          setCompareMode,
+          compareLayout,
+          setCompareLayout,
+          filterOpen,
+          setFilterOpen,
+          f,
+          setF,
+          cf,
+          setCf,
+          branchQ,
+          setBranchQ,
+          scTab,
+          setScTab,
+          diffTab,
+          setDiffTab,
+          consoleLines,
+          log,
+          clearConsole,
+          commitMsg,
+          setCommitMsg,
+          commits,
+          totalCommitCount,
+          getCommitHash,
+          getCommitFullSha,
+          graphData,
+          graphHasMore,
+          graphLoading,
+          graphLoadingMore,
+          loadMoreGraph,
+          repositoryError,
+          refreshRepository,
+          stagedFiles,
+          unstagedFiles,
+          untrackedFiles,
+          stashes,
+          worktrees,
+          submodules,
+          refreshWorktrees,
+          refreshSubmodules,
+          refreshStatus,
+          addWorktree,
+          removeWorktree,
+          lockWorktree,
+          unlockWorktree,
+          pruneWorktrees,
+          openPathInFileManager,
+          openPathInTerminal,
+          initSubmodule,
+          updateSubmodule,
+          syncSubmodule,
+          deinitSubmodule,
+          checkoutRecordedSubmoduleCommit,
+          pullSubmoduleTrackedBranch,
+          getSubmodulePointerDiff,
+          stageSubmodulePointer,
+          checkoutBranch,
+          checkoutTrackingBranch,
+          resolveConflictSide,
+          renameBranch,
+          deleteBranch,
+          setUpstream,
+          mergeBranch,
+          rebaseBranch,
+          resetToRef,
+          cherryPickCommit,
+          revertCommit,
+          createTag,
+          deleteTag,
+          stageFile,
+          stageAll,
+          unstageFile,
+          unstageAll,
+          discardChanges,
+          discardAll,
+          commitChanges,
+          createStash,
+          applyStash,
+          dropStash,
+          fetchCommitFiles,
+          matchesFilter,
+          matchesCompareFilter,
+          doFetch,
+          doPull,
+          doPush,
+          doSync,
+          createBranch,
+          openRepository,
+          cloneRepository,
+          closeRepository,
+          knownRepositories,
+          selectRepository,
+          forgetRepository,
+          recentBranches,
+          actionBusy,
+          activeRemoteAction,
+          aiMessage,
+          aiBusy,
+          aiConfig,
+          updateAIConfig,
+          updateAll,
+          paletteAll,
+          runPaletteQuery,
+          repoName,
+          repoPath,
+          currentBranch,
+          aheadCount,
+          behindCount,
+          onFetchProp: props.onFetch,
+          onPullProp: props.onPull,
+          onPushProp: props.onPush,
+          getCompare,
+          createPatch,
+          applyPatchText,
+          createComparePatch,
+          copyStagedPatch,
+          openApplyPatchDialog,
+          addRemote,
+          setRemoteUrl,
+          deleteRemote,
+          getRemotes,
+          openAddRemoteDialog,
+          openEditRemoteDialog,
+          preferences,
+          updatePreference,
+          keybindings,
+          canCommitNow,
+          setKeybinding,
+          resetKeybinding,
+          resetAllKeybindings
+        }}
+      >
+        {children}
+      </GitClientContext.Provider>
+    </GitGraphInteractionContext.Provider>
   );
 };
 
@@ -3740,6 +3870,14 @@ export const useGitClient = (): GitClientContextType => {
   const ctx = useContext(GitClientContext);
   if (!ctx) {
     throw new Error('useGitClient must be used within a GitClientProvider');
+  }
+  return ctx;
+};
+
+export const useGitGraphInteractions = (): GitGraphInteractionContextType => {
+  const ctx = useContext(GitGraphInteractionContext);
+  if (!ctx) {
+    throw new Error('useGitGraphInteractions must be used within a GitClientProvider');
   }
   return ctx;
 };

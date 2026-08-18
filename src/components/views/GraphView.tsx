@@ -1,6 +1,12 @@
 import { tauriGitBackend } from '../../services/tauriGitBackend';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useGitClient, refBadge, statusColor, COLORS } from '../../context/GitClientContext';
+import {
+  useGitGraphInteractions,
+  refBadge,
+  statusColor,
+  COLORS,
+  buildGraphData
+} from '../../context/GitClientContext';
 import { Input } from '../common/FormControls';
 import { Button } from '../common/Button';
 import { Tag } from '../common/Tag';
@@ -10,7 +16,14 @@ import { ResetDialog } from '../common/ResetDialog';
 import { DiffViewer } from '../common/DiffViewer';
 import { isEditableTarget } from '../../hooks/useKeybindings';
 import { useDiffContent, DiffContentSource } from '../../hooks/useDiffContent';
-import { DiffFile, GraphRowData } from '../../types/git-client';
+import { CommitRaw, DiffFile, GraphRowData } from '../../types/git-client';
+import { useAppSelector } from '../../store/hooks';
+import {
+  selectGraphHasMore,
+  selectGraphLoading,
+  selectGraphLoadingMore,
+  selectGraphRows
+} from '../../store/selectors';
 
 interface GraphFilterOption {
   value: string;
@@ -303,9 +316,6 @@ export const GraphView: React.FC = () => {
     setGraphLayout,
     f,
     setF,
-    commits,
-    getCommitHash,
-    getCommitFullSha,
     checkoutBranch,
     createTag,
     cherryPickCommit,
@@ -315,10 +325,6 @@ export const GraphView: React.FC = () => {
     confirm,
     currentBranch,
     toastRun,
-    graphData,
-    graphHasMore,
-    graphLoading,
-    graphLoadingMore,
     loadMoreGraph,
     repositoryError,
     refreshRepository,
@@ -330,13 +336,55 @@ export const GraphView: React.FC = () => {
     expanded,
     toggleExpandCommit,
     fetchCommitFiles,
-    matchesFilter,
     openMenu,
     prompt,
     setView,
     setDiffTab,
     preferences
-  } = useGitClient();
+  } = useGitGraphInteractions();
+  const graphRows = useAppSelector(selectGraphRows);
+  const graphHasMore = useAppSelector(selectGraphHasMore);
+  const graphLoading = useAppSelector(selectGraphLoading);
+  const graphLoadingMore = useAppSelector(selectGraphLoadingMore);
+  const commits = useMemo<CommitRaw[]>(() => {
+    const indexBySha = new Map(graphRows.map((row, index) => [row.sha, index]));
+    return graphRows.map(row => {
+      const parentIndexes = row.parents
+        .map(parent => indexBySha.get(parent))
+        .filter((index): index is number => index !== undefined);
+      return [
+        row.subject,
+        row.author,
+        row.date.replace('T', ' ').replace('Z', '').slice(0, 16),
+        parentIndexes,
+        row.refs
+      ];
+    });
+  }, [graphRows]);
+  const graphData = useMemo(() => buildGraphData(commits), [commits]);
+  const getCommitHash = useCallback(
+    (index: number) => graphRows[index]?.shortSha || '',
+    [graphRows]
+  );
+  const getCommitFullSha = useCallback((index: number) => graphRows[index]?.sha || '', [graphRows]);
+  const matchesFilter = useCallback(
+    (index: number) => {
+      const commit = commits[index];
+      if (!commit) return false;
+      if (f.authors.length && !f.authors.some(author => commit[1] === author)) return false;
+      if (f.msg && !commit[0].toLowerCase().includes(f.msg.toLowerCase())) return false;
+      if (f.from && commit[2] < `${f.from} 00:00`) return false;
+      if (f.to && commit[2] > `${f.to} 23:59`) return false;
+      if (
+        f.refs.length &&
+        !f.refs.some(ref => (commit[4] || []).some(item => item.includes(ref)))
+      ) {
+        return false;
+      }
+      return true;
+    },
+    [commits, f]
+  );
 
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
